@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Wrangler local state and generated files
+.wrangler/
+
+# Build artifacts
+dist/
+coverage/
+
+# Environment and local editor files
+.env
+.env.*
+!.env.example
+.vscode/
+.DS_Store

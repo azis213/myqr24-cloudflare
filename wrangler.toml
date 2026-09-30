@@ -1,0 +1,7 @@
+name = "myqr24-cloudflare"
+main = "src/index.ts"
+compatibility_date = "2026-09-30"
+
+# TypeScript source files are compiled by Wrangler automatically.
+# Add bindings (KV, D1, R2, Durable Objects, secrets) here as the
+# edge-routing and NFC/QR infrastructure evolves.
