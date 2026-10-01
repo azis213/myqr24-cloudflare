@@ -14,3 +14,6 @@ coverage/
 !.env.example
 .vscode/
 .DS_Store
+
+# graphify-axet
+.graphify/

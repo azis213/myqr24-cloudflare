@@ -1,7 +1,45 @@
-name = "myqr24-cloudflare"
+name = "myqr24-edge-routing"
 main = "src/index.ts"
 compatibility_date = "2026-09-30"
 
 # TypeScript source files are compiled by Wrangler automatically.
-# Add bindings (KV, D1, R2, Durable Objects, secrets) here as the
-# edge-routing and NFC/QR infrastructure evolves.
+#
+# Deployments are environment-specific. Create one KV namespace per environment,
+# then replace the corresponding namespace IDs below.
+#
+# Required secrets must be configured separately for every environment:
+#   npx wrangler secret put FEISTEL_SECRET --env staging
+#   npx wrangler secret put TAG_HMAC_SECRET --env staging
+#   npx wrangler secret put REDIRECT_SIGNING_SECRET --env staging
+#
+#   npx wrangler secret put FEISTEL_SECRET --env production
+#   npx wrangler secret put TAG_HMAC_SECRET --env production
+#   npx wrangler secret put REDIRECT_SIGNING_SECRET --env production
+#
+# Configure the Worker routes in the Cloudflare dashboard after deployment:
+#   s.qx4.uk/*       -> myqr24-edge-routing-staging
+#   s.myqr24.com/t/* -> myqr24-edge-routing-staging
+#   qx4.uk/*         -> myqr24-edge-routing
+#   p.myqr24.com/t/* -> myqr24-edge-routing
+#
+# Do not bind staging and production to the same KV namespace or secrets.
+
+[env.staging]
+name = "myqr24-edge-routing-staging"
+
+[env.staging.vars]
+SCAN_ENVIRONMENT = "staging"
+
+# [[env.staging.kv_namespaces]]
+# binding = "TAG_CONFIG"
+# id = "<staging-kv-namespace-id>"
+
+[env.production]
+name = "myqr24-edge-routing"
+
+[env.production.vars]
+SCAN_ENVIRONMENT = "production"
+
+# [[env.production.kv_namespaces]]
+# binding = "TAG_CONFIG"
+# id = "<production-kv-namespace-id>"

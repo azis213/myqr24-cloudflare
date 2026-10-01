@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "secrets": {
+    "FEISTEL_SECRET": "test-feistel-secret",
+    "TAG_HMAC_SECRET": "test-hmac-secret",
+    "REDIRECT_SIGNING_SECRET": "test-redirect-signing-secret"
+  },
+  "groups": {
+    "group-default": {
+      "id": "group-default",
+      "featureIds": [
+        "json-default"
+      ]
+    }
+  },
+  "features": {
+    "json-default": {
+      "id": "json-default",
+      "type": "json",
+      "enabled": true,
+      "payload": {
+        "campaign": "default"
+      }
+    },
+    "redirect-default": {
+      "id": "redirect-default",
+      "type": "redirect",
+      "enabled": true,
+      "url": "https://destination.example.test/fixed",
+      "status": 302
+    },
+    "redirect-range": {
+      "id": "redirect-range",
+      "type": "redirect",
+      "enabled": true,
+      "urlTemplate": "https://app.example.test/tag/{tagId}?id={decodedValue}&group={groupId}&length={length}",
+      "status": 307
+    },
+    "redirect-tag": {
+      "id": "redirect-tag",
+      "type": "redirect",
+      "enabled": true,
+      "url": "https://destination.example.test/tag-override",
+      "status": 301
+    },
+    "redirect-signed": {
+      "id": "redirect-signed",
+      "type": "redirect",
+      "enabled": true,
+      "urlTemplate": "https://app.example.test/one-time?tag={tagId}&id={decodedValue}",
+      "signing": {
+        "ttlSeconds": 60
+      },
+      "status": 302
+    },
+    "disabled-feature": {
+      "id": "disabled-feature",
+      "type": "json",
+      "enabled": false,
+      "payload": {
+        "ignored": true
+      }
+    },
+    "unsafe-redirect": {
+      "id": "unsafe-redirect",
+      "type": "redirect",
+      "enabled": true,
+      "url": "javascript:alert(1)",
+      "status": 302
+    },
+    "unknown-placeholder": {
+      "id": "unknown-placeholder",
+      "type": "redirect",
+      "enabled": true,
+      "urlTemplate": "https://app.example.test/{tenant}",
+      "status": 302
+    },
+    "signature-placeholder": {
+      "id": "signature-placeholder",
+      "type": "redirect",
+      "enabled": true,
+      "urlTemplate": "https://app.example.test/{tagSignature}",
+      "status": 302
+    }
+  }
+}
