@@ -309,6 +309,8 @@ Die jeweilige PWA/API erzwingt die fachlichen Regeln serverseitig: Bei `tag-chat
 
 `tag-checkin` ist der einzige neue Routing-Feature-Typ für Besuche. Collection, Challenge und Campaign sind keine separaten Edge-Features und enthalten weder Koordinaten noch Scan-Historie im KV. Die vollständige fachliche Spezifikation ist [TAG Check-in, Collections & Campaigns](20-Special-Specifications/TAG_CHECKIN_COLLECTIONS_CAMPAIGNS.md).
 
+POI-/Community-TAGs für Gipfel, Hütten, Museen, touristische Orte und ähnliche öffentliche Standorte sind ebenfalls **keine zusätzlichen Edge-Feature-Typen**. Sie sind eine autorisierte Produktklasse, die `tag-vault` und optional `tag-checkin` sowie `tag-guestbook` kombiniert. Betreiberprüfung, Anbringungszustimmung, Laufzeit, Moderation, Meldeweg, Status und Kontingente werden ausschließlich durch die Application API und Datenbank umgesetzt; sie gehören niemals in `TAG_CONFIG`. Die vollständige Produkt- und Schutzspezifikation steht in [TAG-Typen und POI-/Community-TAGs](20-Special-Specifications/TAG_TYPES_AND_POI_FEATURES.md).
+
 ### Feature-Zuweisung
 
 Nach erfolgreicher Range-Bestätigung bestimmt die spezifischste nicht leere Liste die primäre Aktion:

@@ -338,6 +338,8 @@ Ein reines Public-Tag ist kein eigener Datentyp: Es ist ein Vault mit ausschlie�
 
 Das Profil `summit-guide` steuert ausschließlich die öffentliche Darstellung. GEO-verifizierte Besuche, Collection-Einträge, Campaign-Credits und deren Berechtigungen gehören zum separaten Feature `tag-checkin`; die verbindliche Regelung steht in [TAG Check-in, Collections & Campaigns](TAG_CHECKIN_COLLECTIONS_CAMPAIGNS.md).
 
+Für öffentliche Gipfel-, Hütten-, Museums-, Tourismus- und Community-TAGs gelten zusätzlich die Produkt-, Betreiber-, Anbringungs-, Laufzeit-, Moderations- und Meldeanforderungen aus [TAG-Typen und POI-/Community-TAGs](TAG_TYPES_AND_POI_FEATURES.md). Ein `summit-guide`-Profil allein macht ein TAG nicht zu einem autorisierten POI-TAG.
+
 Inhalte werden nicht als frei ausführbares HTML gespeichert, sondern als serverseitig validierte Inhaltsblöcke. JavaScript, Inline-Eventhandler, frei eingebettete iFrames und externe Skripte sind in Vault-Inhalten nicht zulässig.
 
 ```ts
@@ -600,7 +602,12 @@ export interface VaultFeature {
   type: "tag-vault";
   enabled: true;
   appUrlTemplate: string;
-  presentation?: "standard" | "gallery" | "public-page" | "museum-exhibit";
+  presentation?:
+    | "standard"
+    | "gallery"
+    | "public-page"
+    | "museum-exhibit"
+    | "summit-guide";
   accessMode?: "mixed" | "public-only" | "private-first";
   display?: {
     publicActionMode?: "hidden" | "footer-menu" | "owner-only" | "access-request";
