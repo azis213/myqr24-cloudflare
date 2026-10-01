@@ -30,9 +30,9 @@ name = "myqr24-edge-routing-staging"
 [env.staging.vars]
 SCAN_ENVIRONMENT = "staging"
 
-# [[env.staging.kv_namespaces]]
-# binding = "TAG_CONFIG"
-# id = "<staging-kv-namespace-id>"
+[[env.staging.kv_namespaces]]
+binding = "TAG_CONFIG"
+id = "e05d3c9ead4b40b389e0e63db098e87a"
 
 [env.production]
 name = "myqr24-edge-routing"

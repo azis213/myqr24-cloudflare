@@ -4,6 +4,9 @@ node_modules/
 # Wrangler local state and generated files
 .wrangler/
 
+# Local Tag Lab registry (may contain non-public test tag IDs)
+.tag-lab/
+
 # Build artifacts
 dist/
 coverage/

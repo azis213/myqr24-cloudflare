@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1d4ed8" />
+    <meta
+      name="description"
+      content="myQR24 Staging-Test-PWA für die Verifikation von Tag-Weiterleitungen."
+    />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/app-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+    <title>myQR24 · Staging-Tag-Test</title>
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="test-card" aria-labelledby="page-title">
+        <div class="environment-badge">STAGING · TEST-PWA</div>
+        <p class="eyebrow">myQR24 Edge Tag Router</p>
+        <h1 id="page-title">Tag-Weiterleitung erfolgreich</h1>
+        <p class="intro">
+          Diese Seite ist ausschließlich der sichtbare Nachweis für eine
+          erfolgreiche Weiterleitung eines Staging-NFC- oder QR-Tags.
+        </p>
+
+        <dl class="details">
+          <div>
+            <dt>Tag-ID</dt>
+            <dd id="tag-id">Wird ermittelt …</dd>
+          </div>
+          <div>
+            <dt>Aufgerufene URL</dt>
+            <dd id="requested-url" class="breakable">Wird ermittelt …</dd>
+          </div>
+          <div>
+            <dt>Zeitpunkt (lokal)</dt>
+            <dd id="timestamp">Wird ermittelt …</dd>
+          </div>
+          <div>
+            <dt>Redirect-Ablauf (`exp`)</dt>
+            <dd id="redirect-expiry">Nicht vorhanden</dd>
+          </div>
+          <div>
+            <dt>Redirect-Signatur (`sig`)</dt>
+            <dd id="redirect-signature">Nicht vorhanden</dd>
+          </div>
+        </dl>
+
+        <p class="notice">
+          Signatur- und Ablaufparameter werden nur angezeigt. Diese Test-PWA
+          bewertet sie nicht und ersetzt keine serverseitige Prüfung.
+        </p>
+      </section>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

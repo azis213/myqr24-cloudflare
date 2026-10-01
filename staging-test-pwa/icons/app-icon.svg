@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">myQR24 Staging-Test</title>
+  <rect width="512" height="512" rx="112" fill="#1d4ed8" />
+  <path
+    fill="#fff"
+    d="M136 136h104v104H136zm24 24v56h56v-56zm112-24h104v104H272zm24 24v56h56v-56zM136 272h104v104H136zm24 24v56h56v-56zm144 0h32v32h-32zm40 0h32v32h-32zm-72 40h32v32h-32zm40 0h32v32h-32zm40 0h64v32h-64zm-40 40h32v32h-32zm40 0h32v32h-32zm40 0h32v32h-32z"
+  />
+  <text
+    x="256"
+    y="454"
+    fill="#bfdbfe"
+    font-family="Arial, sans-serif"
+    font-size="42"
+    font-weight="700"
+    text-anchor="middle"
+  >STAGING</text>
+</svg>

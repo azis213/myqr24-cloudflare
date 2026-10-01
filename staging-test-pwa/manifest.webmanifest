@@ -1,0 +1,19 @@
+{
+  "name": "myQR24 Staging-Tag-Test",
+  "short_name": "myQR24 Test",
+  "description": "Statische PWA zur Verifikation der myQR24 Staging-Tag-Weiterleitung.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eff6ff",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
