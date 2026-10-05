@@ -33,4 +33,4 @@ Nach erfolgreicher Umsetzung wird pro Zeile:
 1. `Zielcode` auf konkrete exportierte Funktionen bzw. Testabschnitte präzisiert;
 2. der Status auf `implemented` gesetzt;
 3. erst nach erfolgreichem `npm test` und `npm run build` auf `verified` gesetzt;
-4. die Ausführung in [`evidence/README.md`](./evidence/README.md) aktualisiert.
+4. die Ausführung in [`../evidence/README.md`](../evidence/README.md) aktualisiert.

@@ -91,6 +91,7 @@ const RANGE_INDEX_KEY = "tag-range-index";
 const FEISTEL_ROUNDS = 10;
 const MAX_CYCLE_WALK_ITERATIONS = 128;
 const TAG_ID_PATTERN = /^(?:[0-9a-z]{6}|[0-9a-z]{8})$/i;
+const ROUTE_SEGMENTS = new Set(["t", "t1"]);
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const REDIRECT_STATUSES = new Set<RedirectStatus>([301, 302, 303, 307, 308]);
 const MIN_REDIRECT_TTL_SECONDS = 10;
@@ -173,7 +174,8 @@ function isTagLength(value: unknown): value is TagLength {
 }
 
 /**
- * Extracts a tag ID only from the URL shapes permitted for the deployment.
+ * Extracts a tag ID only from the case-insensitive, route-based URL shapes
+ * permitted for the deployment. Direct tag paths are deliberately rejected.
  * A staging Worker must never resolve production scan hosts and vice versa.
  */
 export function extractTagRequest(
@@ -184,16 +186,17 @@ export function extractTagRequest(
   const segments = url.pathname.split("/").filter(Boolean);
   const hosts = SCAN_HOSTS[environment];
 
-  const tagId =
-    hostname === hosts.short && segments.length === 1
-      ? segments[0]
-      : hostname === hosts.descriptive &&
-          segments.length === 2 &&
-          segments[0] === "t"
-        ? segments[1]
-        : null;
+  if (
+    (hostname !== hosts.short && hostname !== hosts.descriptive) ||
+    segments.length !== 2
+  ) {
+    return null;
+  }
 
-  if (!tagId || !TAG_ID_PATTERN.test(tagId)) {
+  const routeSegment = segments[0].toLowerCase();
+  const tagId = segments[1];
+
+  if (!ROUTE_SEGMENTS.has(routeSegment) || !TAG_ID_PATTERN.test(tagId)) {
     return null;
   }
 

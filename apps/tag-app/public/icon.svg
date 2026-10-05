@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title">
+  <title>myQR24 TAG</title>
+  <rect width="192" height="192" rx="40" fill="#12372a"/>
+  <path d="M47 47h34v34H47zm64 0h34v34h-34zM47 111h34v34H47zm18 18h16v16H65zm46-18h34v34h-34zm-18-36h16v16H93zm0 42h16v16H93z" fill="#f5c85b"/>
+  <circle cx="96" cy="96" r="14" fill="#f6f7f2"/>
+</svg>

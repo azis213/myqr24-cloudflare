@@ -1,0 +1,17 @@
+name = "myqr24-staging-test-pwa"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-10-02"
+
+# This Pages application renders public tag views. It intentionally has no
+# Worker, KV, D1, R2 or secret bindings in the public Vault MVP.
+#
+# Current staging project and temporary public URL:
+#   myqr24-staging-test-pwa -> https://myqr24-staging-test-pwa.pages.dev
+#
+# Configure the custom staging domain after the first deployment:
+#   app-staging.myqr24.com -> myqr24-staging-test-pwa
+#
+# Production will be a separate Pages project and custom domain.
+#
+# Future authenticated API integrations must be implemented as a separate
+# application API boundary, never by exposing router secrets to Pages.

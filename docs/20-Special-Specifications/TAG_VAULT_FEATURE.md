@@ -36,7 +36,9 @@ Die Scan-Ansicht zeigt daher niemals automatisch alle Inhalte. Sie zeigt stets n
 | **Tag Vault** | Inhaltsbereich eines einzelnen Tags. |
 | **Besitzer** | Person bzw. Konto, das den Tag administriert. |
 | **Scanner** | Person, die den QR-Code oder NFC-Tag scannt und die öffentliche Scan-Ansicht öffnet. |
-| **PIN** | Nur dem Besitzer bekannte lokale Geheimzahl zum Freischalten der Tag-Verwaltung. |
+| **Owner-PIN** | Geheimnis des Besitzers zum Freischalten der vollständigen Tag-Verwaltung. |
+| **Gast-PIN** | Optionales, vom Owner getrennt konfiguriertes Geheimnis für eingeschränkte Gastbeiträge. Sie gewährt niemals Owner-Rechte oder Sichtbarkeit privater Inhalte. |
+| **Gast-Session** | Kurzlebige, serverseitig ausgestellte Session für einen erfolgreichen Gast-PIN-Login; sie bindet vom Gast angelegte Inhalte an genau diese Sitzung. |
 | **Freigabe** | Zeitlich begrenzte Berechtigung, mit der ein Scanner zusätzlich als `shared` oder `private` markierte Inhalte sehen darf. |
 | **Asset** | Dateiinhalt wie Bild, PDF oder anderes zulässiges Dokument. |
 | **Notiz** | Textinhalt mit eigener Sichtbarkeit. |
@@ -107,7 +109,7 @@ Damit entsteht kein versehentlich öffentliches Dokument durch einen Standardwer
 
 ### 5.1 Öffentliche Scan-Ansicht
 
-Ein Scan auf `https://qx4.uk/{TAG-ID}` führt wie bisher durch den Edge Worker. Ist dem Tag ein Vault-Feature zugewiesen, leitet das Routing beispielsweise auf folgende feste PWA-Ansicht:
+Ein Scan auf `https://qx4.uk/t/{TAG-ID}` führt durch den Edge Worker. Das Routenpfadsegment und die TAG-ID werden case-insensitiv verarbeitet; erzeugte Links verwenden kanonisch Kleinschreibung. Route-lose TAG-URLs sind nicht zulässig. Ist dem Tag ein Vault-Feature zugewiesen, leitet das Routing beispielsweise auf folgende feste PWA-Ansicht:
 
 ```text
 https://app.myqr24.com/tag/{tagId}
@@ -411,7 +413,8 @@ CREATE TABLE tag_vaults (
   presentation TEXT NOT NULL DEFAULT 'standard',
   public_action_mode TEXT NOT NULL DEFAULT 'footer-menu',
   content_blocks_json TEXT NULL,
-  pin_hash TEXT NOT NULL,
+  owner_pin_hash TEXT NOT NULL,
+  guest_pin_hash TEXT NULL,
   pin_version INTEGER NOT NULL DEFAULT 1,
   failed_pin_attempts INTEGER NOT NULL DEFAULT 0,
   pin_locked_until TIMESTAMP NULL,
@@ -422,8 +425,8 @@ CREATE TABLE tag_vaults (
 
 Wichtige Regeln:
 
-- `pin_hash` ist ausschließlich ein langsamer Passwort-Hash, beispielsweise **Argon2id**.
-- Die PIN wird niemals im Klartext gespeichert, geloggt oder an den Client zurückgegeben.
+- `owner_pin_hash` und der optionale `guest_pin_hash` sind getrennte, langsame Passwort-Hashes, beispielsweise **Argon2id**; ein Rollenwechsel durch Wiederverwendung desselben Hashes ist unzulässig.
+- Zugangscodes werden niemals im Klartext gespeichert, geloggt oder an den Client zurückgegeben.
 - Ein zufälliger Salt gehört in den Passwort-Hash-Output.
 - Nach mehreren Fehlversuchen wird der Zugriff zeitweise gesperrt.
 - Der Besitz eines physischen Tags ist kein ausreichender Berechtigungsnachweis für private Inhalte.
@@ -498,10 +501,20 @@ AND expires_at > now
 AND revoked_at IS NULL
 ```
 
-### 7.4 Owner-Sessions und Audit
+### 7.4 Owner-, Gast-Sessions und Audit
 
 ```sql
 CREATE TABLE tag_owner_sessions (
+  id TEXT PRIMARY KEY,
+  tag_id TEXT NOT NULL REFERENCES tag_vaults(tag_id),
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  revoked_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL,
+  last_seen_at TIMESTAMP NULL
+);
+
+CREATE TABLE tag_guest_sessions (
   id TEXT PRIMARY KEY,
   tag_id TEXT NOT NULL REFERENCES tag_vaults(tag_id),
   token_hash TEXT NOT NULL UNIQUE,
@@ -538,7 +551,7 @@ Zu auditierende Ereignisse:
 Scanner / Besitzer-Browser
         │
         ▼
-qx4.uk/{tagId} oder p.myqr24.com/t/{tagId}
+qx4.uk/t/{tagId} oder p.myqr24.com/t/{tagId}
         │
         ▼
 Cloudflare Edge Worker
@@ -646,7 +659,37 @@ Die API prüft die aktuelle Sichtbarkeit bei jedem Abruf und gibt dann entweder:
 - einen sehr kurzlebigen signierten R2-Link aus, oder
 - streamt die Datei selbst.
 
-### 10.2 PIN-Entsperrung
+### 10.2 Zugangscode-Entsperrung und Gastrolle
+
+Die API behandelt Owner- und Gastzugang als getrennte Rollen. Eine Eingabe wird genau einmal per HTTPS an die API übertragen; der Browser erzeugt weder einen statischen Client-Hash noch erhält er Salt, Hash, Secret oder Rollenansprüche als frei speicherbares Token.
+
+```ts
+type AccessCodeFormat = "numeric" | "alphanumeric";
+
+type AccessCodeUiPolicy = {
+  format: AccessCodeFormat;
+  maxLength: 20;
+};
+```
+
+| Format | UI-Vorgabe | Serverseitige Validierung |
+| --- | --- | --- |
+| `numeric` | verdecktes Feld mit `inputmode="numeric"` und `pattern="[0-9]*"` | ausschließlich ASCII-Ziffern `0–9`, maximal 20 Zeichen |
+| `alphanumeric` | verdecktes Textfeld | `A-Z`, `a-z`, `0-9`, optional `-` und `_`; maximal 20 Zeichen |
+
+Die API prüft die Formatvorgabe unabhängig von der UI erneut. Nach erfolgreicher Argon2id-Prüfung stellt sie eine rollenbezogene `HttpOnly`, `Secure`, `SameSite=Strict`-Session aus. PIN-Felder werden im Browser nach dem Request geleert.
+
+Eine Gast-Session darf ausschließlich innerhalb derselben gültigen Session eigene Gastinhalte anlegen, bearbeiten und soft löschen. Sie darf niemals:
+
+- Owner-Inhalte, private Vault-Inhalte oder Owner-Metadaten lesen;
+- Sichtbarkeiten auf `public`, `private` oder `ownerOnly` setzen;
+- Freigaben, PINs, Sessions oder Limits verwalten;
+- fremde Gastinhalte bearbeiten oder löschen;
+- Upload-Limits umgehen.
+
+Die spätere API speichert bei einem Gastinhalt eine interne `created_by_guest_session_id`; die Autorisierung vergleicht sie mit der serverseitigen Session-ID, nicht mit einem Cookie-Rohwert oder der PIN.
+
+### 10.3 Owner-PIN-Entsperrung
 
 ```http
 POST /api/v1/tags/{tagId}/owner-sessions
@@ -665,7 +708,7 @@ Erfolgsantwort:
 
 Alternativ kann die PWA einen kurzlebigen Bearer-Token verwenden, jedoch ist ein `HttpOnly`-Cookie für denselben vertrauenswürdigen Origin meist sicherer.
 
-### 10.3 Inhalte verwalten
+### 10.4 Inhalte verwalten
 
 ```http
 GET    /api/v1/tags/{tagId}/owner/items
@@ -676,7 +719,7 @@ DELETE /api/v1/tags/{tagId}/owner/items/{itemId}
 
 Alle Endpunkte benötigen eine gültige Owner-Session und CSRF-Schutz, wenn Cookie-basierte Authentisierung verwendet wird.
 
-### 10.4 Direkt-Upload mit serverseitiger Freigabe
+### 10.5 Direkt-Upload mit serverseitiger Freigabe
 
 Empfohlener Ablauf:
 
@@ -697,7 +740,7 @@ Empfohlener Ablauf:
 
 Der Browser darf keinen frei wählbaren R2-Key verwenden. Der Key wird ausschließlich serverseitig vergeben.
 
-### 10.5 Freigabe verwalten
+### 10.6 Freigabe verwalten
 
 ```http
 POST /api/v1/tags/{tagId}/owner/grants
@@ -939,7 +982,7 @@ Zusätzlich werden Browser-Token, IP-basierte Limits und optional Turnstile/Bot-
 
 ## 12. Sicherheitsanforderungen
 
-### 12.1 PIN-Sicherheit
+### 12.1 PIN- und Gastzugangssicherheit
 
 - PINs mit **Argon2id** hashieren; bei fehlender Unterstützung mindestens bcrypt mit geeignetem Cost-Factor verwenden.
 - Keine schnelle SHA-256- oder HMAC-Hashung für PINs verwenden.
@@ -947,7 +990,8 @@ Zusätzlich werden Browser-Token, IP-basierte Limits und optional Turnstile/Bot-
 - Beispiel: nach 5 Fehlversuchen für mindestens 15 Minuten sperren.
 - Fehlerantworten bewusst generisch formulieren:  
   `PIN ungültig oder Zugang momentan gesperrt`.
-- PIN-Länge mindestens 6 Stellen; besser optional alphanumerischen Zugangscode oder Passkey ermöglichen.
+- Produktionszugangscodes haben maximal 20 Zeichen; numerische und alphanumerische Formate werden serverseitig strikt getrennt validiert.
+- Kurze, leicht merkbare Werte sind ausschließlich für explizit nicht produktive Staging-Seeds zulässig und gehören nie in öffentliche Fixtures, Client-Bundles oder API-Responses.
 - PIN-Änderung nur in einer bereits authentisierten Owner-Session oder mit zusätzlicher Konto-Verifikation erlauben.
 - Ohne Wiederherstellungsmodell kann eine verlorene PIN den Zugriff dauerhaft blockieren. Deshalb ist ein Besitzerkonto oder ein sicher verwahrter Recovery-Code für Produktion empfehlenswert.
 

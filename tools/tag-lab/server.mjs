@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { randomInt, webcrypto } from "node:crypto";
+import { networkInterfaces } from "node:os";
 import {
   existsSync,
   mkdirSync,
@@ -15,6 +16,16 @@ const HOST = process.env.HOST ?? "127.0.0.1";
 const SECRET_FILE = join(ROOT, ".env.staging.local");
 const STORE_FILE = join(ROOT, ".tag-lab", "staging-tags.json");
 const PUBLIC_DIR = join(import.meta.dirname, "public");
+
+const CONTENT_TEST_FIXTURES = [
+  { id: "trauung1", label: "Lea & Jonas – Hochzeit", description: "Galerie, Dokumente und lokale Gast-Demo" },
+  { id: "fest2026", label: "Hochzeitsfeier – nur ansehen", description: "Galerie ohne Gastuploads" },
+  { id: "menue202", label: "Hochzeit – Dokumente", description: "Einladung und Speisekarte" },
+  { id: "rsq45q", label: "Staging-Testtag", description: "Öffentliche Basisansicht" },
+  { id: "koffer24", label: "Reisekoffer", description: "Lost-&-Found-Kontext" },
+  { id: "album042", label: "Sommer am See", description: "Öffentliche Galerie" },
+  { id: "gipfel99", label: "Sonnspitze", description: "POI- und Sicherheitshinweise" },
+];
 
 const TAG_LENGTHS = new Set([6, 8]);
 const FEISTEL_ROUNDS = 10;
@@ -218,6 +229,36 @@ function scanUrl(tagId) {
   return `https://s.qx4.uk/${tagId}`;
 }
 
+function detectWlanAddress() {
+  const addresses = Object.values(networkInterfaces())
+    .flat()
+    .filter(
+      (address) =>
+        address &&
+        address.family === "IPv4" &&
+        !address.internal &&
+        /^192\.168\./.test(address.address),
+    );
+
+  return addresses[0]?.address ?? "127.0.0.1";
+}
+
+function contentTestBaseUrl() {
+  return (
+    process.env.TAG_APP_BASE_URL?.replace(/\/+$/, "") ??
+    `http://${detectWlanAddress()}:5173`
+  );
+}
+
+function contentTestTags() {
+  const baseUrl = contentTestBaseUrl();
+
+  return CONTENT_TEST_FIXTURES.map((fixture) => ({
+    ...fixture,
+    url: `${baseUrl}/tag/${fixture.id}`,
+  }));
+}
+
 function addConfiguredTags(store) {
   const configuredIds = (localEnvironment.TEST_TAGS ?? "")
     .split(",")
@@ -340,6 +381,34 @@ async function handler(request, response) {
       tags: store.tags.map(publicTag),
       capabilities: { generate6: true, generate8: Boolean(tagHmacSecret) },
     });
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/content-tags") {
+    return sendJson(response, 200, {
+      baseUrl: contentTestBaseUrl(),
+      tags: contentTestTags(),
+    });
+  }
+
+  const contentQrMatch = /^\/api\/content-tags\/([0-9a-z]{6}|[0-9a-z]{8})\/qr$/i.exec(
+    url.pathname,
+  );
+
+  if (request.method === "GET" && contentQrMatch) {
+    const id = contentQrMatch[1].toLowerCase();
+    const tag = contentTestTags().find((candidate) => candidate.id === id);
+
+    if (!tag) {
+      return send(response, 404, "Unknown local content test tag.");
+    }
+
+    const svg = await QRCode.toString(tag.url, {
+      type: "svg",
+      errorCorrectionLevel: "M",
+      margin: 2,
+      color: { dark: "#101b4b", light: "#ffffff" },
+    });
+    return send(response, 200, svg, "image/svg+xml; charset=utf-8");
   }
 
   if (request.method === "POST" && url.pathname === "/api/tags") {

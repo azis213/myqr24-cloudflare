@@ -6,17 +6,19 @@
 
 | Domain / Hostname | Zulässiger Pfad | Zweck | Verhalten |
 | --- | --- | --- | --- |
-| `qx4.uk` | `/{TAG-ID}` | Kurze NFC-/QR-Tag-URL | Tag auflösen |
-| `p.myqr24.com` | `/t/{TAG-ID}` | myQR24-Kompatibilitäts-URL | Tag auflösen |
+| `qx4.uk` | `/t/{TAG-ID}` oder `/t1/{TAG-ID}` | Kurze NFC-/QR-Tag-URL | Tag auflösen |
+| `p.myqr24.com` | `/t/{TAG-ID}` oder `/t1/{TAG-ID}` | myQR24-Kompatibilitäts-URL | Tag auflösen |
 
-Hosts werden unabhängig von Groß-/Kleinschreibung verglichen. Alle anderen Hosts, Pfade und zusätzliche Pfadsegmente liefern `404 Not Found`.
+Hosts, Routenpfadsegment und TAG-ID werden unabhängig von Groß-/Kleinschreibung verglichen und intern normalisiert. Die kanonische, durch myQR24 erzeugte Schreibweise lautet stets `/t/{tag-id-in-lowercase}`. Route-lose TAG-URLs wie `/{TAG-ID}`, zusätzliche Pfadsegmente sowie alle anderen Hosts und Pfade liefern `404 Not Found`.
+
+`/t/` ist die aktuelle Standard-Routenfamilie. `/t1/` ist bereits als erlaubte Erweiterungsroute vorhanden und nutzt bis zu ihrer gesonderten Aktivierung dieselbe Decoder-Konfiguration wie `/t/`. Eine spätere Routenfamilie darf ausschließlich per fester serverseitiger Allowlist an eine neue Decoder-/Secret-Version gebunden werden; weder der URL-Pfad noch KV-Konfiguration dürfen einen frei wählbaren Secret-Namen oder Schlüsselinhalt bestimmen.
 
 ## Tag-ID-Spezifikation
 
 | Eigenschaft | Regel |
 | --- | --- |
 | Alphabet | Base36: `0-9`, `a-z`; Eingaben sind case-insensitiv |
-| Längen | Genau 6 oder 8 Stellen |
+| Längen | Genau 6 oder 8 Stellen; beide Längen sind ausschließlich unter `/t/{TAG-ID}` oder `/t1/{TAG-ID}` zulässig |
 | Normalisierung | Tag-ID wird vor der Verarbeitung zu Kleinbuchstaben normalisiert |
 | Numerische Repräsentation | Verlustfreie Umwandlung in `BigInt` |
 | Fehlerbehandlung | Ungültige IDs werden nicht näher erläutert und liefern `404` |
@@ -147,7 +149,7 @@ Der Worker verwirft den vollständigen Index fail-closed, wenn ein Eintrag ungü
 
 Die Edge-Auflösung folgt zwingend dieser Reihenfolge:
 
-1. Öffentliche URL validieren und die Base36-Tag-ID normalisieren.
+1. Öffentliche URL validieren, das Routenpfadsegment sowie die Base36-Tag-ID normalisieren und ausschließlich die Routenfamilien `/t/` oder `/t1/` akzeptieren.
 2. Tag-ID per Feistel-Netz decodieren und in den kanonischen Längenraum zurückführen.
 3. Bei achtstelligen IDs `base = decodedValue & ~0x0f` bilden und den HMAC-Nibble prüfen. Bei Abweichung endet die Auflösung sofort mit `404`.
 4. Den vollständigen kanonischen `decodedValue` im globalen Range-Index suchen. Ohne passende **aktive** Range endet die Auflösung mit `404`.
@@ -408,7 +410,7 @@ AXX-Formate, Validierung und Mandanten-/Produktzuordnungen sind noch fachlich fe
 
 - Redirect-Ziele stammen ausschließlich aus geprüfter KV-Konfiguration.
 - Der Worker akzeptiert nur `GET` und `HEAD`; andere Methoden liefern `405 Method Not Allowed`.
-- Ungültige URL-Strukturen, Feistel-/HMAC-Fehler, fehlende Ranges, fehlende Gruppen und ungültige Konfigurationen liefern einheitlich `404`.
+- Ungültige URL-Strukturen — insbesondere route-lose sechs- oder achtstellige TAG-IDs und nicht erlaubte Routenpfadsegmente — sowie Feistel-/HMAC-Fehler, fehlende Ranges, fehlende Gruppen und ungültige Konfigurationen liefern einheitlich `404`.
 - Alle Tag-Werte und Range-Grenzen werden als `BigInt` verarbeitet.
 - Range-Keys sind vollständige kanonische Feistel-Ergebnisse; bei achtstelligen IDs gehören die vier HMAC-Bits zum Range-Key.
 - Eine HMAC-Prüfung für achtstellige IDs erfolgt vor jedem Range-, Tag- oder Gruppen-Lookup.

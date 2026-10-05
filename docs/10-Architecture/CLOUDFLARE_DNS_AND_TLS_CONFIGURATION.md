@@ -1,7 +1,7 @@
 # Cloudflare DNS- und TLS-Konfiguration für myQR24
 
 **Status:** Verbindliche Betriebsanleitung für Staging und Production  
-**Stand:** 2026-10-01  
+**Stand:** 2026-10-02  
 **Geltungsbereich:** DNS, Cloudflare Worker Routes, Cloudflare Pages Custom Domains und HTTPS für die myQR24 Scan- und PWA-Domains.
 
 ---
@@ -15,6 +15,7 @@ Der myQR24 Edge Tag Router wird auf Cloudflare Workers betrieben. Die Scan-Domai
 | Staging | kurze Scan-URL | `https://s.qx4.uk/{tagId}` | `myqr24-edge-routing-staging` |
 | Staging | sprechende Scan-URL | `https://s.myqr24.com/t/{tagId}` | `myqr24-edge-routing-staging` |
 | Staging | Test-PWA | `https://app-staging.myqr24.com/tag/{tagId}` | Pages `myqr24-staging-test-pwa` |
+| Staging | temporäres PWA-Ziel | `https://main.myqr24-staging-test-pwa.pages.dev/tag/{tagId}` | Pages Branch-Alias `main` |
 | Production | kurze Scan-URL | `https://qx4.uk/{tagId}` | `myqr24-edge-routing` |
 | Production | sprechende Scan-URL | `https://p.myqr24.com/t/{tagId}` | `myqr24-edge-routing` |
 | Production | spätere PWA | `https://app.myqr24.com/tag/{tagId}` | spätere Production-PWA |
@@ -54,11 +55,12 @@ Bereits bereitgestellte Cloudflare-Ressourcen:
 | Worker-URL | `https://myqr24-edge-routing-staging.azis213.workers.dev` |
 | Staging KV-Namespace | `staging-TAG_CONFIG` |
 | Pages-Projekt | `myqr24-staging-test-pwa` |
-| Temporäre Pages-URL | `https://myqr24-staging-test-pwa.pages.dev` |
+| Bestehende frühere Pages-URL | `https://myqr24-staging-test-pwa.pages.dev` |
+| Neuer stabiler Staging-PWA-Alias | `https://main.myqr24-staging-test-pwa.pages.dev` |
 | Testtag | `rsq45q` |
-| Temporäres Redirect-Ziel | `https://myqr24-staging-test-pwa.pages.dev/tag/{tagId}` |
+| Ziel nach kontrollierter KV-Umstellung | `https://main.myqr24-staging-test-pwa.pages.dev/tag/{tagId}` |
 
-Der temporäre `pages.dev`-Host ist erreichbar. Sobald `app-staging.myqr24.com` als Pages Custom Domain fertig eingerichtet ist, wird das KV-Feature auf die verbindliche Staging-PWA-Adresse umgestellt.
+Die neue React-/Vite-PWA ist über den stabilen Branch-Alias erreichbar. Die laufende Scan-Route verweist zum Stand 2026-10-02 noch auf die frühere projektweite `pages.dev`-Auslieferung; vor einer KV-Änderung muss der tatsächlich aktive Worker samt Namespace im Cloudflare-Dashboard identifiziert werden. Danach wird das Redirect-Feature kontrolliert auf den nachstehenden `main`-Alias umgestellt. Sobald `app-staging.myqr24.com` als Pages Custom Domain fertig eingerichtet ist, wird das KV-Feature auf die verbindliche Staging-PWA-Adresse umgestellt.
 
 ---
 
@@ -134,7 +136,7 @@ Erwartung:
 
 ```text
 302 Found
-Location: https://myqr24-staging-test-pwa.pages.dev/tag/rsq45q?exp=...&sig=...
+Location: https://main.myqr24-staging-test-pwa.pages.dev/tag/rsq45q?exp=...&sig=...
 ```
 
 Nach Umstellung auf die Custom Domain:
@@ -350,10 +352,10 @@ Diese Variante ist ausreichend, um die Worker- und Tag-Weiterleitung unmittelbar
    https://s.qx4.uk/rsq45q
    ```
 
-5. Der erwartete `302` führt zunächst auf:
+5. Nach der kontrollierten KV-Umstellung führt der erwartete `302` zunächst auf:
 
    ```text
-   https://myqr24-staging-test-pwa.pages.dev/tag/rsq45q
+   https://main.myqr24-staging-test-pwa.pages.dev/tag/rsq45q
    ```
 
 ### Variante B: Vollständige Staging-Topologie

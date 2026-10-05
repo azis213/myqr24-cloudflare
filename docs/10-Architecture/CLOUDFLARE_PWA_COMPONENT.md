@@ -3,6 +3,8 @@
 > **Status:** Architekturkonzept  
 > **Zweck:** Auslagerung der fachlichen Tag-Anwendung als eigenständige, vollständig auf Cloudflare betriebene PWA- und API-Komponente.  
 > **Geltungsbereich:** TAG Vault, TAG Chat, Lost & Found, TAG Guestbook sowie GEO-verifizierte TAG Check-ins mit Collections und Campaigns. Der bestehende Edge-Routing-Worker bleibt davon getrennt.
+>
+> **Implementierungsstand:** Dieses Dokument beschreibt die Zielarchitektur. Die tatsächlich deployte öffentliche Staging-MVP-App einschließlich Code-Struktur, Fixture-Adapter, Pages-Routing und Betriebsgrenzen ist ergänzend in [TAG_APP_ARCHITECTURE.md](TAG_APP_ARCHITECTURE.md) dokumentiert. Die verbindlichen Regeln für gemeinsame PWA-Navigation, Systemberechtigungen, lokale Präferenzen, serverseitige Capabilities und Fallbacks stehen im [Berechtigungs-, Datenschutz- und Capability-Modell](PWA_PERMISSION_AND_CAPABILITY_MODEL.md).
 
 ## 1. Architekturentscheidung
 

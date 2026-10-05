@@ -1,7 +1,7 @@
 # Implementierungsstatus
 
 > Letzte fachliche Bewertung: 2026-09-30  
-> Statuswerte und Übergangsregeln: [`README.md`](./README.md)
+> Statuswerte und Übergangsregeln: [`../README.md`](../README.md)
 
 ## Arbeitspakete
 
@@ -54,6 +54,6 @@ Nach Abschluss eines Arbeitspakets wird:
 1. der Status mindestens auf `implemented` gesetzt;
 2. die Traceability Matrix um Code- und Testreferenzen ergänzt;
 3. nach erfolgreichem Test und Build auf `verified` gesetzt;
-4. die konkrete Ausführung in [`evidence/README.md`](./evidence/README.md) referenziert.
+4. die konkrete Ausführung in [`../evidence/README.md`](../evidence/README.md) referenziert.
 
 `verified` setzt immer voraus, dass alle zugehörigen Testfälle grün sind und keine bekannte Abweichung zu `DOMAIN_RULES.md` oder `ARCHITECTURE.md` besteht.

@@ -53,10 +53,13 @@ function range(
   groupId = "group-default",
   active = true,
 ): TagRange {
+  const start = length === 8 ? value & ~0x0fn : value;
+  const end = length === 8 ? start + 15n : value;
+
   return {
     id,
-    start: value.toString(),
-    end: value.toString(),
+    start: start.toString(),
+    end: end.toString(),
     groupId,
     length,
     active,
@@ -117,8 +120,9 @@ function requestFor(
   id: string,
   init?: RequestInit,
   hostname = "qx4.uk",
+  route = "t",
 ): Request {
-  return new Request(`https://${hostname}/${id}`, init);
+  return new Request(`https://${hostname}/${route}/${id}`, init);
 }
 
 async function workerResponse(
@@ -135,20 +139,38 @@ async function workerResponse(
 
 describe("URL extraction", () => {
   it.each([
-    ["https://qx4.uk/Ab12Cd", "production", { id: "ab12cd", length: 6 }],
     [
-      "https://p.myqr24.com/t/ab12cd34",
+      "https://qx4.uk/T/Ab12Cd",
+      "production",
+      { id: "ab12cd", length: 6 },
+    ],
+    [
+      "https://qx4.uk/T/Ab12Cd34",
       "production",
       { id: "ab12cd34", length: 8 },
     ],
-    ["https://s.qx4.uk/Ab12Cd", "staging", { id: "ab12cd", length: 6 }],
     [
-      "https://s.myqr24.com/t/ab12cd34",
+      "https://p.myqr24.com/t1/ab12cd34",
+      "production",
+      { id: "ab12cd34", length: 8 },
+    ],
+    [
+      "https://s.qx4.uk/t/Ab12Cd34",
+      "staging",
+      { id: "ab12cd34", length: 8 },
+    ],
+    [
+      "https://s.myqr24.com/T1/Ab12Cd",
+      "staging",
+      { id: "ab12cd", length: 6 },
+    ],
+    [
+      "https://s.myqr24.com/T1/ab12cd34",
       "staging",
       { id: "ab12cd34", length: 8 },
     ],
   ])(
-    "TC-URL-001/002 extracts a valid %s tag from %s",
+    "TC-URL-001/002 extracts an eight-character tag from a case-insensitive route",
     (input, environment, expected) => {
       expect(
         extractTagRequest(new URL(input), environment as ScanEnvironment),
@@ -157,24 +179,26 @@ describe("URL extraction", () => {
   );
 
   it.each([
-    "https://qx4.uk/t/ab12cd",
-    "https://qx4.uk/ab12cd/extra",
-    "https://p.myqr24.com/ab12cd",
-    "https://p.myqr24.com/t/ab12c!",
-    "https://p.myqr24.com/t/ab12c",
-    "https://s.qx4.uk/ab12cd",
-    "https://s.myqr24.com/t/ab12cd",
-    "https://untrusted.example/ab12cd",
+    "https://qx4.uk/ab12cd",
+    "https://qx4.uk/ab12cd34",
+    "https://qx4.uk/t/ab12c",
+    "https://qx4.uk/t2/ab12cd34",
+    "https://qx4.uk/t/ab12cd34/extra",
+    "https://p.myqr24.com/t/ab12cd3!",
+    "https://p.myqr24.com/t/ab12cd3",
+    "https://s.qx4.uk/t/ab12cd34",
+    "https://s.myqr24.com/ab12cd34",
+    "https://untrusted.example/t/ab12cd34",
   ])("TC-URL-003 rejects unsupported production URL shape: %s", (input) => {
     expect(extractTagRequest(new URL(input), "production")).toBeNull();
   });
 
   it("TC-URL-004 rejects scan hosts assigned to the other environment", () => {
     expect(
-      extractTagRequest(new URL("https://s.qx4.uk/ab12cd"), "production"),
+      extractTagRequest(new URL("https://s.qx4.uk/t/ab12cd34"), "production"),
     ).toBeNull();
     expect(
-      extractTagRequest(new URL("https://qx4.uk/ab12cd"), "staging"),
+      extractTagRequest(new URL("https://qx4.uk/t/ab12cd34"), "staging"),
     ).toBeNull();
   });
 });
@@ -188,7 +212,7 @@ describe("canonical ID and HMAC primitives", () => {
 
   it("TC-CRYPTO-001 decodes a generated six-character tag into I(6)", async () => {
     const tag = await sixTag();
-    const request = extractTagRequest(new URL(`https://qx4.uk/${tag.id}`));
+    const request = extractTagRequest(new URL(`https://qx4.uk/t/${tag.id}`));
 
     await expect(decodeTagId(request!, secrets)).resolves.toBe(tag.value);
     expect(tag.value).toBeGreaterThanOrEqual(36n ** 5n);
@@ -197,7 +221,7 @@ describe("canonical ID and HMAC primitives", () => {
 
   it("TC-CRYPTO-002 and TC-HMAC-001 retain the complete valid 8-character integer", async () => {
     const tag = await eightTag();
-    const request = extractTagRequest(new URL(`https://qx4.uk/${tag.id}`));
+    const request = extractTagRequest(new URL(`https://qx4.uk/t/${tag.id}`));
 
     await expect(decodeTagId(request!, secrets)).resolves.toBe(tag.value);
     expect(tag.value).toBeGreaterThanOrEqual(36n ** 7n);
@@ -209,7 +233,7 @@ describe("canonical ID and HMAC primitives", () => {
     const tag = await eightTag();
     const wrongValue = tag.base | ((tag.value + 1n) & 0x0fn);
     const wrongTag = await publicTag(wrongValue, 8);
-    const request = extractTagRequest(new URL(`https://qx4.uk/${wrongTag.id}`));
+    const request = extractTagRequest(new URL(`https://qx4.uk/t/${wrongTag.id}`));
 
     await expect(decodeTagId(request!, secrets)).resolves.toBeNull();
   });

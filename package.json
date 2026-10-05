@@ -1,23 +1,33 @@
 {
   "name": "myqr24-cloudflare",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Cloudflare Worker for edge routing and NFC/QR tag infrastructure.",
+  "description": "myQR24 Cloudflare edge router and public tag application.",
   "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "wrangler dev",
-    "build": "tsc --noEmit && wrangler deploy --dry-run --outdir dist",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "deploy": "wrangler deploy",
+    "dev": "npm run dev:router",
+    "dev:router": "npm run dev --workspace=@myqr24/edge-router",
+    "dev:app": "npm run dev --workspace=@myqr24/tag-app",
+    "build": "npm run build:router && npm run build:app",
+    "build:router": "npm run build --workspace=@myqr24/edge-router",
+    "build:app": "npm run build --workspace=@myqr24/tag-app",
+    "test": "npm run test:router && npm run test:app",
+    "test:router": "npm run test --workspace=@myqr24/edge-router",
+    "test:app": "npm run test --workspace=@myqr24/tag-app",
+    "test:watch": "npm run test:watch --workspace=@myqr24/edge-router",
+    "deploy": "npm run deploy:router",
+    "deploy:router": "npm run deploy --workspace=@myqr24/edge-router",
+    "deploy:router:staging": "npm run deploy:staging --workspace=@myqr24/edge-router",
+    "deploy:app": "npm run deploy --workspace=@myqr24/tag-app",
+    "deploy:app:staging": "npm run deploy:staging --workspace=@myqr24/tag-app",
     "tag-lab": "node tools/tag-lab/server.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260926.1",
     "@types/qrcode": "^1.5.6",
-    "typescript": "^5.7.3",
-    "vitest": "^3.0.7",
-    "wrangler": "^4.5.0"
+    "typescript": "^5.7.3"
   },
   "dependencies": {
     "qrcode": "^1.5.4"

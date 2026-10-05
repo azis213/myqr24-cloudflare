@@ -93,6 +93,59 @@
         color: #34466a;
       }
 
+      .content-test-panel {
+        margin-bottom: 1.5rem;
+      }
+
+      .content-test-panel h2 {
+        margin-bottom: 0.4rem;
+      }
+
+      .content-test-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 1.25rem;
+      }
+
+      .content-test-card {
+        display: grid;
+        gap: 0.75rem;
+        padding: 1rem;
+        border: 1px solid #d7e2f6;
+        border-radius: 1rem;
+        background: #f9fbff;
+      }
+
+      .content-test-card img {
+        width: 100%;
+        max-width: 13rem;
+        justify-self: center;
+        border: 1px solid #dae3f3;
+        background: white;
+        padding: 0.5rem;
+      }
+
+      .content-test-card h3,
+      .content-test-card p {
+        margin: 0;
+      }
+
+      .content-test-card h3 {
+        color: #122052;
+      }
+
+      .content-test-card p {
+        color: #52627d;
+        font-size: 0.9rem;
+        line-height: 1.45;
+      }
+
+      .content-test-card a {
+        overflow-wrap: anywhere;
+        font-size: 0.82rem;
+      }
+
       .layout {
         display: grid;
         grid-template-columns: minmax(17rem, 0.8fr) minmax(0, 2fr);
@@ -223,8 +276,18 @@
           grid-template-columns: 1fr;
         }
 
+        .content-test-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
         .tag-card {
           grid-template-columns: 120px minmax(0, 1fr);
+        }
+      }
+
+      @media (max-width: 480px) {
+        .content-test-grid {
+          grid-template-columns: 1fr;
         }
       }
 
@@ -286,6 +349,18 @@
         </aside>
       </header>
 
+      <section class="panel content-test-panel" aria-labelledby="content-tags-title">
+        <span class="eyebrow">WLAN-Test</span>
+        <h2 id="content-tags-title">TAG-Content als QR-Code</h2>
+        <p class="muted">
+          Diese QR-Codes öffnen die lokale TAG-App direkt über die interne
+          WLAN-Adresse. Sie testen Inhalte und Bedienung, aber bewusst weder
+          Cloudflare-Routing noch die kryptografische TAG-Validierung.
+        </p>
+        <p id="content-base-url" class="notice"></p>
+        <div id="content-tags" class="content-test-grid" aria-live="polite"></div>
+      </section>
+
       <div class="layout">
         <section class="panel" aria-labelledby="generator-title">
           <h2 id="generator-title">Neuen Testtag erzeugen</h2>
@@ -343,6 +418,8 @@
         tags: document.querySelector("#tags"),
         template: document.querySelector("#tag-template"),
         generationButtons: [...document.querySelectorAll("[data-length]")],
+        contentBaseUrl: document.querySelector("#content-base-url"),
+        contentTags: document.querySelector("#content-tags"),
       };
 
       function setStatus(message = "", isError = false) {
@@ -391,6 +468,47 @@
 
           elements.tags.append(card);
         }
+      }
+
+      function renderContentTags(tags) {
+        elements.contentTags.replaceChildren();
+
+        for (const tag of tags) {
+          const card = document.createElement("article");
+          card.className = "content-test-card";
+
+          const image = document.createElement("img");
+          image.alt = `WLAN-QR-Code für ${tag.label}`;
+          image.src = `/api/content-tags/${encodeURIComponent(tag.id)}/qr`;
+
+          const title = document.createElement("h3");
+          title.textContent = tag.label;
+
+          const description = document.createElement("p");
+          description.textContent = tag.description;
+
+          const link = document.createElement("a");
+          link.href = tag.url;
+          link.target = "_blank";
+          link.rel = "noreferrer";
+          link.textContent = tag.url;
+
+          card.append(image, title, description, link);
+          elements.contentTags.append(card);
+        }
+      }
+
+      async function loadContentTags() {
+        const response = await fetch("/api/content-tags");
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Content-Test-TAGs konnten nicht geladen werden.");
+        }
+
+        elements.contentBaseUrl.textContent =
+          `WLAN-Zielbasis: ${payload.baseUrl}`;
+        renderContentTags(payload.tags);
       }
 
       async function loadTags() {
@@ -457,6 +575,13 @@
           true,
         ),
       );
+
+      loadContentTags().catch((error) => {
+        elements.contentBaseUrl.textContent =
+          error instanceof Error
+            ? error.message
+            : "Content-Test-TAGs konnten nicht geladen werden.";
+      });
     </script>
   </body>
 </html>
