@@ -140,7 +140,41 @@ Eine User Story darf erst verlassen werden, wenn alle folgenden Punkte erfüllt 
 
 **Regel:** Alle Stories eines zusammenhängenden Story-Gates müssen erfolgreich getestet sein, bevor eine abhängige Story begonnen wird. Unabhängige Arbeiten innerhalb derselben Welle dürfen nur verschränkt erfolgen, wenn die Contract-Version bereits festgeschrieben und getestet ist.
 
-### 5.3 Qualitätsbefehle und Evidenz
+### 5.3 Lokale PHP-/MySQL-Testumgebung für Anwendungskomponenten
+
+Die gemeinsame, anwendungsneutrale Docker-Topologie unter [`tools/local-php-mysql/`](../../../tools/local-php-mysql/README.md) ist für alle künftigen PHP-/MySQL-Anwendungskomponenten verbindlich. Sie ist als W0-Artefakt verifiziert und enthält:
+
+- MySQL `8.4` in einem privaten Compose-Netz ohne Host-Port;
+- PHP `8.4` CLI mit Composer und `pdo_mysql`;
+- eine ausschließlich lokale, Git-ignorierte `.env.local` mit synthetischen Werten;
+- einen PDO-Selbsttest für Verbindung, `utf8mb4`, UTC, InnoDB-Commit und Rollback;
+- einen klar als lokal und destruktiv markierten Volume-Reset.
+
+Vor einem PHP-/MySQL-Integrationslauf wird die Topologie mit den dokumentierten Befehlen gestartet und der Selbsttest ausgeführt:
+
+```powershell
+docker compose --env-file tools/local-php-mysql/.env.local -f tools/local-php-mysql/compose.yaml up -d mysql
+docker compose --env-file tools/local-php-mysql/.env.local -f tools/local-php-mysql/compose.yaml --profile verify run --rm php /workspace/scripts/verify-mysql.php
+```
+
+Nach dem Lauf wird die Umgebung regulär angehalten; dies erhält das lokale Volume:
+
+```powershell
+docker compose --env-file tools/local-php-mysql/.env.local -f tools/local-php-mysql/compose.yaml down
+```
+
+`down -v` ist ausschließlich für einen bewusst verlangten lokalen Reset zulässig. Er darf nie für Staging oder Produktion dokumentiert oder verwendet werden.
+
+Für spätere App-Integration gelten zusätzlich:
+
+1. Unit-Tests benötigen keine Datenbank, kein Netzwerk und keine Dateisystemabhängigkeit.
+2. Persistenz-, Constraint-, Migrations-, Parallelitäts-, Locking-, Outbox- und Rollback-Nachweise laufen gegen Compose-MySQL. SQLite- und In-Memory-Doubles sind dafür unzulässig.
+3. Integrationstests nutzen nur synthetische Daten sowie eine getrennte Testdatenbank oder einen kontrollierten Schema-Reset; sie bereinigen ihren Zustand.
+4. Externe Ports, insbesondere Cloudflare-Publishing, Dogado und Mail, werden lokal gefakt. Reale externe Tokens, Hosts und APIs sind in lokalen Tests verboten.
+5. Die künftige Anwendung wird als lokaler Mount eingebunden; sie wird nicht in das generische W0-Testimage kopiert.
+6. Ein lokaler Erfolg kann `implemented` stützen, ersetzt aber niemals Dogado-Kompatibilität, Staging-Evidenz oder den Status `verified`.
+
+### 5.4 Qualitätsbefehle und Evidenz
 
 Jede App muss vor Staging mindestens bieten bzw. dokumentieren:
 
@@ -149,13 +183,14 @@ install / setup
 lint
 typecheck oder static analysis
 unit test
-integration test
+MySQL integration test
 contract test
-build
+security / negative test
+build oder package verification
 local smoke test
 ```
 
-Evidenz wird redigiert unter `docs/40-Implementation/evidence/` abgelegt. Keine Tokens, Cookies, Credentials, personenbezogenen Daten, realen Claim-Secrets, vollständigen Nachweise oder privaten URLs in Evidenz, Screenshots oder Logs speichern.
+Die konkreten App-Befehle müssen dieselbe lokale Compose-Topologie verwenden oder dokumentiert kompatibel dazu sein. Evidenz wird redigiert unter `docs/40-Implementation/evidence/` abgelegt. Keine Tokens, Cookies, Credentials, personenbezogenen Daten, realen Claim-Secrets, vollständigen Nachweise oder privaten URLs in Evidenz, Screenshots oder Logs speichern.
 
 ---
 
@@ -171,7 +206,7 @@ Die Reihenfolge basiert auf fachlichen Voraussetzungen; sie ist ausdrücklich ni
 2. Staging-Ressourcen identifizieren: API-Host, DB, isolierter KV-Namespace, Staging-Pages-Origin, Publisher-Token-Scope.
 3. Contract-Overview und `tag-routing-projection-v1` erstellen.
 4. Bestehenden Edge Router mittels Contract-Tests gegen die Projektion absichern.
-5. Lokale Test-Topologie planen: Docker oder gleichwertige isolierte MySQL-Umgebung; Fake-Cloudflare-Adapter; keine realen Secrets in Fixtures.
+5. Die verifizierte lokale PHP-/MySQL-Docker-Topologie unter [`tools/local-php-mysql/`](../../../tools/local-php-mysql/README.md) für alle künftigen PHP-Anwendungskomponenten verwenden: isoliertes MySQL, PHP mit `pdo_mysql`, synthetische Testsecrets, Fake-Cloudflare-Adapter und reproduzierbarer PDO-Selbsttest.
 6. TAG Lab um eine versionierte, ausschließlich nichtproduktive Testtag-Katalogstruktur vorbereiten.
 
 **Gate W0:** Contract-Review, lokale Toolchain, Ressourcenmatrix und Testtag-Policy dokumentiert.  

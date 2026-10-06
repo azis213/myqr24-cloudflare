@@ -27,6 +27,17 @@
 | Security | negative Zugriffs-, Leak- und Missbrauchsfälle | Rechteeskalation, Injection, Secret-Leak, CORS/CSRF | je Freigabe |
 | Staging / Betrieb | reale Systemkette | Drucksnapshot, Staging-KV, Scan → PWA → Read API | je Iterationsgate |
 
+### 2.1 Verbindliche lokale PHP-/MySQL-Ausführung
+
+Die gemeinsame [lokale PHP-/MySQL-Testtopologie](../../../tools/local-php-mysql/README.md) ist für künftige PHP-Anwendungen verbindlich. Sie stellt MySQL 8.4 über ein internes Docker-Compose-Netz und PHP 8.4 CLI mit `pdo_mysql` bereit. Sie ist W0-Testinfrastruktur, keine Control-Plane-Implementierung.
+
+- Unit-Tests haben keine Datenbank-, Netzwerk- oder Dateisystemabhängigkeit.
+- Persistenz-, Constraint-, Migrations-, Parallelitäts-, Locking-, Outbox- und Rollback-Nachweise laufen gegen die lokale Compose-MySQL-Instanz. SQLite und In-Memory-Doubles sind dafür nicht ausreichend.
+- Jeder Integrationstest nutzt ausschließlich synthetische Daten, eine klar getrennte Testdatenbank oder einen kontrollierten Schema-Reset und bereinigt seinen Zustand.
+- Contract-, Publisher- und Fehlerpfadtests nutzen lokale Fixtures und Fake-Adapter; sie laden niemals Cloudflare-, Dogado-, Staging- oder Production-Secrets.
+- Der lokale PDO-Selbsttest prüft vor einer Iteration mindestens Verbindung, `utf8mb4`, UTC, Commit und Rollback.
+- Ein lokaler grüner Lauf belegt weder Dogado-Kompatibilität noch Staging- oder Produktionsreife; `verified` verlangt weiterhin die jeweiligen externen Nachweise.
+
 ## 3. Teststrategie je Iteration
 
 ### 3.1 CP-I01 – Fundament
