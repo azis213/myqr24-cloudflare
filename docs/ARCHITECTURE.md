@@ -12,8 +12,8 @@ Die zulässigen Scan-Hosts werden durch `SCAN_ENVIRONMENT` als deployment-spezif
 
 | Umgebung | kurze Domain | sprechende Domain |
 | --- | --- | --- |
-| Staging | `s.qx4.uk/{TAG-ID}` | `s.myqr24.com/t/{TAG-ID}` |
-| Produktion | `qx4.uk/{TAG-ID}` | `p.myqr24.com/t/{TAG-ID}` |
+| Staging | `s.qr4.uk/t/{TAG-ID}` | `s.myqr24.com/t/{TAG-ID}` |
+| Produktion | `p.qr4.uk/t/{TAG-ID}` | `p.myqr24.com/t/{TAG-ID}` |
 
 Der Vergleich der Hosts erfolgt case-insensitiv. Andere Hosts, Cross-Environment-Hosts oder abweichende Pfadformen werden mit `404 Not Found` abgelehnt. Eine Tag-ID darf ausschließlich aus 6 oder 8 Base36-Zeichen (`0-9`, `a-z`, unabhängig von Groß-/Kleinschreibung) bestehen.
 
@@ -115,9 +115,9 @@ id = "<production-kv-namespace-id>"
 Cloudflare-Routen werden anschließend environment-getrennt konfiguriert:
 
 ```text
-s.qx4.uk/*             -> myqr24-edge-routing-staging
+s.qr4.uk/t/*             -> myqr24-edge-routing-staging
 s.myqr24.com/t/*       -> myqr24-edge-routing-staging
-qx4.uk/*               -> myqr24-edge-routing
+p.qr4.uk/t/*               -> myqr24-edge-routing
 p.myqr24.com/t/*       -> myqr24-edge-routing
 ```
 

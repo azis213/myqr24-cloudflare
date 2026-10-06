@@ -38,10 +38,11 @@ function createConfig(
 function createEnv(
   entries: Record<string, unknown>,
   reads: string[] = [],
+  environment: ScanEnvironment = "production",
 ): Env {
   return {
     ...secrets,
-    SCAN_ENVIRONMENT: "production",
+    SCAN_ENVIRONMENT: environment,
     TAG_CONFIG: createConfig(entries, reads),
   };
 }
@@ -119,7 +120,7 @@ async function eightTag(): Promise<{
 function requestFor(
   id: string,
   init?: RequestInit,
-  hostname = "qx4.uk",
+  hostname = "p.qr4.uk",
   route = "t",
 ): Request {
   return new Request(`https://${hostname}/${route}/${id}`, init);
@@ -129,10 +130,11 @@ async function workerResponse(
   request: Request,
   entries: Record<string, unknown>,
   reads: string[] = [],
+  environment: ScanEnvironment = "production",
 ): Promise<Response> {
   return handleRequest(
     request as Parameters<typeof handleRequest>[0],
-    createEnv(entries, reads),
+    createEnv(entries, reads, environment),
     {} as ExecutionContext,
   );
 }
@@ -140,12 +142,12 @@ async function workerResponse(
 describe("URL extraction", () => {
   it.each([
     [
-      "https://qx4.uk/T/Ab12Cd",
+      "https://p.qr4.uk/T/Ab12Cd",
       "production",
       { id: "ab12cd", length: 6 },
     ],
     [
-      "https://qx4.uk/T/Ab12Cd34",
+      "https://p.qr4.uk/T/Ab12Cd34",
       "production",
       { id: "ab12cd34", length: 8 },
     ],
@@ -155,7 +157,7 @@ describe("URL extraction", () => {
       { id: "ab12cd34", length: 8 },
     ],
     [
-      "https://s.qx4.uk/t/Ab12Cd34",
+      "https://s.qr4.uk/t/Ab12Cd34",
       "staging",
       { id: "ab12cd34", length: 8 },
     ],
@@ -179,14 +181,16 @@ describe("URL extraction", () => {
   );
 
   it.each([
-    "https://qx4.uk/ab12cd",
-    "https://qx4.uk/ab12cd34",
-    "https://qx4.uk/t/ab12c",
-    "https://qx4.uk/t2/ab12cd34",
-    "https://qx4.uk/t/ab12cd34/extra",
+    "https://p.qr4.uk/ab12cd",
+    "https://p.qr4.uk/ab12cd34",
+    "https://p.qr4.uk/t/ab12c",
+    "https://p.qr4.uk/t2/ab12cd34",
+    "https://p.qr4.uk/t/ab12cd34/extra",
+    "https://qr4.uk/t/ab12cd34",
+    "https://qx4.uk/t/ab12cd34",
     "https://p.myqr24.com/t/ab12cd3!",
     "https://p.myqr24.com/t/ab12cd3",
-    "https://s.qx4.uk/t/ab12cd34",
+    "https://s.qr4.uk/t/ab12cd34",
     "https://s.myqr24.com/ab12cd34",
     "https://untrusted.example/t/ab12cd34",
   ])("TC-URL-003 rejects unsupported production URL shape: %s", (input) => {
@@ -195,12 +199,107 @@ describe("URL extraction", () => {
 
   it("TC-URL-004 rejects scan hosts assigned to the other environment", () => {
     expect(
-      extractTagRequest(new URL("https://s.qx4.uk/t/ab12cd34"), "production"),
+      extractTagRequest(new URL("https://s.qr4.uk/t/ab12cd34"), "production"),
     ).toBeNull();
     expect(
-      extractTagRequest(new URL("https://qx4.uk/t/ab12cd34"), "staging"),
+      extractTagRequest(new URL("https://p.qr4.uk/t/ab12cd34"), "staging"),
     ).toBeNull();
   });
+});
+
+describe("platform landing page", () => {
+  it("TC-HOME-004 returns the static HTML landing page on the production www root", async () => {
+    const response = await workerResponse(
+      new Request("https://www.myqr24.com/"),
+      {},
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(response.headers.get("cache-control")).toBe(
+      "public, max-age=300, s-maxage=3600",
+    );
+    expect(response.headers.get("content-security-policy")).toContain(
+      "default-src 'none'",
+    );
+    await expect(response.text()).resolves.toContain(
+      "<title>myQR24 – intelligente TAGs</title>",
+    );
+  });
+
+  it("TC-HOME-005 serves no body for HEAD and fails closed outside the production www root", async () => {
+    const headResponse = await workerResponse(
+      new Request("https://www.myqr24.com/", { method: "HEAD" }),
+      {},
+    );
+    const stagingResponse = await workerResponse(
+      new Request("https://www.myqr24.com/"),
+      {},
+      [],
+      "staging",
+    );
+    const pathResponse = await workerResponse(
+      new Request("https://www.myqr24.com/about"),
+      {},
+    );
+
+    expect(headResponse.status).toBe(200);
+    expect(await headResponse.text()).toBe("");
+    expect(stagingResponse.status).toBe(404);
+    expect(pathResponse.status).toBe(404);
+  });
+});
+
+describe("platform home redirect", () => {
+  it.each([
+    ["https://p.qr4.uk/", "production"],
+    ["https://p.myqr24.com/", "production"],
+    ["https://s.qr4.uk/", "staging"],
+    ["https://s.myqr24.com/", "staging"],
+  ])(
+    "TC-HOME-001 redirects the root of an allowed %s host",
+    async (input, environment) => {
+      const response = await workerResponse(
+        new Request(input),
+        {},
+        [],
+        environment as ScanEnvironment,
+      );
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toBe("https://www.myqr24.com/");
+    },
+  );
+
+  it("TC-HOME-002 discards root query parameters and supports HEAD", async () => {
+    const response = await workerResponse(
+      new Request("https://p.qr4.uk/?source=bot", { method: "HEAD" }),
+      {},
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("https://www.myqr24.com/");
+    expect(await response.text()).toBe("");
+  });
+
+  it.each([
+    ["https://qr4.uk/", "production"],
+    ["https://s.qr4.uk/", "production"],
+    ["https://p.qr4.uk/", "staging"],
+    ["https://untrusted.example/", "production"],
+  ])(
+    "TC-HOME-003 keeps roots of unsupported hosts fail-closed",
+    async (input, environment) => {
+      const response = await workerResponse(
+        new Request(input),
+        {},
+        [],
+        environment as ScanEnvironment,
+      );
+
+      expect(response.status).toBe(404);
+    },
+  );
 });
 
 describe("canonical ID and HMAC primitives", () => {
@@ -212,7 +311,7 @@ describe("canonical ID and HMAC primitives", () => {
 
   it("TC-CRYPTO-001 decodes a generated six-character tag into I(6)", async () => {
     const tag = await sixTag();
-    const request = extractTagRequest(new URL(`https://qx4.uk/t/${tag.id}`));
+    const request = extractTagRequest(new URL(`https://p.qr4.uk/t/${tag.id}`));
 
     await expect(decodeTagId(request!, secrets)).resolves.toBe(tag.value);
     expect(tag.value).toBeGreaterThanOrEqual(36n ** 5n);
@@ -221,7 +320,7 @@ describe("canonical ID and HMAC primitives", () => {
 
   it("TC-CRYPTO-002 and TC-HMAC-001 retain the complete valid 8-character integer", async () => {
     const tag = await eightTag();
-    const request = extractTagRequest(new URL(`https://qx4.uk/t/${tag.id}`));
+    const request = extractTagRequest(new URL(`https://p.qr4.uk/t/${tag.id}`));
 
     await expect(decodeTagId(request!, secrets)).resolves.toBe(tag.value);
     expect(tag.value).toBeGreaterThanOrEqual(36n ** 7n);
@@ -233,7 +332,7 @@ describe("canonical ID and HMAC primitives", () => {
     const tag = await eightTag();
     const wrongValue = tag.base | ((tag.value + 1n) & 0x0fn);
     const wrongTag = await publicTag(wrongValue, 8);
-    const request = extractTagRequest(new URL(`https://qx4.uk/t/${wrongTag.id}`));
+    const request = extractTagRequest(new URL(`https://p.qr4.uk/t/${wrongTag.id}`));
 
     await expect(decodeTagId(request!, secrets)).resolves.toBeNull();
   });

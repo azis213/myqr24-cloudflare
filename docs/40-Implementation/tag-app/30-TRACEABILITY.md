@@ -41,6 +41,9 @@ Die Router-seitige Validierung selbst wird nicht dupliziert. Ihre Stories und Te
 | APP-US-061 | bewusster Kamerastart, bekannte myQR24-URL-Kandidaten und manueller Fallback | APP-TC-PERMISSION-002, APP-TC-PERMISSION-003 | APP-TD-007 | Scanner-Adapter, URL-Kandidat-Erkennung, manuelle Eingabe | planned |
 | APP-US-062 | keine Startdialoge, Kontextdialog, Verweigerungs- und Präferenzverhalten | APP-TC-PERMISSION-002 bis APP-TC-PERMISSION-004 | APP-TD-007, APP-TD-008 | Permission-Adapter, lokale Präferenzverwaltung, Fallback-UI | planned |
 | APP-US-063 (lokaler Anteil) | lokales Berechtigungszentrum, Systemstatus und Widerruf | APP-TC-PERMISSION-004 | APP-TD-008 | `/me/privacy-and-permissions`, lokale Präferenzen | planned |
+| APP-US-070 | neutrale Startseite ohne Berechtigungsdialoge | APP-TC-HOME-001 | APP-TD-007 | Startseite, Navigation und Offline-Hinweise | planned |
+| APP-US-071 | explizite, idempotente und löschbare lokale Collection ohne Berechtigungswirkung | APP-TC-COLLECTION-001, APP-TC-COLLECTION-002 | APP-TD-007 | lokaler Collection-Store, bewusste Hinzufüge-/Löschaktion | planned |
+| APP-US-073 (öffentlicher Einstieg) | strikte Public-/PIN-/Closed-Trennung ohne lokale Freigabe | APP-TC-COLLECTION-002, APP-TC-PIN-001, APP-TC-PIN-002 | APP-TD-010 | Runtime-View-Adapter, neutraler PIN-Einstieg, Cache-Guard | planned |
 
 Die PWA implementiert in dieser Iteration weder eine fachliche Berechtigung noch Server-Consent-Persistenz. Kamera- und Browserverhalten bleibt plattformabhängig; die manuelle Eingabe ist deshalb verpflichtender Fallback.
 
@@ -52,12 +55,21 @@ Die PWA implementiert in dieser Iteration weder eine fachliche Berechtigung noch
 | APP-US-063 (Serveranteil), APP-US-064, APP-US-065 | minimalistische Einwilligungsdaten, Capability-Vertrag, Scan-Speicherpolicy und erneute API-Prüfung | APP-TC-PERMISSION-005 bis APP-TC-PERMISSION-007 | APP-TD-008, APP-TD-009 | Application API, Session-/Policy-Layer, persönliche Views | planned |
 | APP-US-012 | öffentliche Medien, Alt-Texte und getrennte Auslieferung | APP-TC-API-004 | APP-TD-010 | API, public/private R2-Auslieferung | planned |
 | APP-US-015 | Cache-Policy und Widerruf | APP-TC-API-003 | APP-TD-010 | API-Header, CDN-/Asset-Strategie | planned |
+| APP-US-072 | explizite Übernahme lokaler Einträge mit Account-Session und Nutzerisolation | APP-TC-COLLECTION-003 | APP-TD-010 | Collection-Import-API, Account-Session, `no-store`-Guard | planned |
+| APP-US-073 (geschützter Content) | serverseitig geprüfter PIN-Flow und neutraler Sichtbarkeitsvertrag | APP-TC-PIN-001, APP-TC-PIN-002 | APP-TD-010 | Runtime-/PIN-API, transientes PIN-Formular, `no-store`-Guard | planned |
+
+## APP-I03A — Öffentlicher TAG-Claim
+
+| Stories | Akzeptanzbereich | Testfälle | Testdaten | Geplante Komponenten | Status |
+| --- | --- | --- | --- | --- | --- |
+| APP-US-016 | serverseitig gelieferte Claim-Capability, HTTPS-Claim-Request und keine lokale Besitzannahme | APP-TC-CLAIM-001, APP-TC-CLAIM-002, APP-TC-CLAIM-003 | APP-TD-010 | Claim-Formular, PublicTagView-/Capability-Mapper und öffentlicher Control-Plane-Claim-Contract | planned; fachliche Credential-, Lockout-, Policy- und Owner-Entscheidung liegt ausschließlich bei der Control Plane |
+| APP-US-017 | neutrale Fehler, Mehrfachklickschutz, Supportverweis und kein dauerhafter Claim-Cache | APP-TC-CLAIM-003, APP-TC-CLAIM-004 | APP-TD-010 | Claim-Result- und Fehlerzustände, datensparsamer Supportverweis | planned; kein Claim-Secret oder interner Claim-Status im Client |
 
 ## APP-I04 — Owner und Inhaltsverwaltung
 
 | Stories | Akzeptanzbereich | Testfälle | Testdaten | Geplante Komponenten | Status |
 | --- | --- | --- | --- | --- | --- |
-| APP-US-020 | Owner-Session, CSRF und Rate Limits | APP-TC-OWNER-001, APP-TC-OWNER-002 | APP-TD-020 | Auth-/Session-API, Owner-PWA | planned |
+| APP-US-020 | Account-Owner- oder separate TAG-Owner-Passphrase-Session, CSRF, Scope und Rate Limits | APP-TC-OWNER-001, APP-TC-OWNER-002, APP-TC-OWNER-006, APP-TC-OWNER-007 | APP-TD-020 | Auth-/Session-API, Owner-Passphrase-Flow, TAG-gebundene Owner-PWA | planned |
 | APP-US-021, APP-US-022 | Blockvalidierung, Persistenz und Sichtbarkeit | APP-TC-OWNER-003 | APP-TD-010, APP-TD-020 | Owner-API, D1, Admin-UI | planned |
 | APP-US-023 | Upload-Validierung und Medienstatus | APP-TC-OWNER-004 | APP-TD-020 | R2, Upload-API, Queue-Consumer | planned |
 | APP-US-024, APP-US-025 | private Freigabe, atomare Nutzung und Audit | APP-TC-OWNER-005 | APP-TD-020 | API, D1, gegebenenfalls Durable Object | planned |

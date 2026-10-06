@@ -240,7 +240,46 @@
 
 ---
 
-## Epic C — Owner- und Inhaltsverwaltung
+## Epic C — Öffentlicher TAG-Claim
+
+### APP-US-016 — TAG nach Scan mit Claim-Secret übernehmen
+
+**Priorität:** P0  
+**Iteration:** APP-I03  
+**Status:** planned
+
+**Als** berechtigte Person mit einem noch claimbaren TAG  
+**möchte ich** den TAG nach dem Scan in der TAG-App mit meinem Claim-Secret übernehmen,  
+**damit** der normale Claim ohne Verwaltungsoberfläche durchgeführt werden kann.
+
+#### Akzeptanzkriterien
+
+- Die Claim-Aktion wird nur angezeigt, wenn die aktuelle serverseitig gelieferte Capability sie erlaubt.
+- Die TAG-App sendet `tagId` und das eingegebene Claim-Secret ausschließlich per HTTPS an den vorgesehenen öffentlichen Claim-Endpunkt der Control Plane.
+- Die Control Plane entscheidet allein über Credential-Prüfung, Pool-/Produktpolicy, Lockout, Rate Limit, atomare Owner-Zuordnung und Verbrauch.
+- Das Eingabefeld nutzt einen geeigneten geheimen Eingabetyp, wird nach jedem Request geleert und wird weder in Local Storage, Session Storage, URL, Service-Worker-Cache, Telemetrie noch Fehlermeldungen gespeichert.
+- Die öffentliche UI zeigt ausschließlich neutrale Erfolgs-, Sperr- oder Nichtverfügbarhinweise und keine Hashes, Fehlversuchszähler, Ownerdaten, Pooldetails oder Credentialregeln.
+- Der Claim ist nach erfolgreicher serverseitiger Antwort im aktualisierten Capability-/View-Zustand nachvollziehbar; die App erzeugt keine lokale Besitzannahme.
+
+### APP-US-017 — Claim-Probleme datensparsam behandeln
+
+**Priorität:** P0  
+**Iteration:** APP-I03  
+**Status:** planned
+
+**Als** TAG-Nutzer  
+**möchte ich** bei einem nicht erfolgreichen Claim einen verständlichen, aber datensparsamen Hinweis erhalten,  
+**damit** ich den Vorgang sicher wiederholen oder Support nutzen kann, ohne interne Informationen zu erhalten.
+
+#### Akzeptanzkriterien
+
+- Fehlerantworten unterscheiden öffentlich nicht zwischen unbekanntem, bereits geclaimtem, gesperrtem oder nicht claimbarem TAG, sofern die Policy keinen ausdrücklichen sicheren Hinweis erlaubt.
+- Die UI schützt vor Mehrfachklicks während eines laufenden Requests und behandelt Netzwerkfehler ohne erneute lokale Credential-Verwendung.
+- Eine Support-Option verweist nur auf einen dokumentierten Kontakt- bzw. Supportweg und übermittelt weder Claim-Secret noch private Claim-Details.
+- Die PWA speichert keine fehlgeschlagenen Claim-Eingaben und keine öffentlichen Claim-Responses dauerhaft offline.
+- Wiederholte Claim-Versuche werden von der UI nicht als erfolgreich dargestellt, bevor die Control Plane dies bestätigt.
+
+## Epic D — Owner- und Inhaltsverwaltung
 
 ### APP-US-020 — Als Owner TAG-Inhalte sicher verwalten
 
@@ -254,12 +293,12 @@
 
 #### Akzeptanzkriterien
 
-- Owner-Aktionen erfordern eine serverseitig geprüfte Owner-Session.
-- Sessions nutzen sichere, `HttpOnly`, `Secure` und passend konfigurierte SameSite-Cookies.
-- TAG-PINs werden nie im Klartext oder mit schnellen Hashes gespeichert.
-- Rate Limits und ein geeigneter Schutz gegen Authentisierungsversuche sind vorhanden.
-- Die PWA speichert keine langlebigen Owner-Tokens im Local Storage.
-- Schreibende Cookie-Requests besitzen einen geeigneten CSRF-Schutz.
+- Owner-Aktionen erfordern entweder eine serverseitig zugeordnete Account-Owner-Session oder eine TAG-gebundene Owner-Passphrase-Freigabe.
+- Eine Owner-Passphrase ist vom Claim-Secret und einer Besucher-PIN getrennt; sie wird nur als langsamer, gesalzener Hash gespeichert und niemals im Klartext.
+- Erfolgreiche Owner-Passphrase-Prüfung erzeugt ausschließlich eine kurzlebige, TAG-gebundene `HttpOnly`, `Secure`, `SameSite=Strict`-Session.
+- Rate Limits, progressive Sperren, neutrale Fehlerantworten und geeigneter CSRF-Schutz gelten für jeden Owner-Flow.
+- Die PWA speichert weder Owner-Passphrase noch langlebige Owner-Tokens im Local Storage.
+- Eine lokale oder kontogebundene Lese-Collection ist kein Berechtigungsnachweis; jede Änderungsanfrage wird serverseitig erneut gegen die Owner-Zuordnung geprüft.
 
 ### APP-US-021 — Öffentliche Vault-Inhalte erstellen und ändern
 
@@ -372,7 +411,7 @@
 
 ---
 
-## Epic D — TAG Chat und Lost & Found
+## Epic E — TAG Chat und Lost & Found
 
 ### APP-US-030 — Lost-&-Found-Status erkennen
 
@@ -480,7 +519,7 @@
 
 ---
 
-## Epic E — TAG Guestbook
+## Epic F — TAG Guestbook
 
 ### APP-US-040 — Ein offenes Guestbook erkennen
 
@@ -570,7 +609,7 @@
 
 ---
 
-## Epic F — TAG Check-ins, Collections und Campaigns
+## Epic G — TAG Check-ins, Collections und Campaigns
 
 ### APP-US-050 — Check-in nach expliziter Standortfreigabe starten
 
@@ -697,7 +736,84 @@
 
 ---
 
-## Epic G — Gemeinsame PWA, Scan und Berechtigungssteuerung
+## Epic H — Startseite, lokale und kontogebundene Collections
+
+### APP-US-070 — TAG-App ohne TAG-ID sinnvoll starten
+
+**Priorität:** P0  
+**Iteration:** APP-I02A  
+**Status:** planned
+
+**Als** myQR24-Nutzer  
+**möchte ich** die TAG-App direkt ohne TAG-ID öffnen können,  
+**damit** ich scannen, mich anmelden oder bereits gespeicherte TAGs wiederfinden kann.
+
+#### Akzeptanzkriterien
+
+- Die Route `/` zeigt eine neutrale Startseite mit den Aktionen **TAG scannen**, **Anmelden** und **Meine Collection**.
+- Der Start löst weder Kamera-, Standort- noch andere Browserberechtigungen aus.
+- Ohne Anmeldung ist eine lokale Collection erreichbar; kontogebundene Einträge verlangen eine serverseitig geprüfte Session.
+- Die Startseite behauptet nicht, dass ein TAG gescannt, geclaimt oder vom Nutzer besessen wurde.
+- Die PWA-Shell kann offline starten, zeigt aber klar an, wenn aktuelle TAG-Inhalte nicht geladen werden können.
+
+### APP-US-071 — TAG bewusst lokal zur Collection hinzufügen
+
+**Priorität:** P1  
+**Iteration:** APP-I02A  
+**Status:** planned
+
+**Als** Besucher eines Museums, einer Burg oder eines Ereignisses  
+**möchte ich** einen geöffneten TAG bewusst lokal zu meiner Collection hinzufügen,  
+**damit** ich ihn später ohne erneuten physischen Scan wiederfinden kann.
+
+#### Akzeptanzkriterien
+
+- Das Hinzufügen ist eine explizite Nutzeraktion; ein Scan oder Direktaufruf erzeugt nicht automatisch eine lokale Historie.
+- Ein lokaler Eintrag enthält höchstens `tagId`, Hinzufügezeit, optionalen lokalen Namen und einen nicht autoritativen öffentlichen Anzeige-Snapshot.
+- Derselbe TAG wird lokal idempotent nur einmal geführt; der Nutzer kann ihn einzeln oder vollständig löschen.
+- Beim Öffnen wird stets der aktuelle öffentliche View neu geladen; ein lokaler Snapshot ersetzt weder Sichtbarkeit noch Content.
+- Die UI erklärt, dass Browserdatenlöschung, Gerätewechsel oder private Browserprofile die lokale Collection entfernen können.
+- Die lokale Collection verleiht keine Owner-, Upload-, Besucher-PIN- oder sonstige Berechtigung und enthält keine Credentials, Sessions oder private Inhalte.
+
+### APP-US-072 — Lokale Collection nach Anmeldung explizit übernehmen
+
+**Priorität:** P1  
+**Iteration:** APP-I03  
+**Status:** planned
+
+**Als** angemeldeter Nutzer  
+**möchte ich** meine lokale Collection bewusst in mein Konto übernehmen,  
+**damit** sie nach Gerätewechsel oder Browserdatenlöschung verfügbar bleibt.
+
+#### Akzeptanzkriterien
+
+- Eine Übernahme verlangt eine aktive serverseitige Account-Session und eine ausdrückliche Bestätigung.
+- Die API prüft jede übermittelte `tagId` neu, speichert nur zulässige persönliche Referenzen und behandelt identische Einträge idempotent.
+- Geschlossene oder nicht verfügbare TAGs dürfen als persönliche Referenz bestehen bleiben, liefern beim Öffnen aber nur ihren aktuellen neutralen Status.
+- Private Views, PIN-Freigaben, Sessions, Ownerrechte und lokale Credentials werden nie übertragen.
+- Persönliche Collection-Reads und -Writes liefern `Cache-Control: no-store`; der Service Worker persistiert sie nicht.
+- Nach bestätigter Übernahme kann die App anbieten, lokale Einträge zu löschen, ohne sie stillschweigend zu entfernen.
+
+### APP-US-073 — Öffentliche und PIN-geschützte TAG-Aufrufe korrekt trennen
+
+**Priorität:** P0  
+**Iteration:** APP-I03  
+**Status:** planned
+
+**Als** TAG-Owner und Besucher  
+**möchte ich** die öffentliche Erreichbarkeit eines TAGs vom PIN-geschützten Contentzugriff getrennt erleben,  
+**damit** eine bekannte URL oder ein Collection-Eintrag keine Freigabe umgeht.
+
+#### Akzeptanzkriterien
+
+- `/tag/{tagId}` kann bei `public` direkt freigegebenen Content anzeigen und bleibt damit ohne komplizierten Share-Link teilbar.
+- Bei `closed`, unbekannter oder nicht veröffentlichter Runtime-Projektion zeigt die App eine neutrale Nichtverfügbar-Ansicht.
+- Bei `pin-required` zeigt die App nur einen neutralen Freigabe-Einstieg; geschützter Content wird erst nach serverseitiger Prüfung geliefert.
+- Besucher-PINs werden ausschließlich transient per HTTPS übermittelt und niemals in URL, Browser-Storage, Service-Worker-Cache, Logs oder Telemetrie gespeichert.
+- Ein Sichtbarkeitswechsel wird durch die aktuelle serverseitige Runtime-View wirksam; lokale Collections, URL-Kenntnis oder alte Client-Flags umgehen ihn nicht.
+- Ein späterer Share-Link ist eine eigene widerrufbare Capability und nicht Teil des MVP.
+
+## Epic I — Gemeinsame PWA, Scan und Berechtigungssteuerung
 
 Die verbindlichen Architektur- und Datenschutzregeln stehen im [Berechtigungs-, Datenschutz- und Capability-Modell](../../10-Architecture/PWA_PERMISSION_AND_CAPABILITY_MODEL.md). Dieser Epic bereitet die gemeinsame Nutzeroberfläche vor; die Application API bleibt für Rollen, Sichtbarkeit, Capabilities und jede geschützte Aktion autoritativ.
 

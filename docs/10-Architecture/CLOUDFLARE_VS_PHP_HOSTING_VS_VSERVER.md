@@ -245,7 +245,7 @@ Für Stufe 3 benötigt myQR24 mindestens:
 Cloudflare Workers sind für den bestehenden Edge Tag Router besonders geeignet:
 
 ```text
-https://s.qx4.uk/{tagId}
+https://s.qr4.uk/t/{tagId}
 https://s.myqr24.com/t/{tagId}
         │
         ▼
@@ -647,10 +647,10 @@ Ziel: Kosten, Verfügbarkeit und Fachprozesse anhand realer Nutzung optimieren.
 ```text
                          Cloudflare
 ┌──────────────────────────────────────────────────────────────┐
-│ qx4.uk / myqr24.com DNS-Zonen                                │
+│ p.qr4.uk / myqr24.com DNS-Zonen                                │
 │                                                              │
 │ Scan-Domains                                                 │
-│   s.qx4.uk/{tagId}                                           │
+│   s.qr4.uk/t/{tagId}                                           │
 │   s.myqr24.com/t/{tagId}                                     │
 │          │                                                   │
 │          ▼                                                   │

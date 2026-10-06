@@ -30,7 +30,7 @@ Die ausführliche Zielarchitektur für die spätere PWA, die autoritative Applic
 NFC-/QR-Scan
     │
     ▼
-https://s.qx4.uk/{tagId}
+https://s.qr4.uk/t/{tagId}
     │
     ▼
 Cloudflare Edge Router
@@ -131,7 +131,7 @@ Weitere künftige öffentliche App-Routen müssen ausdrücklich in dieser Regel 
 ### 4.1 Erfolgreicher Staging-Flow
 
 ```text
-1. Scanner öffnet https://s.qx4.uk/{tagId}
+1. Scanner öffnet https://s.qr4.uk/t/{tagId}
 2. Edge Router validiert den Scan und liefert einen signierten HTTP-Redirect.
 3. Browser folgt dem Redirect auf /tag/{tagId} der Pages-App.
 4. Pages liefert wegen _redirects die React-Shell aus.

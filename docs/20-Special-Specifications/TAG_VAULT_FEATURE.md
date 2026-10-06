@@ -109,7 +109,7 @@ Damit entsteht kein versehentlich öffentliches Dokument durch einen Standardwer
 
 ### 5.1 Öffentliche Scan-Ansicht
 
-Ein Scan auf `https://qx4.uk/t/{TAG-ID}` führt durch den Edge Worker. Das Routenpfadsegment und die TAG-ID werden case-insensitiv verarbeitet; erzeugte Links verwenden kanonisch Kleinschreibung. Route-lose TAG-URLs sind nicht zulässig. Ist dem Tag ein Vault-Feature zugewiesen, leitet das Routing beispielsweise auf folgende feste PWA-Ansicht:
+Ein Scan auf `https://p.qr4.uk/t/{TAG-ID}` führt durch den Edge Worker. Das Routenpfadsegment und die TAG-ID werden case-insensitiv verarbeitet; erzeugte Links verwenden kanonisch Kleinschreibung. Route-lose TAG-URLs sind nicht zulässig. Ist dem Tag ein Vault-Feature zugewiesen, leitet das Routing beispielsweise auf folgende feste PWA-Ansicht:
 
 ```text
 https://app.myqr24.com/tag/{tagId}
@@ -551,7 +551,7 @@ Zu auditierende Ereignisse:
 Scanner / Besitzer-Browser
         │
         ▼
-qx4.uk/t/{tagId} oder p.myqr24.com/t/{tagId}
+p.qr4.uk/t/{tagId} oder p.myqr24.com/t/{tagId}
         │
         ▼
 Cloudflare Edge Worker

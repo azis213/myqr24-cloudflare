@@ -2,8 +2,8 @@
 
 | Story | Akzeptanzschwerpunkt | Testfälle | Testdaten | Zielcode | Status |
 | --- | --- | --- | --- | --- | --- |
-| US-001 | Zulässige öffentliche URLs und Normalisierung | TC-URL-001 bis TC-URL-003 | `edge-routing.json` | `extractTagRequest` | verified |
-| US-002 | Einheitlich fail-closed, HTTP-Methoden und HEAD | TC-URL-003, TC-HTTP-001, TC-HTTP-002, TC-RESPONSE-004 | In-Memory-KV mit Fehlerfällen | `handleRequest`, `notFound` | verified |
+| US-001 | Zulässige öffentliche URLs und Normalisierung | TC-URL-001 bis TC-URL-003, TC-HOME-001, TC-HOME-003 bis TC-HOME-005 | `edge-routing.json` | `extractTagRequest`, `isScanHost`, `isPlatformHomeHost`, `handleRequest` | verified |
+| US-002 | Einheitlich fail-closed, HTTP-Methoden und HEAD | TC-URL-003, TC-HOME-001 bis TC-HOME-005, TC-HTTP-001, TC-HTTP-002, TC-RESPONSE-004 | In-Memory-KV mit Fehlerfällen | `handleRequest`, `platformHomeRedirect`, `platformHomeResponse`, `notFound` | verified |
 | US-003 | Kanonische Längenräume und `BigInt` | TC-CRYPTO-001 bis TC-CRYPTO-004 | deterministische Testsecrets und Vektoren | `parseBase36`, `decodeFeistel`, `formatBase36` | verified |
 | US-004 | HMAC über maskierte Basis; vollständiger Range-Key | TC-HMAC-001 bis TC-HMAC-004 | Achtstellenvektoren, KV-Spy | `calculateHmacNibble`, `decodeTagId` | verified |
 | US-005 | Aktive, length-gebundene, nicht überlappende Ranges | TC-RANGE-001 bis TC-RANGE-005 | valide und fehlerhafte Range-Indizes | `isValidRangeIndex`, `findRange` | verified |

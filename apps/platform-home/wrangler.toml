@@ -1,0 +1,8 @@
+name = "myqr24-platform-home"
+main = "src/index.ts"
+compatibility_date = "2026-10-06"
+workers_dev = true
+
+routes = [
+  { pattern = "www.myqr24.com/*", zone_name = "myqr24.com" }
+]

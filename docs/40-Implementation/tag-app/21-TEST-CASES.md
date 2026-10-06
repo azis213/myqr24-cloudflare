@@ -42,6 +42,23 @@
 | APP-TC-PERMISSION-005 | APP-US-064 | Contract/Component | anonyme, angemeldete und Owner-Capability-Responses rendern | nur API-gelieferte Kontextaktionen erscheinen; öffentliche Inhalte bleiben vorrangig sichtbar | planned |
 | APP-TC-PERMISSION-006 | APP-US-064 | Security/API | geschützte Aktion mit manipuliertem Button, lokaler Capability oder abgelaufener Response senden | API lehnt Request trotz Client-Zustand erneut autoritativ ab | planned |
 | APP-TC-PERMISSION-007 | APP-US-063 bis APP-US-065 | Cache/Privacy | Präferenz-, Einwilligungs-, Scan- und Capability-Antworten sowie Service Worker prüfen | persönliche Antworten verwenden `no-store`; Service Worker persistiert keine privaten Daten | planned |
+| APP-TC-CLAIM-001 | APP-US-016, APP-US-064 | Component/Contract | claimbare und nicht claimbare Capability rendern | Claim-Eingabe erscheint ausschließlich für die serverseitig gelieferte Capability; lokale TAG-ID-Historie erzeugt keine Claim-Aktion | planned |
+| APP-TC-CLAIM-002 | APP-US-016 | API/Component | Claim mit gültigem Secret absenden | TAG-ID und Secret gehen nur per HTTPS an den öffentlichen Claim-Contract; Erfolg wird erst nach bestätigter Serverantwort angezeigt | planned |
+| APP-TC-CLAIM-003 | APP-US-016, APP-US-017 | Privacy/Security | Secret nach Request, Netzwerkfehler, Abbruch und Seitennavigation prüfen | Secret fehlt in URL, Verlauf, Local-/Session Storage, Service-Worker-Cache, Telemetrie, Fehlermeldung und anschließendem UI-Zustand | planned |
+| APP-TC-CLAIM-004 | APP-US-017 | Component/Security | neutrale Ablehnung, Sperre und Mehrfachklick behandeln | neutrale Meldung ohne Status-/Owner-/Policy-Leck; laufender Request ist gesperrt; App behauptet keinen lokalen Claim-Erfolg | planned |
+
+## Geplante Start-, Collection- und Sichtbarkeits-Testfälle: APP-I02A und APP-I03
+
+| ID | Stories | Ebene | Testfall | Erwartetes Ergebnis | Status |
+| --- | --- | --- | --- | --- | --- |
+| APP-TC-HOME-001 | APP-US-070, APP-US-062 | Component/Browser | Route `/` laden und Berechtigungs-APIs überwachen | neutrale Startseite mit Scan, Anmeldung und Collection; keine Berechtigungsabfrage beim Start | planned |
+| APP-TC-COLLECTION-001 | APP-US-071 | Component/Storage | TAG bewusst hinzufügen, doppelt hinzufügen und lokal löschen | nur explizite Aktion speichert; `tagId` ist idempotent; keine Credentials oder Ownerdaten werden persistiert | planned |
+| APP-TC-COLLECTION-002 | APP-US-071, APP-US-073 | Integration | lokalen Eintrag nach Sichtbarkeitswechsel öffnen | aktueller Public View ersetzt Snapshot; geschlossene oder unbekannte Runtime liefert neutralen Status | planned |
+| APP-TC-COLLECTION-003 | APP-US-072 | API/Authorization | lokale TAG-Liste mit und ohne Account-Session importieren; Einträge eines anderen Accounts abfragen | Import nur mit Session, pro Account/TAG idempotent, strikte Nutzerisolation und `no-store` | planned |
+| APP-TC-PIN-001 | APP-US-073 | API/Privacy | `public`, `pin-required`, `closed` und unbekannten TAG aufrufen | nur `public` enthält Content; PIN-Modus enthält neutralen Einstieg; andere Fälle leaken keine Details | planned |
+| APP-TC-PIN-002 | APP-US-073 | Security/Cache | Besucher-PIN eingeben, Seite wechseln und Cache/Storage prüfen | PIN steht weder in URL, Speicher, Logs noch Service-Worker-Cache; geschützter Response verwendet `no-store` | planned |
+| APP-TC-OWNER-006 | APP-US-020 | Security/Authorization | Owner-Passphrase, Account-Owner-Session und Collection-Eintrag gegen denselben Schreibendpunkt prüfen | nur gültige TAG-gebundene Owner-Session oder Account-Zuordnung erlaubt Änderungen; Collection wird abgewiesen | planned |
+| APP-TC-OWNER-007 | APP-US-020 | Security/Header | Owner-Passphrase mit Erfolg, falschem Wert, Rate-Limit und CSRF prüfen | neutrale Fehler; progressive Sperre; erfolgreiche Kurzsession ist `HttpOnly`, `Secure`, `SameSite=Strict` und TAG-begrenzt | planned |
 
 ## Geplante API-/Vault-Testfälle: APP-I03 und APP-I04
 

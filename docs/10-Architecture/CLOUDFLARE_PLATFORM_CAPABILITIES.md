@@ -1,4 +1,4 @@
-# Cloudflare-Plattformbausteine für myQR24
+h# Cloudflare-Plattformbausteine für myQR24
 
 **Status:** Architekturleitfaden  
 **Datum:** 2026-10-01  
@@ -685,7 +685,7 @@ Jeder produktionsrelevante Cloudflare-Baustein erhält getrennte Ressourcen.
 | Ressource | Staging | Production |
 | --- | --- | --- |
 | Edge Router | `myqr24-edge-routing-staging` | `myqr24-edge-routing` |
-| Scan-Domains | `s.qx4.uk`, `s.myqr24.com` | `qx4.uk`, `p.myqr24.com` |
+| Scan-Domains | `s.qr4.uk`, `s.myqr24.com` | `p.qr4.uk`, `p.myqr24.com` |
 | PWA | `app-staging.myqr24.com` | `app.myqr24.com` |
 | KV | eigenes `TAG_CONFIG` | eigenes `TAG_CONFIG` |
 | Secrets | eigene Werte | neue, unabhängige Werte |
@@ -707,7 +707,7 @@ Staging darf niemals auf Production-Datenbanken, Production-Buckets, Production-
 1. Cloudflare-Konto, DNS-Zonen und Zugriffsrechte prüfen.
 2. getrennten Staging-KV-Namespace anlegen.
 3. Staging-Secrets setzen.
-4. Edge Router auf `s.qx4.uk` und `s.myqr24.com` deployen.
+4. Edge Router auf `s.qr4.uk` und `s.myqr24.com` deployen.
 5. eine valide Test-Range und ein Redirect-Feature konfigurieren.
 6. Positiv- und Negativtests dokumentieren.
 

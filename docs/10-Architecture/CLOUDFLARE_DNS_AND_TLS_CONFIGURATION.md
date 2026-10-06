@@ -1,8 +1,10 @@
 # Cloudflare DNS- und TLS-Konfiguration für myQR24
 
 **Status:** Verbindliche Betriebsanleitung für Staging und Production  
-**Stand:** 2026-10-02  
+**Stand:** 2026-10-06  
 **Geltungsbereich:** DNS, Cloudflare Worker Routes, Cloudflare Pages Custom Domains und HTTPS für die myQR24 Scan- und PWA-Domains.
+
+**Operative Umsetzung bei weiterem Dogado-DNS:** Die konkrete Schrittfolge für die delegierten Edge-Subzonen `s.myqr24.com` und `p.myqr24.com` steht in [Dogado DNS: Cloudflare Edge für myQR24-Subdomains](../80-Deployment/10-DOGADO-DNS-DELEGATION-FOR-CLOUDFLARE-EDGE.md).
 
 ---
 
@@ -12,20 +14,27 @@ Der myQR24 Edge Tag Router wird auf Cloudflare Workers betrieben. Die Scan-Domai
 
 | Umgebung | Zweck | Vollständige URL bzw. Host | Cloudflare-Komponente |
 | --- | --- | --- | --- |
-| Staging | kurze Scan-URL | `https://s.qx4.uk/{tagId}` | `myqr24-edge-routing-staging` |
-| Staging | sprechende Scan-URL | `https://s.myqr24.com/t/{tagId}` | `myqr24-edge-routing-staging` |
+| Staging | **primäre Scan-URL für die erste TAG-Ausgabe** | `https://s.myqr24.com/t/{tagId}` | `myqr24-edge-routing-staging` |
 | Staging | Test-PWA | `https://app-staging.myqr24.com/tag/{tagId}` | Pages `myqr24-staging-test-pwa` |
 | Staging | temporäres PWA-Ziel | `https://main.myqr24-staging-test-pwa.pages.dev/tag/{tagId}` | Pages Branch-Alias `main` |
-| Production | kurze Scan-URL | `https://qx4.uk/{tagId}` | `myqr24-edge-routing` |
-| Production | sprechende Scan-URL | `https://p.myqr24.com/t/{tagId}` | `myqr24-edge-routing` |
+| Production | **primäre Scan-URL für die erste TAG-Ausgabe** | `https://p.myqr24.com/t/{tagId}` | `myqr24-edge-routing` |
 | Production | spätere PWA | `https://app.myqr24.com/tag/{tagId}` | spätere Production-PWA |
+| Production | Plattforminformation | `https://www.myqr24.com/` | `myqr24-edge-routing` |
+| Staging-Test | zusätzliche Scan-, Runtime- und Medien-URL | `https://s.qr4.uk/t/{tagId}` | `myqr24-edge-routing-staging` |
+| Production-Test | zusätzliche Scan-, Runtime- und Medien-URL | `https://p.qr4.uk/t/{tagId}` | `myqr24-edge-routing` |
+
+Für die erste Herstellung physischer QR-/NFC-TAGs werden ausschließlich `s.myqr24.com/t/{tagId}` in Staging und `p.myqr24.com/t/{tagId}` in Production verwendet. `s.qr4.uk` und `p.qr4.uk` dürfen dagegen bereits für Tests und Abnahmen verwendet werden und besitzen denselben Scan-, Runtime-API- und Medienvertrag wie ihre jeweilige myQR24-Umgebung.
+
+Eine öffentliche `tagId` ist nicht an einen Host gebunden. Derselbe Production-TAG kann daher parallel über `p.myqr24.com/t/{tagId}` und `p.qr4.uk/t/{tagId}` aufgelöst werden; bereits hergestellte Träger werden dadurch nicht verändert.
 
 Nicht verwenden:
 
 ```text
+qr4.uk
+qx4.uk
 qx4u.uk
 p.myqr24.net
-t.qx4.uk
+t.qr4.uk
 t.myqr24.com
 ```
 
@@ -64,9 +73,11 @@ Die neue React-/Vite-PWA ist über den stabilen Branch-Alias erreichbar. Die lau
 
 ---
 
-## 4. `qx4.uk`: Staging-Scan-Domain in der bestehenden Cloudflare-Zone
+## 4. `qr4.uk`: gleichwertige Testhosts
 
-`qx4.uk` wird bereits auf Cloudflare gehostet. Die Konfiguration erfolgt vollständig im Cloudflare Dashboard.
+Die Zone `qr4.uk` wird für die gleichwertigen Testhosts `s.qr4.uk` und `p.qr4.uk` verwendet. Diese Hosts dürfen für technische Tests und Abnahmen eingesetzt werden, werden aber nicht als primäre URL für die erste physische TAG-Herstellung ausgegeben.
+
+Der Apex `qr4.uk` bleibt bis zur ausdrücklichen Produktentscheidung deaktiviert. Insbesondere wird dort keine Worker-Route für kurze Scan-URLs eingerichtet.
 
 ### 4.1 DNS-Record anlegen
 
@@ -75,7 +86,7 @@ Pfad:
 ```text
 Cloudflare Dashboard
 → Websites
-→ qx4.uk
+→ qr4.uk
 → DNS
 → Records
 → Add record
@@ -86,7 +97,7 @@ Record:
 | Feld | Wert |
 | --- | --- |
 | Type | `A` |
-| Name | `s` |
+| Name | `s` bzw. `p` |
 | IPv4 address | `192.0.2.1` |
 | Proxy status | **Proxied** (orange Wolke) |
 | TTL | Auto |
@@ -94,7 +105,7 @@ Record:
 Dadurch entsteht:
 
 ```text
-s.qx4.uk → Cloudflare Edge → Worker Route
+s.qr4.uk bzw. p.qr4.uk → Cloudflare Edge → Worker Route
 ```
 
 > Die Platzhalter-IP ist bei aktivierter Worker Route nicht das tatsächliche Ziel der Scan-Anfrage. Die orange Wolke ist zwingend.
@@ -115,7 +126,7 @@ Cloudflare Dashboard
 Route:
 
 ```text
-s.qx4.uk/*
+s.qr4.uk/t/*
 ```
 
 Worker:
@@ -129,7 +140,7 @@ myqr24-edge-routing-staging
 Nach DNS- und Zertifikatspropagation:
 
 ```text
-GET https://s.qx4.uk/rsq45q
+GET https://s.qr4.uk/t/rsq45q
 ```
 
 Erwartung:
@@ -192,6 +203,7 @@ Dieses Modell ist langfristig am einfachsten und wird für die Production-Archit
 | Production Scan | A | `p` | `192.0.2.1` | **Proxied** |
 | Staging PWA | nach Pages-Vorgabe | `app-staging` | von Cloudflare Pages vorgegeben | nach Pages-Vorgabe |
 | Production PWA | nach Pages-Vorgabe | `app` | von Cloudflare Pages vorgegeben | nach Pages-Vorgabe |
+| Plattforminformation | A | `www` | `192.0.2.1` | **Proxied** |
 
 Anschließend werden die Worker Routes angelegt:
 
@@ -324,8 +336,9 @@ Diese Fehler dürfen nicht durch Deaktivieren von HTTPS oder durch ein selbstsig
 Prüfung nach Propagation:
 
 ```powershell
-curl.exe -I https://s.qx4.uk/rsq45q
 curl.exe -I https://s.myqr24.com/t/rsq45q
+curl.exe -I https://s.qr4.uk/t/rsq45q
+curl.exe -I https://p.qr4.uk/t/rsq45q
 curl.exe -I https://app-staging.myqr24.com/tag/rsq45q
 ```
 
@@ -339,73 +352,159 @@ Falls später weitere proxied Dogado-Webhosts über Cloudflare ausgeliefert werd
 
 ## 9. Reihenfolge für die aktuelle Staging-Abnahme
 
-### Variante A: Nur `s.qx4.uk` sofort aktivieren
+### Verbindliche erste Staging-Topologie
 
-Diese Variante ist ausreichend, um die Worker- und Tag-Weiterleitung unmittelbar zu testen.
-
-1. In der vorhandenen Cloudflare-Zone `qx4.uk` den proxied A-Record `s → 192.0.2.1` anlegen.
-2. Worker Route `s.qx4.uk/* → myqr24-edge-routing-staging` anlegen.
-3. Auf TLS-Propagierung warten.
-4. Test ausführen:
-
-   ```text
-   https://s.qx4.uk/rsq45q
-   ```
-
-5. Nach der kontrollierten KV-Umstellung führt der erwartete `302` zunächst auf:
-
-   ```text
-   https://main.myqr24-staging-test-pwa.pages.dev/tag/rsq45q
-   ```
-
-### Variante B: Vollständige Staging-Topologie
-
-Zusätzlich zu Variante A:
-
-1. `app-staging.myqr24.com` im Pages-Projekt als Custom Domain aktivieren.
-2. `s.myqr24.com` durch vollständigen DNS-Umzug oder NS-Delegation an Cloudflare anbinden.
-3. Worker Route anlegen:
+1. `s.myqr24.com` durch vollständigen DNS-Umzug oder NS-Delegation an Cloudflare anbinden.
+2. Im Staging Worker die Route anlegen:
 
    ```text
    s.myqr24.com/t/* → myqr24-edge-routing-staging
    ```
 
-4. Das Staging-Feature in KV auf folgende Ziel-URL umstellen:
+3. `app-staging.myqr24.com` im Pages-Projekt als Custom Domain aktivieren.
+4. Das Staging-Feature im identifizierten aktiven KV-Namespace kontrolliert auf die Ziel-URL umstellen:
 
    ```text
    https://app-staging.myqr24.com/tag/{tagId}
    ```
 
-5. Beide Scan-URL-Formen testen:
+5. DNS- und TLS-Propagierung abwarten und den Scan testen:
 
    ```text
-   https://s.qx4.uk/rsq45q
    https://s.myqr24.com/t/rsq45q
    ```
 
-Beide müssen zu derselben PWA-Route mit derselben Tag-ID führen.
+Erwartung:
+
+```text
+HTTP 302
+Location: https://app-staging.myqr24.com/tag/rsq45q?exp=...&sig=...
+```
+
+### Gleichwertige QR4-Testhosts
+
+Zusätzlich zur verbindlichen myQR24-Staging-Abnahme dürfen die QR4-Testhosts eingerichtet und geprüft werden:
+
+1. In der Cloudflare-Zone `qr4.uk` die proxied A-Records `s → 192.0.2.1` und `p → 192.0.2.1` anlegen.
+2. Worker-Routen anlegen:
+
+   ```text
+   s.qr4.uk/t/*   → myqr24-edge-routing-staging
+   s.qr4.uk/t1/*  → myqr24-edge-routing-staging
+   p.qr4.uk/t/*   → myqr24-edge-routing
+   p.qr4.uk/t1/*  → myqr24-edge-routing
+   ```
+
+3. Staging und Production jeweils gegen die zugehörigen, getrennten Bindings testen:
+
+   ```text
+   https://s.qr4.uk/t/rsq45q
+   https://p.qr4.uk/t/{productionTagId}
+   ```
+
+Die QR4-Hosts müssen jeweils zur selben fachlichen TAG-ID und zur umgebungszugehörigen TAG-App führen. `https://qr4.uk/...` wird dabei nicht eingerichtet oder getestet.
 
 ---
 
-## 10. Worker-Routen je Umgebung
+## 10. Worker-gehostete Plattforminformation und Scan-Redirect
 
-| Umgebung | Route | Worker |
-| --- | --- | --- |
-| Staging | `s.qx4.uk/*` | `myqr24-edge-routing-staging` |
-| Staging | `s.myqr24.com/t/*` | `myqr24-edge-routing-staging` |
-| Production | `qx4.uk/*` | `myqr24-edge-routing` |
-| Production | `p.myqr24.com/t/*` | `myqr24-edge-routing` |
+Der Production Edge Router liefert unter `https://www.myqr24.com/` eine statische HTML-Seite mit Basisinformationen zu myQR24. Ein Aufruf ohne TAG auf einem der vier erlaubten Scan-Hosts wird per Worker auf diese Seite weitergeleitet:
+
+```text
+https://s.myqr24.com/  → https://www.myqr24.com/
+https://s.qr4.uk/      → https://www.myqr24.com/
+https://p.myqr24.com/  → https://www.myqr24.com/
+https://p.qr4.uk/      → https://www.myqr24.com/
+```
+
+### 10.1 DNS- und Worker-Konfiguration
+
+In der Cloudflare-Zone `myqr24.com` wird der Host `www` mit einem proxied Platzhalter-Origin angelegt:
+
+| Feld | Wert |
+| --- | --- |
+| Type | `A` |
+| Name | `www` |
+| IPv4 address | `192.0.2.1` |
+| Proxy status | **Proxied** |
+| TTL | Auto |
+
+Danach wird ausschließlich im **Production**-Worker folgende Route eingerichtet:
+
+```text
+www.myqr24.com/* → myqr24-edge-routing
+```
+
+Diese breite Route ist absichtlich auf den einen Plattformhost begrenzt. Der Worker erlaubt dort nur `GET` und `HEAD` auf `/`, liefert die statische HTML-Seite mit Sicherheitsheadern und begrenzter Cache-Policy aus und antwortet auf jeden anderen Pfad mit `404`.
+
+Die Scan-Hosts werden ebenfalls durch ihre Worker-Handler auf `/` weitergeleitet. Dafür ist keine Cloudflare Redirect Rule erforderlich. Ihre bestehenden Scan-Routen bleiben eng auf `/t/*` und `/t1/*` begrenzt.
+
+### 10.2 Abgrenzung und Bot-Schutz
+
+Der Worker-Redirect ist ausschließlich eine Landingpage für Basisdomain-Aufrufe. Er darf **nicht** als Fehlerbehandlung für TAG-Scans erweitert werden:
+
+```text
+/t/{gültiger, zugewiesener Tag}       → normale TAG-Auflösung
+/t/{ungültiger oder unbekannter Tag}  → 404
+/sonstiger-pfad                        → 404
+qr4.uk/                                → nicht aktiviert bzw. 404
+```
+
+Bei auffälligem automatisiertem Traffic werden in Cloudflare zusätzlich WAF Custom Rules oder Rate-Limiting Rules ausschließlich für die Scan-Pfadfamilien `/t/*` und `/t1/*` eingerichtet. Die Regel soll Requests mit ungewöhnlich hoher Rate und vielen unterschiedlichen TAG-IDs je Quell-IP challengen oder begrenzen. Die konkrete Schwelle wird nach Cloudflare-Analytics und realem Scanvolumen festgelegt, damit reguläre Kamera-Scans nicht beeinträchtigt werden.
+
+## 11. Worker-Routen je Umgebung
+
+| Umgebung | Route | Worker | Betriebsstatus |
+| --- | --- | --- | --- |
+| Staging | `s.myqr24.com/`, `s.myqr24.com/t/*`, `s.myqr24.com/t1/*` | `myqr24-edge-routing-staging` | Scan-Root-Redirect und verbindliche erste TAG-Ausgabe |
+| Production | `p.myqr24.com/`, `p.myqr24.com/t/*`, `p.myqr24.com/t1/*` | `myqr24-edge-routing` | Scan-Root-Redirect und verbindliche erste TAG-Ausgabe |
+| Staging-Test | `s.qr4.uk/`, `s.qr4.uk/t/*`, `s.qr4.uk/t1/*` | `myqr24-edge-routing-staging` | für Tests und Abnahmen zulässig |
+| Production-Test | `p.qr4.uk/`, `p.qr4.uk/t/*`, `p.qr4.uk/t1/*` | `myqr24-edge-routing` | für Tests und Abnahmen zulässig |
+| Plattforminformation | `www.myqr24.com/*` | `myqr24-edge-routing` | statische HTML-Seite nur für `GET`/`HEAD /` |
 
 Die Routen müssen bewusst eng bleiben. Der Worker prüft zusätzlich intern Host und Pfad fail-closed.
 
 ---
 
-## 11. Abnahmetests
+## 12. Abnahmetests
 
-### Positivtests
+### Root-Redirect-Tests
 
 ```text
-GET https://s.qx4.uk/rsq45q
+GET  https://s.myqr24.com/
+HEAD https://s.qr4.uk/?source=test
+GET  https://p.myqr24.com/
+GET  https://p.qr4.uk/
+```
+
+Jeder Aufruf liefert:
+
+```text
+HTTP 302
+Location: https://www.myqr24.com/
+```
+
+Query-Parameter erscheinen nicht im `Location`-Header.
+
+### Plattforminformations-Test
+
+```text
+GET  https://www.myqr24.com/
+HEAD https://www.myqr24.com/
+GET  https://www.myqr24.com/other
+```
+
+Erwartung:
+
+```text
+GET /       → HTTP 200, Content-Type: text/html; charset=utf-8
+HEAD /      → HTTP 200, leerer Body
+GET /other  → HTTP 404
+```
+
+### Positivtests für die verbindliche erste Staging-Topologie
+
+```text
 GET https://s.myqr24.com/t/rsq45q
 ```
 
@@ -419,22 +518,22 @@ Location: https://app-staging.myqr24.com/tag/rsq45q?exp=...&sig=...
 ### Negativtests
 
 ```text
-GET  https://s.qx4.uk/t/rsq45q          → 404
 GET  https://s.myqr24.com/rsq45q        → 404
-GET  https://s.qx4.uk/invalid!          → 404
-POST https://s.qx4.uk/rsq45q            → 405
+GET  https://s.myqr24.com/t/invalid!    → 404
+POST https://s.myqr24.com/t/rsq45q      → 405
 ```
 
 Production-Hosts dürfen durch den Staging-Worker nicht aufgelöst werden:
 
 ```text
-GET https://qx4.uk/rsq45q               → nicht durch Staging auflösen
+GET https://p.qr4.uk/t/rsq45q           → nicht durch Staging auflösen
 GET https://p.myqr24.com/t/rsq45q       → nicht durch Staging auflösen
+GET https://qr4.uk/t/rsq45q             → nicht eingerichtet
 ```
 
 ---
 
-## 12. Sicherheits- und Betriebsregeln
+## 13. Sicherheits- und Betriebsregeln
 
 1. Keine Cloudflare-Origin-IP erraten oder als A-Record übernehmen.
 2. Keine Scan-Domain auf graue Wolke (DNS only) setzen, wenn sie per Worker Route bedient wird.
@@ -444,3 +543,6 @@ GET https://p.myqr24.com/t/rsq45q       → nicht durch Staging auflösen
 6. Bestehende Mail- und Webrecords bei einem vollständigen DNS-Umzug vorab vollständig inventarisieren.
 7. Production erst nach dokumentierter Staging-Abnahme konfigurieren.
 8. Die temporäre `pages.dev`-URL ist nur für die erste Teststrecke zulässig; vor einer breiteren Staging-Nutzung soll auf `app-staging.myqr24.com` umgestellt werden.
+9. Die Worker-Route `www.myqr24.com/*` ist ausschließlich für die statische Plattforminformation zulässig; der Handler erlaubt dort nur `GET` und `HEAD` auf `/`.
+10. Die Scan-Root-Weiterleitung gilt nur für die vier explizit erlaubten Scan-Hosts und ausschließlich den Pfad `/`.
+11. Ungültige oder nicht gefundene TAGs bleiben `404`; sie werden nie auf die Plattform-Startseite weitergeleitet.

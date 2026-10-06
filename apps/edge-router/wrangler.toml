@@ -17,11 +17,23 @@ compatibility_date = "2026-09-30"
 #   npx wrangler secret put REDIRECT_SIGNING_SECRET --env production
 #
 # Configure the Worker routes in the Cloudflare dashboard after deployment:
-#   s.qx4.uk/*       -> myqr24-edge-routing-staging
-#   s.myqr24.com/t/* -> myqr24-edge-routing-staging
-#   qx4.uk/*         -> myqr24-edge-routing
-#   p.myqr24.com/t/* -> myqr24-edge-routing
+#   s.myqr24.com/     -> myqr24-edge-routing-staging
+#   s.myqr24.com/t/*  -> myqr24-edge-routing-staging
+#   s.myqr24.com/t1/* -> myqr24-edge-routing-staging
+#   s.qr4.uk/         -> myqr24-edge-routing-staging
+#   s.qr4.uk/t/*      -> myqr24-edge-routing-staging
+#   s.qr4.uk/t1/*     -> myqr24-edge-routing-staging
+#   p.myqr24.com/     -> myqr24-edge-routing
+#   p.myqr24.com/t/*  -> myqr24-edge-routing
+#   p.myqr24.com/t1/* -> myqr24-edge-routing
+#   p.qr4.uk/         -> myqr24-edge-routing
+#   p.qr4.uk/t/*      -> myqr24-edge-routing
+#   p.qr4.uk/t1/*     -> myqr24-edge-routing
+#   www.myqr24.com/*  -> myqr24-edge-routing
 #
+# The www route is the only deliberately broad route. The explicit scan-root
+# routes cover only /. Its handler permits only GET/HEAD on / and responds 404
+# for every other www path.
 # Do not bind staging and production to the same KV namespace or secrets.
 
 [env.staging]

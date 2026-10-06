@@ -6,10 +6,16 @@
 
 | Domain / Hostname | Zulässiger Pfad | Zweck | Verhalten |
 | --- | --- | --- | --- |
-| `qx4.uk` | `/t/{TAG-ID}` oder `/t1/{TAG-ID}` | Kurze NFC-/QR-Tag-URL | Tag auflösen |
-| `p.myqr24.com` | `/t/{TAG-ID}` oder `/t1/{TAG-ID}` | myQR24-Kompatibilitäts-URL | Tag auflösen |
+| `s.myqr24.com` | `/t/{TAG-ID}` oder `/t1/{TAG-ID}` | primäre Staging Scan-URL | Staging-TAG auflösen |
+| `s.qr4.uk` | `/t/{TAG-ID}` oder `/t1/{TAG-ID}` | gleichwertige Staging-Test-URL | Staging-TAG auflösen |
+| `p.myqr24.com` | `/t/{TAG-ID}` oder `/t1/{TAG-ID}` | primäre Production Scan-URL | Production-TAG auflösen |
+| `p.qr4.uk` | `/t/{TAG-ID}` oder `/t1/{TAG-ID}` | gleichwertige Production-Test-URL | Production-TAG auflösen |
 
-Hosts, Routenpfadsegment und TAG-ID werden unabhängig von Groß-/Kleinschreibung verglichen und intern normalisiert. Die kanonische, durch myQR24 erzeugte Schreibweise lautet stets `/t/{tag-id-in-lowercase}`. Route-lose TAG-URLs wie `/{TAG-ID}`, zusätzliche Pfadsegmente sowie alle anderen Hosts und Pfade liefern `404 Not Found`.
+Hosts, Routenpfadsegment und TAG-ID werden unabhängig von Groß-/Kleinschreibung verglichen und intern normalisiert. Die kanonische, durch myQR24 erzeugte Schreibweise lautet stets `/t/{tag-id-in-lowercase}`.
+
+Die Staging-Hosts dürfen ausschließlich vom Staging-Worker und die Production-Hosts ausschließlich vom Production-Worker aufgelöst werden. Dieselbe fachliche TAG-ID kann innerhalb ihrer Umgebung über beide zulässigen Hosts aufgelöst werden. Für die erste physische TAG-Herstellung bleiben `s.myqr24.com` und `p.myqr24.com` die primären Ausgabehosts.
+
+`qr4.uk` ohne Subdomain ist bis zu einer separaten Produktentscheidung für sehr kurze URLs kein zulässiger Scan-, API- oder Medienhost. Die abgelösten Hosts `qx4.uk` und `s.qx4.uk` sind ebenfalls nicht zulässig. Der exakte Root-Pfad `/` der vier zulässigen Scan-Hosts (`s.myqr24.com`, `s.qr4.uk`, `p.myqr24.com`, `p.qr4.uk`) liefert ausschließlich für `GET` und `HEAD` einen `302`-Redirect auf `https://www.myqr24.com/`, ohne Query-Parameter zu übernehmen. Route-lose TAG-URLs wie `/{TAG-ID}`, zusätzliche Pfadsegmente sowie alle sonstigen Hosts und Pfade liefern `404 Not Found`.
 
 `/t/` ist die aktuelle Standard-Routenfamilie. `/t1/` ist bereits als erlaubte Erweiterungsroute vorhanden und nutzt bis zu ihrer gesonderten Aktivierung dieselbe Decoder-Konfiguration wie `/t/`. Eine spätere Routenfamilie darf ausschließlich per fester serverseitiger Allowlist an eine neue Decoder-/Secret-Version gebunden werden; weder der URL-Pfad noch KV-Konfiguration dürfen einen frei wählbaren Secret-Namen oder Schlüsselinhalt bestimmen.
 

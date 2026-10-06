@@ -26,8 +26,8 @@ Der Worker ist absichtlich nur die **lesende Edge-Auflösungsschicht**. Er enth�
 
 | Umgebung | kurze Scan-URL | sprechende Scan-URL | Worker |
 | --- | --- | --- | --- |
-| Staging | `https://s.qx4.uk/{tagId}` | `https://s.myqr24.com/t/{tagId}` | `myqr24-edge-routing-staging` |
-| Produktion | `https://qx4.uk/{tagId}` | `https://p.myqr24.com/t/{tagId}` | `myqr24-edge-routing` |
+| Staging | `https://s.qr4.uk/t/{tagId}` | `https://s.myqr24.com/t/{tagId}` | `myqr24-edge-routing-staging` |
+| Produktion | `https://p.qr4.uk/t/{tagId}` | `https://p.myqr24.com/t/{tagId}` | `myqr24-edge-routing` |
 
 **Wichtig:**
 
@@ -42,10 +42,10 @@ Der Worker ist absichtlich nur die **lesende Edge-Auflösungsschicht**. Er enth�
 Diese Routen müssen nach erfolgreichem Worker-Deployment in Cloudflare eingerichtet werden:
 
 ```text
-s.qx4.uk/*             -> myqr24-edge-routing-staging
+s.qr4.uk/t/*             -> myqr24-edge-routing-staging
 s.myqr24.com/t/*       -> myqr24-edge-routing-staging
 
-qx4.uk/*               -> myqr24-edge-routing
+p.qr4.uk/t/*               -> myqr24-edge-routing
 p.myqr24.com/t/*       -> myqr24-edge-routing
 ```
 
@@ -59,11 +59,11 @@ Die Datei `src/index.ts` enthält die explizite, umgebungsbezogene Host-Allowlis
 
 ```ts
 staging:
-  s.qx4.uk/{tagId}
+  s.qr4.uk/t/{tagId}
   s.myqr24.com/t/{tagId}
 
 production:
-  qx4.uk/{tagId}
+  p.qr4.uk/t/{tagId}
   p.myqr24.com/t/{tagId}
 ```
 
@@ -223,14 +223,14 @@ myqr24-edge-routing-staging
 
 ### 6.5 Staging-DNS und Routen einrichten
 
-In den Cloudflare-Zonen `qx4.uk` und `myqr24.com`:
+In den Cloudflare-Zonen `qr4.uk` und `myqr24.com`:
 
-1. DNS-Eintrag für `s.qx4.uk` erstellen und proxied schalten.
+1. DNS-Eintrag für `s.qr4.uk` erstellen und proxied schalten.
 2. DNS-Eintrag für `s.myqr24.com` erstellen und proxied schalten.
 3. Die Routen erstellen:
 
    ```text
-   s.qx4.uk/*
+   s.qr4.uk/t/*
    s.myqr24.com/t/*
    ```
 
@@ -302,7 +302,7 @@ Die Staging-Abnahme ist erst erfüllt, wenn mindestens folgende Nachweise vorlie
 - Worker myqr24-edge-routing-staging ist deployed.
 - SCAN_ENVIRONMENT ist staging.
 - Staging-KV ist als TAG_CONFIG gebunden.
-- s.qx4.uk/* zeigt auf den Staging Worker.
+- s.qr4.uk/t/* zeigt auf den Staging Worker.
 - s.myqr24.com/t/* zeigt auf den Staging Worker.
 ```
 
@@ -311,7 +311,7 @@ Die Staging-Abnahme ist erst erfüllt, wenn mindestens folgende Nachweise vorlie
 Mit einer gültigen, im Staging-KV konfigurierten Testtag-ID:
 
 ```text
-GET https://s.qx4.uk/{tagId}
+GET https://s.qr4.uk/t/{tagId}
 GET https://s.myqr24.com/t/{tagId}
 ```
 
@@ -320,18 +320,18 @@ Beide müssen dieselbe konfigurierte Aktion liefern (Redirect oder JSON).
 Negativtests:
 
 ```text
-GET https://s.qx4.uk/t/{tagId}          -> 404
+GET https://s.qr4.uk/{tagId}            -> 404
 GET https://s.myqr24.com/{tagId}        -> 404
-GET https://qx4.uk/{tagId}              -> nicht durch Staging auflösen
+GET https://p.qr4.uk/t/{tagId}              -> nicht durch Staging auflösen
 GET https://p.myqr24.com/t/{tagId}      -> nicht durch Staging auflösen
-GET https://s.qx4.uk/invalid!           -> 404
-POST https://s.qx4.uk/{tagId}           -> 405
+GET https://s.qr4.uk/invalid!           -> 404
+POST https://s.qr4.uk/t/{tagId}           -> 405
 ```
 
 Bei 8-stelligen IDs zusätzlich mindestens eine manipulierter HMAC-Prüffall:
 
 ```text
-GET https://s.qx4.uk/{manipulatedTagId} -> 404
+GET https://s.qr4.uk/t/{manipulatedTagId} -> 404
 ```
 
 ### Nachweisablage
@@ -369,7 +369,7 @@ npm run deploy -- --env production
 Danach erst die Production-Routen einrichten bzw. aktivieren:
 
 ```text
-qx4.uk/*
+p.qr4.uk/t/*
 p.myqr24.com/t/*
 ```
 
@@ -468,7 +468,7 @@ Die Dry-Runs enthielten erwartungsgemäß noch keine `TAG_CONFIG`-KV-Bindung, we
 ## 13. Offene Punkte für die Deployment-Session
 
 - [ ] Cloudflare-Konto und Zugriffsrechte prüfen.
-- [ ] Zonen-/DNS-Verwaltung für `qx4.uk` und `myqr24.com` bestätigen.
+- [ ] Zonen-/DNS-Verwaltung für `qr4.uk` und `myqr24.com` bestätigen.
 - [ ] Staging-KV erstellen und ID in `wrangler.toml` eintragen.
 - [ ] Production-KV erstellen und ID in `wrangler.toml` eintragen.
 - [ ] Staging-Secrets setzen.

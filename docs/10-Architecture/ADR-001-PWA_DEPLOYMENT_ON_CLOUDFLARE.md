@@ -54,7 +54,7 @@ Empfohlene Staging-Topologie:
 NFC-/QR-Testtag
   │
   ▼
-https://s.qx4.uk/{tagId}
+https://s.qr4.uk/t/{tagId}
 https://s.myqr24.com/t/{tagId}
   │
   ▼

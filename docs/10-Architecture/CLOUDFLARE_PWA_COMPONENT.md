@@ -27,7 +27,7 @@ Die PWA und API laufen vollständig auf Cloudflare. „PWA/API“ bezeichnet som
 NFC-/QR-Scan
     │
     ▼
-https://qx4.uk/{tagId}
+https://p.qr4.uk/t/{tagId}
 https://p.myqr24.com/t/{tagId}
     │
     ▼
@@ -76,7 +76,7 @@ https://p.myqr24.com/t/{tagId}
 
 | Komponente | Empfohlene Domain | Cloudflare-Baustein | Aufgabe |
 | --- | --- | --- | --- |
-| Edge Resolver | `qx4.uk`, `p.myqr24.com` | Worker | sichere öffentliche Tag-Auflösung |
+| Edge Resolver | `p.qr4.uk`, `p.myqr24.com` | Worker | sichere öffentliche Tag-Auflösung |
 | PWA | `app.myqr24.com` | Pages oder Worker mit Assets | Scan-Ansicht und Owner-Oberfläche |
 | API | `app.myqr24.com/api` oder `api.myqr24.com` | Worker | fachliche APIs und Autorisierung |
 | Öffentliche Assets | `media.myqr24.com` | R2 Custom Domain | nur versionierte, explizit öffentliche Dateien |

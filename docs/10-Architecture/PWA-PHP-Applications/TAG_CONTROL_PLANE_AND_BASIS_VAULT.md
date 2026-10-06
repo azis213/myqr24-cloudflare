@@ -388,7 +388,72 @@ Der Worker kennt nur dieses Feature-Dokument und leitet auf die feste, validiert
 
 ---
 
-## 11. Verwandte Dokumente
+## 11. Öffentliche TAG-Runtime-Projektion und Owner-gesteuerte Sichtbarkeit
+
+### 11.1 Öffentlicher Read-Pfad
+
+Die öffentliche TAG-App ist auch ohne Scan direkt aufrufbar. Sie bietet eine neutrale Startseite mit Scan, Anmeldung und persönlicher Collection; eine öffentliche TAG-Route bleibt über `/tag/{tagId}` aufrufbar. Ein Scan durch den Edge Router führt weiterhin zu derselben Route.
+
+```text
+Browser oder Scan
+  → TAG-App `/tag/{tagId}`
+  → Edge Public-View-API / Runtime-Worker
+  → veröffentlichte, öffentliche TAG-Runtime-Projektion
+  → typisiertes Rendering von Content, Galerie oder erlaubtem Redirect
+```
+
+Die App implementiert keine Feistel-, HMAC-, Range- oder Routing-Entscheidung. Der Edge Router validiert Scan-URLs; die öffentliche View-API entscheidet anhand der veröffentlichten Projektion nur über die zulässige öffentliche Darstellung.
+
+Eine fehlende, geschlossene, gesperrte oder nicht veröffentlichte Projektion erzeugt öffentlich eine neutrale Nichtverfügbar-Ansicht. Sie offenbart weder Owner-, Claim- noch Entwurfsdetails.
+
+### 11.2 Deterministische öffentliche Projektion
+
+Die Control Plane publiziert neben der minimalen Routing-Projektion eine getrennte, versionierte Public-Runtime-Projektion. Der öffentliche Key wird ausschließlich aus der kanonischen Base36-`tagId`, nicht aus Owner-, Organisations- oder internen DB-IDs abgeleitet:
+
+```text
+public-tag-config/v1/{tagId[0:2]}/{tagId}/{revision}.json
+public-media/v1/{tagId[0:2]}/{tagId}/{revision}/...
+```
+
+Ein kleiner Pointer/Manifest-Eintrag kann auf die aktuelle veröffentlichte Revision zeigen. KV eignet sich für kleine Pointer oder kleine Views; R2 eignet sich für versionierte JSON- und Medienobjekte. Ein Worker liefert einen stabilen API-Vertrag und leitet den Key ausschließlich serverseitig ab. Es gibt keinen frei parametrisierbaren Objektpfad und keine `ownerId` im öffentlichen Key.
+
+Die öffentliche Runtime-Projektion enthält ausschließlich veröffentlichte, typisierte Daten: Sichtbarkeitsmodus, erlaubte Content-Blöcke, Galerie-Metadaten und serverseitig validierte Feature-/Redirect-Informationen. Sie enthält niemals Owner-ID, Account, Claim- oder Owner-PIN-Hash, Credential, Session, Lockout, Audit, Pool, Bestellung, interne Pfade oder private Entwürfe.
+
+### 11.3 Owner-Konfiguration, Sichtbarkeit und Zugriff
+
+Der Owner bestimmt das gewünschte TAG-Verhalten über eine autorisierte TAG-App-Owner-Oberfläche. Die Control Plane prüft jedoch immer Produktpolicy, Lifecycle, Schema, Rollen und Freigaben und publiziert erst danach eine bereinigte öffentliche Revision.
+
+```text
+Owner-TAG-App
+  → autorisierter Control-Plane-Command
+  → MySQL-Transaktion, Policy, Audit und Outbox
+  → kontrollierter Cloudflare-Publisher
+  → neue öffentliche Runtime-Projektion
+```
+
+Mindestens folgende öffentliche Zugriffsmodi sind vorgesehen:
+
+| Modus | Direkter Aufruf `/tag/{tagId}` |
+| --- | --- |
+| `public` | veröffentlichter Content ist sichtbar und die URL darf geteilt werden |
+| `pin-required` | nur neutraler Einstieg; geschützter Content erst nach serverseitiger PIN-Freigabe |
+| `closed` | neutrale Nichtverfügbarkeit ohne Detailinformation |
+| `redirect` | nur serverseitig validiertes, veröffentlichtes Redirect-Ziel wird ausgeführt |
+
+Eine Collection, lokale Browserdaten oder die Kenntnis einer TAG-ID begründen niemals Owner-, Upload- oder PIN-Rechte.
+
+### 11.4 Collections und Besitzanker
+
+Die TAG-App darf nach bewusster Aktion eine lokale Collection als Verweis auf eine `tagId` führen. Diese ist löschbar, geräte-/browsergebunden und kein Besitznachweis. Nach Anmeldung kann der Nutzer sie ausdrücklich und idempotent in eine kontogebundene Collection übernehmen; persönliche Collection-Antworten verwenden `Cache-Control: no-store`.
+
+Nach einem erfolgreichen Claim muss die Control Plane einen dauerhaften Besitzanker erzwingen:
+
+1. Account-/Organisationsbindung, oder
+2. eine separate, TAG-gebundene Owner-Passphrase.
+
+Die Claim-Session ist nur ein kurzlebiger Setup-Zustand. Owner-Passphrase, gedrucktes Claim-Secret und Besucher-PIN sind getrennte Faktoren mit getrennten Hashes, Rate Limits, Sperrungen und Audit-Ereignissen. Owner-Verwaltung erfordert entweder eine serverseitig zugeordnete Account-Session oder eine kurzlebige, `HttpOnly`, `Secure`, `SameSite=Strict` TAG-Owner-Session nach erfolgreicher Owner-Passphrase-Prüfung. Offline sind unverbindliche Entwürfe möglich, aber kein endgültiger Claim, keine Besitzanker-Einrichtung und kein Publish.
+
+## 12. Verwandte Dokumente
 
 - [ADR-001: PWA Deployment on Cloudflare](../ADR-001-PWA_DEPLOYMENT_ON_CLOUDFLARE.md)
 - [Cloudflare PWA Component](../CLOUDFLARE_PWA_COMPONENT.md)

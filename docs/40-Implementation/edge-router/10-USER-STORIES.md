@@ -8,7 +8,7 @@
 
 ### Akzeptanzkriterien
 
-- `https://qx4.uk/{TAG-ID}` akzeptiert genau ein Base36-Pfadsegment mit 6 oder 8 Zeichen.
+- `https://p.qr4.uk/t/{TAG-ID}` akzeptiert genau ein Base36-Pfadsegment mit 6 oder 8 Zeichen.
 - `https://p.myqr24.com/t/{TAG-ID}` akzeptiert genau die dokumentierte Kompatibilitätsform.
 - Groß- und Kleinschreibung der Tag-ID führt zum selben normalisierten Wert.
 - Andere Hosts, Pfade, zusätzliche Segmente und andere ID-Längen führen zu `404`.

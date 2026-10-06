@@ -6,9 +6,14 @@ Jeder Testfall wird automatisiert in Vitest umgesetzt. Die Kennungen werden in T
 
 | ID | Story | Setup / Eingabe | Erwartetes Ergebnis |
 | --- | --- | --- | --- |
-| TC-URL-001 | US-001 | `https://qx4.uk/Ab12Cd` | Tag-ID `ab12cd`, Länge 6 |
+| TC-URL-001 | US-001 | `https://p.qr4.uk/t/Ab12Cd` | Tag-ID `ab12cd`, Länge 6 |
 | TC-URL-002 | US-001 | `https://p.myqr24.com/t/Ab12Cd34` | Tag-ID `ab12cd34`, Länge 8 |
 | TC-URL-003 | US-001/US-002 | Falscher Host, falscher Pfad, Zusatzsegment, falsche Länge oder ungültiges Alphabet | `404` |
+| TC-HOME-001 | US-001/US-002 | `GET /` auf jedem erlaubten Scan-Host in seiner Umgebung | `302`, `Location: https://www.myqr24.com/` |
+| TC-HOME-002 | US-002 | `HEAD /?source=bot` auf erlaubtem Scan-Host | `302`, leerer Body; Query-Parameter nicht im `Location`-Header |
+| TC-HOME-003 | US-001/US-002 | `GET /` auf Apex, fremdem oder umgebungsfremdem Host | `404` |
+| TC-HOME-004 | US-001/US-002 | `GET /` auf `www.myqr24.com` im Production-Worker | `200`, statisches HTML, Sicherheitsheader und begrenzte Cache-Policy |
+| TC-HOME-005 | US-001/US-002 | `HEAD /`, Staging-Request oder zusätzlicher Pfad auf `www.myqr24.com` | leerer `200`-Body nur für `HEAD /`; sonst `404` |
 | TC-HTTP-001 | US-002 | `POST` auf gültige URL | `405`, Header `Allow: GET, HEAD` |
 | TC-HTTP-002 | US-002/US-009 | Valider `HEAD`-Request | korrekter Status, leerer Body |
 
