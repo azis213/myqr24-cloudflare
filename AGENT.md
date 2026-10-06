@@ -48,9 +48,8 @@ Staging und Production müssen vollständig getrennt sein:
 
 - eigene Worker;
 - eigene `TAG_CONFIG`-KV-Namespaces;
-- eigene `FEISTEL_SECRET`-Secrets;
-- eigene `TAG_HMAC_SECRET`-Secrets;
-- eigene `REDIRECT_SIGNING_SECRET`-Secrets.
+- Staging: eigene versionierte `FEISTEL_SECRET_S01`-, `TAG_HMAC_SECRET_S01`- und `REDIRECT_SIGNING_SECRET_S01`-Secrets;
+- Production: eigene versionierte Secret-Bindings, deren erste Kennung erst vor dem Production-Gate festgelegt wird.
 
 Die Zuordnung erfolgt über `SCAN_ENVIRONMENT` in `wrangler.toml`:
 

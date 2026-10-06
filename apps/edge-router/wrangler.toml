@@ -7,14 +7,14 @@ compatibility_date = "2026-09-30"
 # Deployments are environment-specific. Create one KV namespace per environment,
 # then replace the corresponding namespace IDs below.
 #
-# Required secrets must be configured separately for every environment:
-#   npx wrangler secret put FEISTEL_SECRET --env staging
-#   npx wrangler secret put TAG_HMAC_SECRET --env staging
-#   npx wrangler secret put REDIRECT_SIGNING_SECRET --env staging
+# Required versioned Staging secrets:
+#   npx wrangler secret put FEISTEL_SECRET_S01 --env staging
+#   npx wrangler secret put TAG_HMAC_SECRET_S01 --env staging
+#   npx wrangler secret put REDIRECT_SIGNING_SECRET_S01 --env staging
 #
-#   npx wrangler secret put FEISTEL_SECRET --env production
-#   npx wrangler secret put TAG_HMAC_SECRET --env production
-#   npx wrangler secret put REDIRECT_SIGNING_SECRET --env production
+# Production secret-version names are intentionally not decided or configured
+# during W0. Do not reuse Staging secrets or deploy this Staging binding set
+# to Production.
 #
 # Configure the Worker routes in the Cloudflare dashboard after deployment:
 #   s.myqr24.com/     -> myqr24-edge-routing-staging

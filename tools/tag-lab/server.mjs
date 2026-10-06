@@ -57,12 +57,12 @@ function parseEnvironmentFile(path) {
 }
 
 const localEnvironment = parseEnvironmentFile(SECRET_FILE);
-const feistelSecret = localEnvironment.FEISTEL_SECRET;
-const tagHmacSecret = localEnvironment.TAG_HMAC_SECRET;
+const feistelSecret = localEnvironment.FEISTEL_SECRET_S01;
+const tagHmacSecret = localEnvironment.TAG_HMAC_SECRET_S01;
 
 if (!feistelSecret) {
   throw new Error(
-    "FEISTEL_SECRET is missing. Add it to the local, Git-ignored .env.staging.local file.",
+    "FEISTEL_SECRET_S01 is missing. Add it to the local, Git-ignored .env.staging.local file.",
   );
 }
 
@@ -300,7 +300,7 @@ async function createTag(length) {
 
   if (length === 8 && !tagHmacSecret) {
     throw new Error(
-      "TAG_HMAC_SECRET is missing locally. Add it to .env.staging.local before generating 8-character tags.",
+      "TAG_HMAC_SECRET_S01 is missing locally. Add it to .env.staging.local before generating 8-character tags.",
     );
   }
 

@@ -87,7 +87,7 @@ async function publicTag(
   const encrypted = await encodeFeistel(
     decodedValue,
     length,
-    secrets.FEISTEL_SECRET,
+    secrets.FEISTEL_SECRET_S01,
   );
   expect(encrypted).not.toBeNull();
 
@@ -108,7 +108,7 @@ async function eightTag(): Promise<{
 }> {
   const lower = 36n ** 7n;
   const base = (lower + 64n) & ~0x0fn;
-  const nibble = await calculateHmacNibble(base, secrets.TAG_HMAC_SECRET);
+  const nibble = await calculateHmacNibble(base, secrets.TAG_HMAC_SECRET_S01);
   expect(nibble).not.toBeNull();
 
   const value = base | BigInt(nibble!);
@@ -560,7 +560,7 @@ describe("features, templates and worker responses", () => {
           length: "6",
           groupId: "group-default",
         },
-        secrets.REDIRECT_SIGNING_SECRET,
+        secrets.REDIRECT_SIGNING_SECRET_S01,
       ),
     ).resolves.toBeNull();
   });
@@ -577,7 +577,7 @@ describe("features, templates and worker responses", () => {
     const response = await toSafeRedirect(
       feature,
       context,
-      secrets.REDIRECT_SIGNING_SECRET,
+      secrets.REDIRECT_SIGNING_SECRET_S01,
       now,
     );
 
@@ -598,7 +598,7 @@ describe("features, templates and worker responses", () => {
       unsignedDestination,
       context,
       1_790_786_060,
-      secrets.REDIRECT_SIGNING_SECRET,
+      secrets.REDIRECT_SIGNING_SECRET_S01,
     );
 
     expect(location.searchParams.get("sig")).toBe(expectedSignature);
@@ -621,14 +621,14 @@ describe("features, templates and worker responses", () => {
       destination,
       context,
       expiresAt,
-      secrets.REDIRECT_SIGNING_SECRET,
+      secrets.REDIRECT_SIGNING_SECRET_S01,
     );
     const tamperedSignature = await calculateRedirectSignature(
       "redirect-signed",
       new URL("https://app.example.test/one-time?tag=abc123&id=60478522"),
       context,
       expiresAt,
-      secrets.REDIRECT_SIGNING_SECRET,
+      secrets.REDIRECT_SIGNING_SECRET_S01,
     );
 
     expect(signature).not.toBe(tamperedSignature);
@@ -654,7 +654,7 @@ describe("features, templates and worker responses", () => {
       toSafeRedirect(
         reservedParameterFeature,
         context,
-        secrets.REDIRECT_SIGNING_SECRET,
+        secrets.REDIRECT_SIGNING_SECRET_S01,
         1_790_786_000_000,
       ),
     ).resolves.toBeNull();
@@ -758,3 +758,4 @@ describe("8-character edge integration", () => {
     });
   });
 });
+

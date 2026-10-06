@@ -73,10 +73,10 @@
 
 1. `tagId` sowie `(length, decodedValue)` sind eindeutig constrained.
 2. Sechsstellige Werte stammen ausschließlich aus `I(6)`.
-3. Achtstellige Werte nutzen den nächsten vollständigen 16er-Basisslot; der serverseitige HMAC-Nibble wird danach berechnet.
-4. Der vollständige validierte `decodedValue` wird gespeichert.
-5. Retry/Idempotenz erzeugt keine ungewollte zweite Reservierung.
-6. Feistel-/HMAC-Secrets bleiben ausschließlich serverseitig.
+3. Achtstellige Werte nutzen den nächsten vollständigen 16er-Basisslot; der interne Cloudflare-Codec ergänzt danach das HMAC-Nibble.
+4. Der vollständige validierte `decodedValue` sowie die vom Codec zurückgelieferte öffentliche `tagId` werden gespeichert.
+5. Retry/Idempotenz erzeugt keine ungewollte zweite Reservierung oder zweite Codec-Wirkung.
+6. Die Control Plane besitzt niemals `FEISTEL_SECRET` oder `TAG_HMAC_SECRET`; sie ruft ausschließlich den authentisierten Encode-Vertrag [`tag-codec-internal-v1`](../../10-Architecture/35-Contracts/tag-codec-internal-v1.md) auf.
 
 ### CP-US-012 – TAG-Lebenszyklus serverseitig steuern
 

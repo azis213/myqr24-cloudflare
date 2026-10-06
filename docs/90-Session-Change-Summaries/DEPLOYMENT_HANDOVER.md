@@ -195,9 +195,9 @@ Die zurückgegebene ID bei `env.production.kv_namespaces` eintragen.
 Secrets dürfen nicht in Git, `wrangler.toml`, Test-JSON oder Dokumentation gespeichert werden.
 
 ```sh
-npx wrangler secret put FEISTEL_SECRET --env staging
-npx wrangler secret put TAG_HMAC_SECRET --env staging
-npx wrangler secret put REDIRECT_SIGNING_SECRET --env staging
+npx wrangler secret put FEISTEL_SECRET_S01 --env staging
+npx wrangler secret put TAG_HMAC_SECRET_S01 --env staging
+npx wrangler secret put REDIRECT_SIGNING_SECRET_S01 --env staging
 ```
 
 Für die erste Staging-Range müssen starke, voneinander unabhängige Werte verwendet werden.
@@ -352,13 +352,7 @@ Produktivdeployment erfolgt erst nach bestandener Staging-Abnahme.
 
 ### Production-Secrets
 
-Separat und neu setzen:
-
-```sh
-npx wrangler secret put FEISTEL_SECRET --env production
-npx wrangler secret put TAG_HMAC_SECRET --env production
-npx wrangler secret put REDIRECT_SIGNING_SECRET --env production
-```
+Separat und neu setzen. Die konkreten ersten versionierten Production-Bindungsnamen werden erst vor dem Production-Gate festgelegt; Staging-`_S01`-Werte und -Namen dürfen dafür nicht wiederverwendet werden.
 
 ### Production-Deploy
 
@@ -440,7 +434,7 @@ Die Dry-Runs enthielten erwartungsgemäß noch keine `TAG_CONFIG`-KV-Bindung, we
 3. Nur die vier dokumentierten Scan-Domains verwenden.
 4. Keine Host-Wildcards in der Worker-Logik ergänzen.
 5. Vor dem Erzeugen physischer Tags die passende Umgebung, die korrekten Secrets und den KV-Rangebestand prüfen.
-6. Änderungen an `FEISTEL_SECRET` oder `TAG_HMAC_SECRET` können die Gültigkeit bzw. Auflösbarkeit existierender Tags beeinflussen und dürfen nicht ungeplant erfolgen.
+6. Änderungen an versionierten Feistel- oder HMAC-Secrets können die Gültigkeit bzw. Auflösbarkeit existierender Tags beeinflussen und dürfen nicht ungeplant erfolgen.
 7. Der Range-Index ist sicherheitsrelevant: keine überlappenden, unsortierten oder unvalidierten Ranges schreiben.
 8. Cloudflare KV ist kein Ersatz für eine transaktionale Vergabe-/Verwaltungsdatenbank. Eine spätere Allocation-API benötigt atomare Vergabe und persistente Eindeutigkeitsconstraints.
 9. Der 4-Bit-HMAC-Nibble ist eine vorgegebene Integritätsprüfung, aber kein vollständiger Ersatz für ein längeres Authentifizierungsmerkmal.

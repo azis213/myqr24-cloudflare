@@ -2,9 +2,9 @@
  * myQR24 Edge Tag Router
  *
  * Runtime secrets:
- * - FEISTEL_SECRET: key material for the fixed 10-round Feistel permutation
- * - TAG_HMAC_SECRET: key material for the 4-bit integrity check of 8-character tags
- * - REDIRECT_SIGNING_SECRET: key material for short-lived signed redirect URLs
+ * - FEISTEL_SECRET_S01: Staging key material for the fixed 10-round Feistel permutation
+ * - TAG_HMAC_SECRET_S01: Staging key material for the 4-bit integrity check of 8-character tags
+ * - REDIRECT_SIGNING_SECRET_S01: Staging key material for short-lived signed redirect URLs
  *
  * Runtime bindings:
  * - TAG_CONFIG: Cloudflare KV namespace containing ranges, assignments and features
@@ -15,9 +15,9 @@ export type ScanEnvironment = "staging" | "production";
 export interface Env {
   TAG_CONFIG: KVNamespace;
   SCAN_ENVIRONMENT: ScanEnvironment;
-  FEISTEL_SECRET: string;
-  TAG_HMAC_SECRET: string;
-  REDIRECT_SIGNING_SECRET: string;
+  FEISTEL_SECRET_S01: string;
+  TAG_HMAC_SECRET_S01: string;
+  REDIRECT_SIGNING_SECRET_S01: string;
 }
 
 export type TagLength = 6 | 8;
@@ -468,7 +468,7 @@ export async function calculateHmacNibble(
  */
 export async function decodeTagId(
   tag: TagRequest,
-  env: Pick<Env, "FEISTEL_SECRET" | "TAG_HMAC_SECRET">,
+  env: Pick<Env, "FEISTEL_SECRET_S01" | "TAG_HMAC_SECRET_S01">,
 ): Promise<bigint | null> {
   const encryptedValue = parseBase36(tag.id);
 
@@ -479,7 +479,7 @@ export async function decodeTagId(
   const decodedValue = await decodeFeistel(
     encryptedValue,
     tag.length,
-    env.FEISTEL_SECRET,
+    env.FEISTEL_SECRET_S01,
   );
 
   if (decodedValue === null) {
@@ -492,7 +492,7 @@ export async function decodeTagId(
 
   const base = decodedValue & ~0x0fn;
   const suppliedNibble = Number(decodedValue & 0x0fn);
-  const expectedNibble = await calculateHmacNibble(base, env.TAG_HMAC_SECRET);
+  const expectedNibble = await calculateHmacNibble(base, env.TAG_HMAC_SECRET_S01);
 
   return expectedNibble !== null && suppliedNibble === expectedNibble
     ? decodedValue
@@ -1023,7 +1023,7 @@ export const handleRequest: ExportedHandlerFetchHandler<Env> = async (
         length: tagRequest.length.toString(),
         groupId: resolved.group.id,
       },
-      env.REDIRECT_SIGNING_SECRET,
+      env.REDIRECT_SIGNING_SECRET_S01,
     );
 
     return response ?? notFound();

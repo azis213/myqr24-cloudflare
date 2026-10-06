@@ -1,9 +1,9 @@
 {
   "version": 1,
   "secrets": {
-    "FEISTEL_SECRET": "test-feistel-secret",
-    "TAG_HMAC_SECRET": "test-hmac-secret",
-    "REDIRECT_SIGNING_SECRET": "test-redirect-signing-secret"
+    "FEISTEL_SECRET_S01": "test-feistel-secret",
+    "TAG_HMAC_SECRET_S01": "test-hmac-secret",
+    "REDIRECT_SIGNING_SECRET_S01": "test-redirect-signing-secret"
   },
   "groups": {
     "group-default": {

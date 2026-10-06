@@ -5,8 +5,8 @@
 Alle Testdaten sind künstlich und nicht geheim. Die Test-Secrets dürfen ausschließlich in lokalen Tests verwendet werden:
 
 ```text
-FEISTEL_SECRET=test-feistel-secret
-TAG_HMAC_SECRET=test-hmac-secret
+FEISTEL_SECRET_S01=test-feistel-secret
+TAG_HMAC_SECRET_S01=test-hmac-secret
 ```
 
 Sie sind keine Produktionswerte und werden niemals als Cloudflare Secret gesetzt.

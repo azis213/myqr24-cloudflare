@@ -23,7 +23,7 @@ Verbindliche Architekturgrenzen:
 
 | Quelle | Verifizierter Befund |
 | --- | --- |
-| Git-Abgleich, 2026-10-06 | Arbeitsbaum sauber; Branch `main` liegt fünf lokale Commits vor `origin/main`; `HEAD` ist `bc1d61f351eccb02749d82389b6d1083af4b4757`. |
+| Git-Abgleich, 2026-10-06 | Arbeitsbaum sauber; Branch `main` liegt sechs lokale Commits vor `origin/main`; `HEAD` ist `bde691587cbcdb06fe2e9dccdd99920a8cb8d4ec` (`feat: add local PHP MySQL test topology`). |
 | Lokale Toolchain-Prüfung, 2026-10-06 | Node `v24.19.0`, npm `11.17.0`, PHP CLI `8.5.0`, Composer `2.8.12`; kein lokaler `mysql`-CLI-Client im `PATH`. Docker Engine Client/Server `29.8.0` und Docker Compose `v5.5.1` sind verfügbar. |
 | `apps/edge-router/wrangler.toml` | Staging-Worker und ein Staging-`TAG_CONFIG`-Binding sind konfiguriert; Production-`TAG_CONFIG` bleibt auskommentiert. Die Namespace-ID wird in dieser Matrix nicht wiederholt. |
 | `docs/40-Implementation/evidence/README.md` | Kurze Staging-Scan-Strecke und Cloudflare-Pages-Deploy wurden nachweislich geprüft. Der aktive Worker bzw. dessen aktive Redirect-Konfiguration ist vor KV-Änderungen im Cloudflare-Dashboard zu identifizieren. |
@@ -47,7 +47,9 @@ Verbindliche Architekturgrenzen:
 
 ### Lokale PHP-/MySQL-Testtopologie
 
-Die anwendungsneutrale Compose-Topologie unter [`../../../tools/local-php-mysql/`](../../../tools/local-php-mysql/README.md) ist für `W0-WP-05` festgelegt. Sie enthält eine isolierte lokale MySQL-8.4-Instanz, ein PHP-8.4-CLI-Testimage mit `pdo_mysql` und einen nichtfachlichen PDO-Verifikationstest. MySQL besitzt keinen Host-Port und ist nur im internen Compose-Netz für den PHP-Testcontainer erreichbar.
+Die anwendungsneutrale Compose-Topologie unter [`../../../tools/local-php-mysql/`](../../../tools/local-php-mysql/README.md) ist für `W0-WP-05` festgelegt und erfolgreich lokal verifiziert. Sie enthält eine isolierte lokale MySQL-8.4-Instanz, ein PHP-8.4-CLI-Testimage mit `pdo_mysql` und einen nichtfachlichen PDO-Verifikationstest. MySQL besitzt keinen Host-Port und ist nur im internen Compose-Netz für den PHP-Testcontainer erreichbar.
+
+Der redigierte Selbsttest bestätigte eine PDO-Verbindung, `utf8mb4`, UTC, InnoDB-Commit und Rollback. Die temporäre Verifikationstabelle wurde entfernt; Container und Netzwerk wurden anschließend per nicht-destruktivem `down` entfernt. Das ausschließlich lokale benannte Daten-Volume bleibt dabei erhalten.
 
 Verbindliche lokale Grenzen:
 
@@ -64,14 +66,16 @@ Die konkreten Start-, Verifikations-, Stop- und Reset-Befehle sowie die Testpyra
 
 | Ressource | Bekannter Stand | Status | Einschränkung / nächste Verifikation |
 | --- | --- | --- | --- |
-| Edge Worker | `myqr24-edge-routing-staging` ist laut Orchestrierungsstatus deployed | `partially-resolved` | Aktive Worker-Version und Bindung vor Publisher-/KV-Tests im Dashboard abgleichen |
+| Edge Worker | `myqr24-edge-routing-staging` ist laut Orchestrierungsstatus deployed; die versionierten Staging-Secret-Bindings sind in Cloudflare angelegt | `partially-resolved` | Aktive Worker-Version und Bindung vor Publisher-/KV-Tests im Dashboard abgleichen; Secretwerte bleiben undokumentiert |
 | Staging-`TAG_CONFIG` | In `apps/edge-router/wrangler.toml` gebunden | `partially-resolved` | Namespace-ID wird hier redigiert; aktiven Worker und Namespace vor jeder Änderung eindeutig zuordnen |
 | Staging-Scan-Domain | Kurze Staging-Scan-Strecke wurde als öffentlich funktionierend nachgewiesen | `partially-resolved` | Konkrete aktive Route nicht verändern; negative und Umstellungsnachweise gehören in W3 |
 | Sprechende Staging-Scan-Domain | `s.myqr24.com` ist architektonisch vorgesehen | `open` | DNS-/Dogado-Integration laut Evidenz noch ausstehend bzw. eindeutig zu bestätigen |
 | Staging-Pages-PWA | Cloudflare-Pages-Projekt `myqr24-staging-test-pwa` mit Alias ist dokumentiert | `partially-resolved` | Spätere Custom Domain sowie finale App-Route noch nicht freigegeben |
+| Interner Staging-TAG-Codec | Noch nicht implementiert; der verbindliche Entwurf ist [`tag-codec-internal-v1`](../../../10-Architecture/35-Contracts/tag-codec-internal-v1.md) | `open` | Nicht öffentliche Worker-Route, `FEISTEL_SECRET_S01`, `TAG_HMAC_SECRET_S01`, rotierbarer `TAG_CODEC_API_KEY_S01`, Rate Limit und kompatible Testvektoren vor Staging bestätigen |
 | Staging-Public-Read-API | Nicht vorhanden | `open` | API-Host, CORS-Allowlist, Rate Limit, Cache- und Widerrufsbudget festlegen (`CP-BLK-006`) |
 | Staging-Datenbank | Nicht nachgewiesen | `open` | Erst nach Dogado-Hostingmatrix anlegen bzw. referenzieren |
 | Publisher-Token | Kein Tokenwert oder Scope dokumentiert; das ist korrekt | `open` | Minimaler, nur Staging-`TAG_CONFIG` erlaubender Scope, Secret-Speicher und Betriebsweg bestätigen (`CP-BLK-005`) |
+| Staging-Worker-Secrets | `FEISTEL_SECRET_S01`, `TAG_HMAC_SECRET_S01` und `REDIRECT_SIGNING_SECRET_S01` sind laut Betriebsrückmeldung in Cloudflare angelegt; keine Werte im Repository dokumentiert | `partially-resolved` | Aktive Worker-Version mit den erwarteten Bindungsnamen vor einem echten Scan-Nachweis verifizieren; kompatible Testvektoren bleiben offen (`CP-BLK-003`) |
 | Production-Ressourcen | Nicht Gegenstand der aktuellen Welle | `not-started` | Nicht konfigurieren, nicht veröffentlichen und keine Production-Secrets laden |
 
 ## 5. Festgestellte Dokumentationsabweichungen
@@ -89,10 +93,10 @@ Die konkreten Start-, Verifikations-, Stop- und Reset-Befehle sowie die Testpyra
 Folgende Blocker bleiben für das W0-Gate offen:
 
 - `CP-BLK-001`: Dogado PHP-/MySQL-/Composer-/Cron-/Secret-Fähigkeiten bestätigen.
-- `CP-BLK-003`: getrenntes Staging-Testsecret- und kompatibles Testvektor-Konzept festlegen.
-- `CP-BLK-005`: aktiven Worker, isolierten Namespace, minimalen Publisher-Scope und Betriebsweg verbindlich bestätigen.
+- `CP-BLK-003`: kompatible Staging-Testvektoren für Edge Router und internen TAG-Codec festlegen; `FEISTEL_SECRET_S01` und `TAG_HMAC_SECRET_S01` sind als Cloudflare Worker Secrets angelegt und verbleiben ausschließlich dort.
+- `CP-BLK-005`: aktiven Edge Worker, isolierten Namespace, minimalen Publisher-Scope sowie die nicht öffentliche Codec-Route, `TAG_CODEC_API_KEY_S01`-Speicherung, Rate Limit und Betriebsweg verbindlich bestätigen.
 - `CP-BLK-006`: Staging-Public-Read-API-Origin, CORS, Rate Limit und Cache-/Widerrufsbudget entscheiden.
 
-`W0-WP-05` ist technisch vorbereitet, wird jedoch erst nach erfolgreichem dokumentierten Compose-Selbsttest als lokal nachgewiesen geführt. Die externen W0-Blocker bleiben davon unberührt.
+`W0-WP-05` ist als lokaler Nachweis abgeschlossen. Die externe Dogado-/Staging-Validierung und die übrigen W0-Blocker bleiben davon unberührt.
 
-**Nächste zulässige Aktion:** Die lokale Compose-Topologie mit ausschließlich synthetischer `.env.local` starten, den PDO-MySQL-Selbsttest ausführen und den redigierten Erfolg im Orchestrierungsstatus festhalten. Danach sind die bestätigbaren Dogado-Stagingdaten bei der Hosting-/Betriebszuständigkeit einzuholen; bis zum W0-Gate keine Control-Plane- oder Control-Center-Anwendung anlegen und keine KV-Mutation durchführen.
+**Nächste zulässige Aktion:** Die bestätigbaren Dogado-Stagingdaten bei der Hosting-/Betriebszuständigkeit einholen und die Hosting- sowie Staging-Ressourcenmatrix ohne Secretwerte ergänzen. Die lokale Compose-Topologie wird nur bei Bedarf gemäß ihrer README erneut geprüft. Bis zum W0-Gate keine Control-Plane- oder Control-Center-Anwendung anlegen und keine KV-Mutation durchführen.
