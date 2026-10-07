@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "kind": "myqr24.tag-generator.config",
+  "name": "Testkonfiguration TAG-Generator",
+  "updatedAt": "2026-10-07T15:00:00.000Z",
+  "baseUrl": "https://s.myqr24.com/t/",
+  "ranges": [
+    {
+      "id": "fixture-six",
+      "name": "Sechsstelliger Testbereich",
+      "start": "60466176",
+      "end": "60466179",
+      "tagLength": 6,
+      "labelText": "Testetikett 6",
+      "createdAt": "2026-10-07T15:00:00.000Z",
+      "updatedAt": "2026-10-07T15:00:00.000Z"
+    },
+    {
+      "id": "fixture-eight",
+      "name": "Achtstelliger Testbereich",
+      "start": "78364164096",
+      "end": "78364164128",
+      "tagLength": 8,
+      "labelText": "Testetikett 8",
+      "createdAt": "2026-10-07T15:00:00.000Z",
+      "updatedAt": "2026-10-07T15:00:00.000Z"
+    }
+  ],
+  "labelTemplates": [
+    {
+      "id": "fixture-template",
+      "name": "A4 – 3 × 8 (Test)",
+      "page": { "widthMm": 210, "heightMm": 297 },
+      "grid": {
+        "columns": 3,
+        "rows": 8,
+        "labelWidthMm": 63.5,
+        "labelHeightMm": 33.9,
+        "leftMarginMm": 7,
+        "topMarginMm": 12,
+        "horizontalGapMm": 2.5,
+        "verticalGapMm": 0
+      },
+      "elements": {
+        "qr": {
+          "xMm": 2,
+          "yMm": 2,
+          "widthMm": 22,
+          "heightMm": 22,
+          "quietZoneModules": 4,
+          "errorCorrectionLevel": "M"
+        },
+        "text": {
+          "xMm": 26,
+          "yMm": 3,
+          "widthMm": 34,
+          "heightMm": 27,
+          "fontSizePt": 9,
+          "fontWeight": "normal",
+          "horizontalAlign": "left",
+          "verticalAlign": "middle",
+          "lineHeight": 1.15,
+          "overflow": "shrink"
+        }
+      },
+      "createdAt": "2026-10-07T15:00:00.000Z",
+      "updatedAt": "2026-10-07T15:00:00.000Z"
+    }
+  ],
+  "selectedTemplateId": "fixture-template",
+  "printSettings": {
+    "templateId": "fixture-template",
+    "startRow": 2,
+    "startColumn": 2
+  }
+}
