@@ -24,14 +24,16 @@
 | `owner-session-and-content-v1` | TAG Control Plane | `planned` | TAG-gebundene Owner-Session und Inhaltsverwaltung |
 | `collection-api-v1` | TAG Control Plane | `planned` | Accountgebundene Collections |
 
-## Secret-Grenzen
+## Versionierte Secret-Grenzen
 
-| Wert | Zulässige Komponenten | Unzulässige Komponenten |
+Secretnamen enthalten immer eine Versionskennung. Die gegenwärtig festgelegte Staging-Version ist `S01`. Ein neuer Secretwert wird unter einem neuen Namen angelegt; ein bestehender versionsgebundener Name wird nicht mit einem anderen Wert überschrieben. Die konkrete erste Production-Version wird erst vor dem Production-Gate festgelegt.
+
+| Staging-Wert | Zulässige Komponenten | Unzulässige Komponenten |
 | --- | --- | --- |
-| `FEISTEL_SECRET` | Cloudflare Edge Router, Cloudflare interner TAG Codec Worker | Control Plane, Control Center, TAG-App, TAG Lab, Browser |
-| `TAG_HMAC_SECRET` | Cloudflare Edge Router, Cloudflare interner TAG Codec Worker | Control Plane, Control Center, TAG-App, TAG Lab, Browser |
-| `REDIRECT_SIGNING_SECRET` | Cloudflare Edge Router | Control Plane, Control Center, TAG-App, TAG Lab, Browser |
-| `TAG_CODEC_API_KEY` | Cloudflare interner TAG Codec Worker, serverseitige TAG Control Plane | Control Center, TAG-App, TAG Lab, Browser |
+| `FEISTEL_SECRET_S01` | Cloudflare Staging Edge Router, Cloudflare Staging TAG Codec Worker | Control Plane, Control Center, TAG-App, TAG Lab, Browser |
+| `TAG_HMAC_SECRET_S01` | Cloudflare Staging Edge Router, Cloudflare Staging TAG Codec Worker | Control Plane, Control Center, TAG-App, TAG Lab, Browser |
+| `REDIRECT_SIGNING_SECRET_S01` | Cloudflare Staging Edge Router | Control Plane, Control Center, TAG-App, TAG Lab, Browser |
+| `TAG_CODEC_API_KEY_S01` | Cloudflare Staging TAG Codec Worker, serverseitige Staging Control Plane | Control Center, TAG-App, TAG Lab, Browser |
 | DB-, Session-, CSRF- und Claim-Secrets | ausschließlich serverseitige TAG Control Plane | Cloudflare Pages, Browser, TAG Lab |
 
-Die tatsächlichen Cloudflare-Werte werden als Cloudflare Worker Secrets verwaltet. Lokale Tools verwenden ausschließlich getrennte, Git-ignorierte Testwerte mit denselben Variablennamen in `tools/.env.local`.
+Die tatsächlichen Cloudflare-Werte werden als Cloudflare Worker Secrets verwaltet. Lokale Tools verwenden ausschließlich getrennte, Git-ignorierte Testwerte mit denselben versionierten Variablennamen in `tools/.env.local`. Der lokale TAG Lab liest seine getrennte Staging-Datei `.env.staging.local` und benötigt mindestens `FEISTEL_SECRET_S01`; `TAG_HMAC_SECRET_S01` ist nur für die lokale Erzeugung achtstelliger Tags erforderlich.

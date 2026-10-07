@@ -1,6 +1,6 @@
 # Implementierungsstatus
 
-> Letzte fachliche Bewertung: 2026-09-30  
+> Letzte fachliche Bewertung: 2026-10-06  
 > Statuswerte und Übergangsregeln: [`../README.md`](../README.md)
 
 ## Arbeitspakete
@@ -15,7 +15,8 @@
 | WP-06 | Zentrale KV-Feature-Dokumente | verified | TC-FEATURE-001 bis TC-FEATURE-005 |
 | WP-07 | Sichere Redirect-Templates | verified | TC-TEMPLATE-001 bis TC-TEMPLATE-006 |
 | WP-08 | JSON-Aktionsantwort und HTTP-Verhalten | verified | TC-RESPONSE-001 bis TC-RESPONSE-004 |
-| WP-09 | Fixtures, automatisierte Tests, Build und Evidenz | verified | `npm test`, `npm run build` |
+| WP-09 | Fixtures, automatisierte Tests, Build und Evidenz | verified | `npm test`, `npm run build`, `npm run build:codec` |
+| WP-10 | Gemeinsamer Codec-Kern und privater Codec-Worker | verified | `test/codec-worker.test.ts`, `npm run build:codec`, TC-CODEC-STAGING-001 bis TC-CODEC-STAGING-003 |
 
 ## Verifizierter Implementierungsstand
 
@@ -30,7 +31,12 @@
 | 8-stellige HMAC-Eingabe | Verwendet `base = decodedValue & ~0x0f`; der vollständige validierte Integer bleibt Range-Key |
 | Redirects | Ausschließlich `url` xor `urlTemplate`; Server-Placeholder-Allowlist und HTTP(S)-Prüfung |
 | Testdaten | Versionierte nicht geheime JSON-Fixture unter `test/fixtures/` plus dynamisch berechnete Testwerte |
-| Ausführungsnachweis | `npm test`: 35/35 erfolgreich; `npm run build`: TypeScript-Prüfung und Wrangler-Dry-Run erfolgreich |
+| Gemeinsamer Codec | `src/codec/index.ts` wird vom öffentlichen Scan-Worker und dem separaten privaten Codec-Worker importiert |
+| Codec-Worker | `POST /api/v1/tag-codec/encode` und `/decode`; Bearer-Authentisierung, keine KV-/Redirect-Secret-Bindung, keine CORS-Header |
+| Codec-Deployment | Separate `wrangler.codec.toml`; keine KV-/Redirect-Bindungen; aktive Cloudflare Custom Route `codec.s.myqr24.com/api/v1/*` |
+| Codec-Staging-Secrets | `FEISTEL_SECRET_S01`, `TAG_HMAC_SECRET_S01` und `TAG_CODEC_API_KEY_S01` als nicht auslesbare Cloudflare-Staging-Secrets; keine Werte im Repository |
+| Codec-Staging-Live-Tests | TC-CODEC-STAGING-001 bis TC-CODEC-STAGING-003: DNS/TLS, Route, Auth-/Methodengate sowie autorisierte 6- und 8-stellige Roundtrips verifiziert |
+| Ausführungsnachweis | 2026-10-06: `npm test` 62/62 erfolgreich; Scan- und Codec-Worker-Dry-Runs sowie die Codec-Staging-Live-Tests erfolgreich; Details in `../evidence/README.md` |
 
 ## Story-Status
 
@@ -46,6 +52,9 @@
 | US-008 | Sichere Redirect-Templates | verified |
 | US-009 | JSON-Aktionsdokumente | verified |
 | US-010 | Reproduzierbare Test- und Build-Evidenz | verified |
+| CP-US-011 | Private TAG-ID-Erstellung ohne Codec-Secrets in der Control Plane | verified |
+| CP-US-013 | Poolgrenzen im kanonischen `decodedValue`-Raum | verified |
+| CP-BLK-005 | Private Codec-Route und minimale Secret-Bindungen | verified |
 
 ## Aktualisierungsregel
 

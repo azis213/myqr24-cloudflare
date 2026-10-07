@@ -1,6 +1,6 @@
 # Testfallkatalog
 
-Jeder Testfall wird automatisiert in Vitest umgesetzt. Die Kennungen werden in Testnamen oder Testkommentaren wiederverwendet.
+Lokale Testfälle werden automatisiert in Vitest umgesetzt; ihre Kennungen werden in Testnamen oder Testkommentaren wiederverwendet. Die als **Staging-Live-Test** gekennzeichneten Fälle prüfen den deployten Cloudflare-Worker und benötigen zur autorisierten Ausführung lokal bereitgestellte, nicht protokollierte Secrets. Sie werden ohne Secret-Werte, erzeugte TAG-IDs oder reale Kundendaten als Betriebsnachweis dokumentiert.
 
 ## URL und HTTP-Verhalten
 
@@ -29,6 +29,23 @@ Jeder Testfall wird automatisiert in Vitest umgesetzt. Die Kennungen werden in T
 | TC-HMAC-002 | US-004 | Gleiche Basis mit manipuliertem Nibble | `null` bzw. Edge-`404` |
 | TC-HMAC-003 | US-004 | Ungültiger HMAC-Request mit KV-Spy | `404`, keine KV-Leseoperation |
 | TC-HMAC-004 | US-004 | Gültiger 8-stelliger Wert in Range | vollständiger Integer wird als Range-Key verwendet |
+
+## Private Codec-API
+
+| ID | Story | Setup / Eingabe | Erwartetes Ergebnis |
+| --- | --- | --- | --- |
+| TC-CODEC-001 | CP-US-011 | Authentisierter `POST /api/v1/tag-codec/encode` für kanonischen 6-stelligen Wert, anschließend `decode` | Lowercase-ID sowie identischer vollständiger Wert im Encode-/Decode-Roundtrip |
+| TC-CODEC-002 | CP-US-011/CP-US-013 | Authentisierter 8-stelliger Encode mit kanonischer, durch 16 teilbarer Basis, anschließend `decode` | HMAC-geschützte 8-stellige ID; Decode liefert vollständigen Wert inklusive Nibble |
+| TC-CODEC-003 | CP-BLK-005 | Unbekannter Pfad, `GET` oder fehlender Bearer-Key | `404`, `405` mit `Allow: POST` bzw. neutrale `401`; keine CORS-Freigabe |
+| TC-CODEC-004 | CP-US-011/CP-US-013 | Nicht-JSON, Schemafehler, nichtkanonischer 6-stelliger Wert, nicht ausgerichtete 8-stellige Basis oder ungültige ID | Neutrale `400 {"error":{"code":"invalid_request"}}` ohne Kryptografiedetails |
+
+## Codec-Staging-Live-Tests
+
+| ID | Story | Setup / Eingabe | Erwartetes Ergebnis |
+| --- | --- | --- | --- |
+| TC-CODEC-STAGING-001 | CP-BLK-005 | Nicht autorisierter `POST` und `GET` auf `https://codec.s.myqr24.com/api/v1/tag-codec/encode` | `POST` liefert neutrale `401`-Antwort mit `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` und ohne CORS-Freigabe; `GET` liefert `405` mit `Allow: POST`. |
+| TC-CODEC-STAGING-002 | CP-US-011 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für einen künstlichen kanonischen 6-stelligen Wert | Beide Requests liefern `200 OK`; Länge und decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
+| TC-CODEC-STAGING-003 | CP-US-011/CP-US-013 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für eine künstliche kanonische, durch 16 teilbare 8-stellige Basis | Beide Requests liefern `200 OK`; Länge und HMAC-validierter decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
 
 ## Range-Index
 
@@ -86,4 +103,5 @@ Jeder Testfall wird automatisiert in Vitest umgesetzt. Die Kennungen werden in T
 | ID | Story | Ausführung | Erwartetes Ergebnis |
 | --- | --- | --- | --- |
 | TC-EVIDENCE-001 | US-010 | `npm test` | Alle oben genannten automatisierten Tests erfolgreich |
-| TC-EVIDENCE-002 | US-010 | `npm run build` | TypeScript-/Worker-Build erfolgreich |
+| TC-EVIDENCE-002 | US-010 | `npm run build` | TypeScript-/Scan-Worker-Build erfolgreich |
+| TC-EVIDENCE-003 | CP-US-011/CP-BLK-005 | `npm run build:codec` | TypeScript-/Codec-Worker-Build erfolgreich |

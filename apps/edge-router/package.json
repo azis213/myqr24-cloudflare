@@ -8,10 +8,14 @@
     "dev": "wrangler dev",
     "build": "wrangler deploy --dry-run --env staging",
     "build:production": "wrangler deploy --dry-run --env production",
+    "build:codec": "wrangler deploy --dry-run --config wrangler.codec.toml --env staging",
+    "build:codec:production": "wrangler deploy --dry-run --config wrangler.codec.toml --env production",
     "test": "vitest run",
     "test:watch": "vitest",
     "deploy": "wrangler deploy",
-    "deploy:staging": "wrangler deploy --env staging"
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:codec": "wrangler deploy --config wrangler.codec.toml",
+    "deploy:codec:staging": "wrangler deploy --config wrangler.codec.toml --env staging"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260926.1",

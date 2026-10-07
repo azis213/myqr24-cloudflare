@@ -1,0 +1,29 @@
+# Private myQR24 TAG codec Worker.
+#
+# This is a separate Worker deployment that bundles the shared src/codec
+# implementation but deliberately has neither TAG_CONFIG nor the redirect
+# signing secret. Bind only the codec host route after DNS, WAF/Access and
+# rate-limit controls have been approved.
+name = "myqr24-tag-codec"
+main = "src/codec-worker.ts"
+compatibility_date = "2026-09-30"
+
+# Required Staging secrets:
+#   npx wrangler secret put FEISTEL_SECRET_S01 --config wrangler.codec.toml --env staging
+#   npx wrangler secret put TAG_HMAC_SECRET_S01 --config wrangler.codec.toml --env staging
+#   npx wrangler secret put TAG_CODEC_API_KEY_S01 --config wrangler.codec.toml --env staging
+#
+# Configure only the approved private API route in Cloudflare:
+#   codec.s.myqr24.com/api/v1/* -> myqr24-tag-codec-staging
+#
+# Apply strict, route-specific WAF/rate-limit controls and optional Cloudflare
+# Access/IP allowlisting to codec.*. API authentication remains mandatory.
+
+[env.staging]
+name = "myqr24-tag-codec-staging"
+
+[env.production]
+name = "myqr24-tag-codec"
+
+# Production secret-version names and private API routing are intentionally
+# deferred. Never reuse Staging secret values in Production.

@@ -19,7 +19,13 @@ npm test
 npm run build
 ```
 
-Die Befehle müssen im Projekt-Root ausgeführt werden.
+Die Befehle müssen im jeweiligen Anwendungspaket oder über ein äquivalentes Root-Skript ausgeführt werden. Für den getrennten Edge-Codec-Worker gelten zusätzlich:
+
+```sh
+npm --prefix apps/edge-router test
+npm --prefix apps/edge-router run build
+npm --prefix apps/edge-router run build:codec
+```
 
 | Nachweis | Bedeutung |
 | --- | --- |
@@ -44,6 +50,46 @@ Für den Status `verified` gelten zusätzlich die Regeln der jeweiligen Teststra
 | Wrangler-Dry-Run | Kein Deployment durchgeführt; Bundle: 18.05 KiB (gzip: 4.79 KiB) |
 
 Der Dry-Run meldet aktuell keine Bindings, da die reale Cloudflare-KV-Namespace-ID bewusst nicht als Platzhalter in `wrangler.toml` hinterlegt wird. Vor dem ersten Deployment muss die auskommentierte `TAG_CONFIG`-KV-Bindung mit einer echten Namespace-ID aktiviert und die Secrets `FEISTEL_SECRET`, `TAG_HMAC_SECRET` sowie `REDIRECT_SIGNING_SECRET` gesetzt werden.
+
+### Verifizierter lokaler Codec-Worker-Durchlauf — 2026-10-06
+
+Der öffentliche Scan-Worker und der neue private Codec-Worker verwenden den gemeinsamen, lokalen Feistel-/HMAC-Kern. Es wurde kein Deployment, keine Route und kein Secret gesetzt.
+
+| Befehl | Ergebnis |
+| --- | --- |
+| `npm --prefix apps/edge-router test` | Erfolgreich: 2 Testdateien, 62 Tests bestanden; enthalten sind die 58 Scan-/Router-Regressionstests und 4 Codec-API-Contract-Tests. |
+| `npm --prefix apps/edge-router run build` | Erfolgreicher Scan-Worker-Wrangler-Dry-Run; erwartete Staging-Bindungen `TAG_CONFIG` und `SCAN_ENVIRONMENT`; Bundle 23.21 KiB (gzip 6.68 KiB). |
+| `npm --prefix apps/edge-router run build:codec` | Erfolgreicher Codec-Worker-Wrangler-Dry-Run; keine Nicht-Secret-Bindungen; Bundle 11.74 KiB (gzip 3.24 KiB). |
+
+Der Codec-Dry-Run meldet absichtlich `No bindings found`: `FEISTEL_SECRET_S01`, `TAG_HMAC_SECRET_S01` und `TAG_CODEC_API_KEY_S01` werden ausschließlich als Cloudflare-Secrets zur Laufzeit gesetzt. KV- und Redirect-Signing-Bindungen sind für diesen Worker nicht konfiguriert.
+
+### Bereitgestellter privater Codec-Worker — 2026-10-06
+
+Der getrennte Staging-Worker wurde ohne KV-/Redirect-Bindungen bei Cloudflare veröffentlicht. Die nachträglich konfigurierte private Custom Route ist aktiv. Die drei erforderlichen Runtime-Secrets `FEISTEL_SECRET_S01`, `TAG_HMAC_SECRET_S01` und `TAG_CODEC_API_KEY_S01` wurden als nicht auslesbare Cloudflare-Staging-Secrets hinterlegt; ihre Werte sind nicht im Repository dokumentiert.
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Deployment-Befehl | `npm --prefix apps/edge-router run deploy:codec:staging` erfolgreich |
+| Worker | `myqr24-tag-codec-staging` |
+| Cloudflare-Workers-URL | `https://myqr24-tag-codec-staging.azis213.workers.dev` |
+| Version | `5dfa66d0-cee1-437c-9f62-6537173bcf3b` |
+| Bindings | keine Nicht-Secret-Bindungen |
+| Custom Route | `codec.s.myqr24.com/api/v1/*` eingerichtet und per DNS/TLS/HTTP geprüft |
+
+Die private Staging-Route `codec.s.myqr24.com/api/v1/*` ist öffentlich per DNS auflösbar und erreicht den bereitgestellten Codec-Worker.
+
+| Live-Prüfung ohne Zugangsdaten | Ergebnis |
+| --- | --- |
+| `POST https://myqr24-tag-codec-staging.azis213.workers.dev/api/v1/tag-codec/encode` | `401 Unauthorized`, JSON-Fehlercode `unauthorized`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, kein CORS-Header |
+| TC-CODEC-STAGING-001: `POST https://codec.s.myqr24.com/api/v1/tag-codec/encode` | `401 Unauthorized`; DNS, TLS, Route und Bearer-Auth-Gate verifiziert |
+| TC-CODEC-STAGING-001: `GET https://codec.s.myqr24.com/api/v1/tag-codec/encode` | `405 Method Not Allowed`, `Allow: POST`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` |
+
+| Autorisierter Live-Roundtrip | Ergebnis |
+| --- | --- |
+| TC-CODEC-STAGING-002: `POST /encode` und anschließender `POST /decode`, TAG-Länge 6 | Beide Requests `200 OK`; decodierter Wert stimmt mit dem kanonischen Eingabewert überein. |
+| TC-CODEC-STAGING-003: `POST /encode` und anschließender `POST /decode`, TAG-Länge 8 | Beide Requests `200 OK`; der HMAC-geschützte Wert wird erfolgreich zurückgewonnen und stimmt mit dem ursprünglichen kanonischen Eingabewert überein. |
+
+Damit sind DNS, TLS, die Custom Route, das Auth-Gate, das Methodengate sowie die autorisierte Codierung und Decodierung für beide unterstützten TAG-Längen über die vorgesehene Staging-Domain verifiziert. Die Bearer-Authentisierung bleibt auch nach WAF-/Rate-Limit-Regeln und optionalem Cloudflare Access oder einer IP-Allowlist verpflichtend.
 
 ### Verifizierter öffentlicher Staging-Durchlauf — 2026-10-01
 
