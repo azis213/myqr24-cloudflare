@@ -17,6 +17,12 @@ Vor wesentlichen Änderungen diese Dokumente lesen:
 - `docs/40-Implementation/20-TEST-STRATEGY.md` und `21-TEST-CASES.md` – Teststrategie und Testfälle
 - `docs/90-Session-Change-Summaries/DEPLOYMENT_HANDOVER.md` – Ausgangspunkt für die initiale Cloudflare-Bereitstellung
 
+## Refinement-Ideen sind keine Umsetzungsquelle
+
+`docs/00-Refinement/**` ist ein ausdrücklich unverbindlicher Ideenspeicher. Dokumente dort dürfen bei regulären Implementierungs-, Test-, Deployment- und Wiederaufnahmesessions weder automatisch gelesen noch als Anforderung interpretiert werden.
+
+Der Ordner darf nur bei einem ausdrücklich erteilten Refinement-Auftrag gelesen oder fortgeschrieben werden. Eine darin beschriebene Idee darf erst umgesetzt werden, nachdem sie über die verbindliche Architektur, Domain-Regeln, versionierte Contracts, Stories, Tests, Traceability und Status-Gates übernommen wurde. Maßgeblich bleibt bis dahin die aktuelle Architektur- und Vertragsdokumentation außerhalb von `docs/00-Refinement/`.
+
 ## Verbindliches Domainmodell
 
 | Umgebung | kurze Scan-URL | sprechende Scan-URL |
