@@ -59,7 +59,7 @@
 
 **Akzeptanzkriterien**
 
-1. Die Informationsarchitektur ist desktop-first: Tabellen, Filter, Batch-Aktionen, Pool-/Chargenverwaltung, Druckfreigaben, Projektion und Publishing sind für breite Office-Ansichten, Tastaturbedienung und parallele Informationen optimiert.
+1. Die Informationsarchitektur ist desktop-first: Tabellen, Filter, Batch-Aktionen, Pool-/Chargenverwaltung, spätere Druckfreigaben, Projektion und Publishing sind für breite Office-Ansichten, Tastaturbedienung und parallele Informationen optimiert.
 2. Mobile Ansichten sind responsiv und ermöglichen mindestens Anmeldung, TAG-ID-Eingabe oder -Scan, datensparsame Statusprüfung, begleiteten Support-Claim sowie die Anzeige einer Audit-/Korrelationsreferenz.
 3. Komplexe oder risikoreiche Massen- und Konfigurationsaufgaben dürfen mobil bewusst eingeschränkt, schreibgeschützt oder auf eine Desktop-Ansicht verwiesen werden.
 4. Sensible mobile Aktionen verlangen dieselben serverseitigen Rollenprüfungen wie Desktop-Aktionen und bei Policy-pflichtigen Folgeaktionen eine erneute starke Authentisierung.
@@ -171,19 +171,20 @@
 4. Jede Statusänderung verlangt einen fachlichen Grund, soweit sie sicherheits- oder betriebsrelevant ist.
 5. Status, Projektion und Audit bleiben nachvollziehbar konsistent.
 
-### CC-US-014 – QR- und Druckdaten kontrolliert erzeugen
+### CC-US-014 – Kanonische Scan-URL- und QR-Daten für reservierten TAG vorbereiten
 
 **Als** TAG-Manager  
-**möchte ich** aus einer bereits reservierten TAG-ID kanonische Scan-URLs und QR-/Druckdaten erzeugen,  
-**damit** nur zulässige Tags in die physische Ausgabe gelangen.
+**möchte ich** aus einer bereits reservierten TAG-ID kanonische Scan-URLs und QR-Daten prüfen,  
+**damit** die TAG-Verwaltung eine zulässige Scan-Referenz anzeigen kann, ohne einen Druck- oder Produktionsprozess auszulösen.
 
 **Akzeptanzkriterien**
 
 1. URLs verwenden ausschließlich die dokumentierten Host- und Pfadformen der gewählten Umgebung.
 2. TAG-ID und URL sind kanonisch kleingeschrieben.
-3. Reguläre QR-/Druckdaten enthalten weder Secrets noch Cloudflare- oder Verwaltungszugangsdaten; ein Claim-Credential erscheint ausschließlich im separat freigegebenen, vertraulichen Druck-/Self-Print-Export.
-4. Staging- und Produktionsausgabe sind eindeutig gekennzeichnet und getrennt.
-5. Produktive Druckfreigabe ist erst nach den definierten Staging- und Veröffentlichungsprüfungen möglich.
+3. Die angezeigten QR-Daten enthalten weder Secrets noch Cloudflare- oder Verwaltungszugangsdaten.
+4. Staging- und Produktionsreferenzen sind eindeutig gekennzeichnet und getrennt.
+5. Die Story erzeugt weder PDF noch Druckauftrag, Drucksnapshot, Range-Export, Claim-Credential-Export, QA-Status, Nachdruck, Übergabe oder Aktivierung.
+6. Jeder physische oder produktive Druckprozess ist unabhängig von der TAG-Verwaltung. Erst der zurückgestellte TCC-/TCP-Exportumfang darf autorisierte Exportdaten bereitstellen; PDF-/Label-Aufbereitung und physischer Druck bleiben außerhalb von TCC/TCP.
 
 ## CC-I03 – Routing-Projektion und Publishing
 
@@ -370,3 +371,5 @@
 | Private Uploads, Empfängerfreigaben und Einmalfreigaben | deferred | benötigt separate Vault-API-, R2-, Sicherheits-, Retention- und Datenschutzfreigabe |
 | Lost & Found, Chat, Guestbook, Check-ins und Campaigns | deferred | eigene spezifizierte Fachdomänen und Laufzeit-APIs erforderlich |
 | Payment, Fulfillment und externe Storage-OAuth-Anbindungen | deferred | Produkt-, Compliance- und Integrationsentscheidung erforderlich |
+| Kontrollierter TCC-/TCP-JSON-Druckexport für logische TAG-Ranges | deferred | erst nach lauffähigem TCC-/TCP-Fundament: berechtigte Person wählt eine logische `decodedValue`-Range, die Control Plane legt einen persistenten Exportauftrag an und TCC lädt dessen unveränderliches JSON herunter. JSON enthält `exportOrderId`, Export-/Vorlagenversion, logische Range, Zeit-/Auditdaten sowie je TAG `tagId`, kanonische Scan-URL und QR-Payload. Ist ein TAG nicht organisationsgebunden freigeschaltet, enthält sein Eintrag zusätzlich die zugehörige Claim-PIN; diese ist für erneut auszugebende Aufträge verschlüsselt in der TCP-DB gespeichert. Ein bestehender Auftrag bleibt mit identischer `exportOrderId` und identischem Snapshot erneut herunterladbar. Keine PDF-/Label-Aufbereitung oder Druckeransteuerung. |
+| Lokales PDF-/Label-Aufbereitungstool | deferred | spätere lokale Single-Page-Anwendung verarbeitet ausschließlich einen freigegebenen JSON-Export zu einem versionierten Zweckform-PDF mit QR-Code, verwendet `exportOrderId` als PDF-Header und nutzt nur den lokalen Browser-/Betriebssystemdruckdialog; keine API, DB, Range-Auswahl, Reservierung oder Aktivierungswirkung |

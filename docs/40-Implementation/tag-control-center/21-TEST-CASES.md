@@ -42,7 +42,7 @@
 | `CC-TC-LIFECYCLE-001` | CC-US-010 / CC-US-013 | Erlaubter Ablauf `draft → pending-review → ready-to-publish` | Statuswechsel ist mit korrekter Rolle möglich und auditiert | Integration |
 | `CC-TC-LIFECYCLE-002` | CC-US-013 | Ungültiger Statussprung, etwa `draft → active` | Statuswechsel wird verweigert | Unit |
 | `CC-TC-PRINT-001` | CC-US-014 | Staging-QR-Daten erzeugen | kanonische Staging-URL ohne Secrets, klar als Staging markiert | Unit |
-| `CC-TC-PRINT-002` | CC-US-014 | Produktionsdruck vor Gate-Freigabe | Erzeugung/Freigabe wird verweigert | Integration |
+| `CC-TC-PRINT-002` | CC-US-014 | QR-Vorschau versucht Export-, PDF- oder Druckprozess auszulösen | Kein Export, PDF, Druckauftrag, Freigabe, Publish oder Aktivierungsstatus entsteht; die QR-Vorschau bleibt auf kanonische Referenzdaten begrenzt | Integration |
 | `CC-TC-CLAIM-001` | CC-US-016 | erlaubte Claim-Strategie für Pool/Produkt wählen | UI bietet nur serverseitig erlaubte Einzel-, Bogen-/Chargencredential-, Preassign- oder Self-Print-Modelle | UI/Contract |
 | `CC-TC-CLAIM-002` | CC-US-016 | manipulierte oder nicht erlaubte Claim-Strategie senden | Control Plane lehnt ab; UI zeigt neutralen Fehler ohne Policy- oder Credentialdetails | Security |
 | `CC-TC-CLAIM-003` | CC-US-016 | offene Charge in der UI anzeigen | Credential-Typ, Verteilungsmodell und Sperrpolicy sichtbar; keine Hashes oder Klartextwerte nach Freigabe | UI/Security |

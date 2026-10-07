@@ -26,12 +26,12 @@ Das TAG Control Center referenziert diese Backendschnittstellen später, impleme
 | CP-US-013 Allocation Pools | CP-WP-04 | CP-TC-POOL-001 bis 004 | CP-TD-001, CP-TD-012 | Pool-Service, kanonische Poolrange-/Kapazitäts-/Policy-Prüfung | Poolgrenzen-, Erschöpfungs- und Leak-Tests | planned |
 | CP-US-011 atomare Reservierung | CP-WP-02, CP-WP-05 | CP-TC-ALLOC-001 bis 005 | CP-TD-001, CP-TD-002 | DB-gestützter Allocator, Lock-/Idempotenzservice, Secret-Provider | Parallelitäts-, Retry- und Leak-Tests | planned |
 | CP-US-012 TAG-Lebenszyklus | CP-WP-05 | CP-TC-LIFECYCLE-001 bis 003 | CP-TD-003 | Statusautomat und Unpublish-Planer | Status-/Sperr-/Outbox-Nachweis | planned |
-| CP-US-025 Claim-Credentials | CP-WP-05A, CP-WP-06 | CP-TC-CLAIM-PREP-001 bis 003 | CP-TD-011 | Credential-Service, individueller Hash, Claim-Gruppe und vertraulicher Export-Guard | Hash-, Bogen-PIN- und Leak-Tests | planned |
+| CP-US-025 Claim-Credentials | CP-WP-05A, CP-WP-06 | CP-TC-CLAIM-PREP-001 bis 003 | CP-TD-011 | Credential-Service mit individuellem Prüfhash, TAG-bezogen verschlüsseltem PIN-Wert, Claim-Gruppe und autorisiertem JSON-Export-Guard | Hash-, Verschlüsselungs-, Bogen-PIN-, organisationsbezogene Ausnahme- und Leak-Tests | planned |
 | CP-US-026 öffentlicher Claim | CP-WP-05A, CP-WP-08A | CP-TC-CLAIM-001 bis 006 | CP-TD-011 | Public Claim API und atomarer kanalneutraler Claim-Service mit Lockout-/Rate-Limit-Guards | Parallelclaim-, Lockout-, Drosselungs-, neutraler Fehler- und TAG-App-Contract-Test | planned |
 | CP-US-028 manueller Support-Claim | CP-WP-05A, CP-WP-08A | CP-TC-SUPPORT-CLAIM-001 bis 002 | CP-TD-011 | Support-Claim-Command über denselben Claim-Service, Re-Auth-/Audit-Guard | Cross-Channel-Contract, Secret-Sanitizing, Rollen-, Re-Auth- und Audit-Tests | planned |
 | CP-US-027 Preassign/Self-Print | CP-WP-05, CP-WP-05A, CP-WP-06 | CP-TC-PREASSIGN-001 bis 003 | CP-TD-002, CP-TD-012 | Owner-Zuordnungsservice und vertraulicher Self-Print-Export | Zuordnungs-, Widerrufs- und Exporttests | planned |
-| CP-US-020 Produktionslos | CP-WP-05, CP-WP-07 | CP-TC-PRODUCTION-001 bis 003 | CP-TD-002, CP-TD-004 | Produktionslos-/Druckauftragsservice | atomare Los- und Zuordnungstests | planned |
-| CP-US-021 Drucksnapshot | CP-WP-06, CP-WP-07 | CP-TC-SNAPSHOT-001 bis 004 | CP-TD-004, CP-TD-010 | Scan-URL-/QR-Payload-Generator, Snapshot-/Exportservice | Determinismus-, Prüfsummen- und Leak-Tests | planned |
+| CP-US-020 JSON-Exportauftrag | CP-WP-05, CP-WP-07 | CP-TC-PRODUCTION-001 bis 003 | CP-TD-002, CP-TD-004 | persistenter Exportauftragsservice für logische `decodedValue`-Ranges, atomare TAG-Zuordnung und Audit | Atomizitäts-, Eindeutigkeits-, Range- und Nachdruckreferenztests | planned |
+| CP-US-021 JSON-Export-Snapshot | CP-WP-06, CP-WP-07 | CP-TC-SNAPSHOT-001 bis 004 | CP-TD-004, CP-TD-010, CP-TD-011 | Scan-URL-/QR-Payload-Generator, unveränderlicher JSON-Snapshot-/Downloadservice mit `exportOrderId` und kontrollierter PIN-Entschlüsselung | Determinismus-, Auftrags-ID-, Prüfsummen-, PIN-Ausnahme- und Leak-Tests | planned |
 | CP-US-022 Druck/QA/Ausschuss | CP-WP-08 | CP-TC-QA-001 bis 003 | CP-TD-003, CP-TD-004 | QA-Statusautomat und Ausschussprozess | QA-, Teilproduktions- und Ausschussnachweis | planned |
 | CP-US-023 Nachdruck/Verlust/Diebstahl | CP-WP-08, CP-WP-10 | CP-TC-REPRINT-001 bis 003 | CP-TD-003, CP-TD-004, CP-TD-006 | Nachdruck-/Ersatz-/Sperrservice, Unpublish-Planer | Nachdruck-, Ersatz- und Sperrtests | planned |
 | CP-US-024 Übergabe/Aktivierung | CP-WP-08, CP-WP-05 | CP-TC-HANDOVER-001 bis 002 | CP-TD-004, CP-TD-008 | Übergabe- und Aktivierungsgate | kontrollierte Übergabe-/Aktivierungsprüfung | planned |
@@ -53,7 +53,7 @@ Das TAG Control Center referenziert diese Backendschnittstellen später, impleme
 | --- | --- | --- | --- |
 | Admin-Befehle | serverseitige Validierung, AuthZ, Workflow, Fehlervertrag | TAG Control Center | CP-TC-AUTHZ-001, fachliche Service-Tests; UI-Tests im CC-Strang |
 | KV-Projektion | minimaler, validierter, nicht geheimer Publish-Diff | Edge Router | CP-TC-PROJECTION-001 bis 003, CP-TC-PUBLISH-002 |
-| Scan-URL/QR-Payload | kanonische Produktionsdaten ohne Secrets | Drucksystem / physischer TAG | CP-TC-SNAPSHOT-001 bis 003 |
+| JSON-Druckexport | kanonische TAG-Daten je logischer Range, unveränderlicher JSON-Snapshot mit `exportOrderId`; Claim-PIN nur für nicht organisationsgebunden freigeschaltete claimbare TAGs | TAG Control Center / externe Druckaufbereitung / Druckerei | CP-TC-PRODUCTION-001 bis 003, CP-TC-SNAPSHOT-001 bis 004 |
 | PublicTagView | nur freigegebene öffentliche Daten, neutrale Fehler | TAG-App | CP-TC-API-001 bis 004, CP-TC-E2E-001 bis 002 |
 | Public Runtime-Projektion | öffentliche, revisionierte und aus `tagId` abgeleitete View-/Medienkonfiguration; keine privaten Daten | Cloudflare Runtime / TAG-App | CP-TC-RUNTIME-001 bis 005, APP-TC-PIN-001 bis 002 |
 | Owner-Besitzanker | Account-/Organisationsbindung oder separate TAG-Owner-Passphrase; kein Besitz aus Collection oder Clientzustand | TAG-App / Control Center | CP-TC-CLAIM-007 bis 009, CP-TC-OWNER-001 bis 004, APP-TC-OWNER-006 bis 007 |
@@ -62,7 +62,7 @@ Das TAG Control Center referenziert diese Backendschnittstellen später, impleme
 | Produktionsübergabe | private, auditierte Übergabedaten; keine öffentliche Projektion | Fulfillment / Control Center | CP-TC-HANDOVER-001 bis 002 |
 | öffentlicher TAG-App-Claim | neutraler minimaler Ergebnisvertrag, serverseitige Credential-Prüfung und atomare Owner-Zuordnung | TAG-App / künftige Owner-Authentisierung | CP-TC-CLAIM-001 bis 005 |
 | manueller Support-Claim | gemeinsamer Claim-Service ohne Secret-Persistenz; zusätzliche Support-AuthZ, Re-Authentisierung und Audit für Folgeaktionen | TAG Control Center | CP-TC-SUPPORT-CLAIM-001 bis 002 |
-| vertraulicher Druck-/Self-Print-Export | einmalig bzw. zeitlich begrenzt verfügbarer Credential-/ID-Export; nie KV oder Public API | Control Center / Fulfillment | CP-TC-CLAIM-PREP-001 bis 003, CP-TC-PREASSIGN-002 |
+| vertraulicher JSON-Druckexport | nur autorisierter Download eines persistenten Exportauftrags; verschlüsselte Claim-PINs werden ausschließlich im Snapshot-Prozess entschlüsselt und fehlen bei organisationsgebunden freigeschalteten TAGs; nie KV, Public API, Audit oder Log | TAG Control Center / externe Druckaufbereitung / Druckerei | CP-TC-CLAIM-PREP-001 bis 003, CP-TC-SNAPSHOT-001 bis 004 |
 
 ## 4. Ergänzungsprozess bei Implementierungsbeginn
 

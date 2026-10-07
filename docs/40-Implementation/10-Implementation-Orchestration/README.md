@@ -54,6 +54,21 @@ Vor Beginn einer Welle sind mindestens zu lesen:
 
 Bei Konflikten gelten Architektur- und Domain-Regeln vor UI-Annahmen; ein Konflikt wird als Blocker dokumentiert und nicht stillschweigend im Code entschieden.
 
+### 2.1 Ausschluss unverbindlicher Refinements
+
+`docs/00-Refinement/` ist kein Teil der verbindlichen Quellen und darf bei Start, Wiederaufnahme oder autonomer Umsetzung nicht automatisch gelesen, als Kontext übernommen oder als Anforderung umgesetzt werden. Der Ordner enthält ausschließlich unverbindliche Ideen; maßgeblich bleiben die Architektur-, Domain-, Contract-, Story-, Test-, Traceability- und Statusdokumente außerhalb dieses Ordners.
+
+Eine Idee aus `docs/00-Refinement/` darf nur nach einem ausdrücklich beauftragten Refinement gelesen oder fortgeschrieben werden. Eine spätere Übernahme in die Umsetzung erfordert in dieser Reihenfolge:
+
+1. explizite Architektur- bzw. Fachentscheidung;
+2. Fortschreibung der maßgeblichen Architektur- und Domain-Dokumentation;
+3. Erstellung oder Anpassung versionierter Contracts;
+4. Fortschreibung von Stories, Akzeptanzkriterien, Teststrategie, Testfällen und Traceability;
+5. Bewertung von Sicherheits-, Datenschutz-, Betriebs-, Migrations-, Deployment- und Rollback-Auswirkungen;
+6. Eintrag eines zulässigen nächsten Arbeitsschritts in Orchestrierungs- und Komponenten-`STATUS.md`.
+
+Erst danach darf die Idee implementiert, migriert, publiziert oder deployt werden.
+
 ---
 
 ## 3. Zielstruktur der Anwendungen
@@ -62,13 +77,14 @@ Die Apps werden erst in der betreffenden Welle erstellt. Vorher keine leeren Sch
 
 | Anwendung | Zielpfad | Primäre Aufgabe | Laufzeit |
 | --- | --- | --- | --- |
-| Control Plane | `apps/tag-control-plane` | PHP-/MySQL-Backend, Migrationen, Domänenlogik, APIs, Audit, Outbox, Publisher | Dogado PHP/MySQL |
+| Control Plane | `apps/tag-control-plane` | PHP-/MySQL-Backend, Migrationen, Domänenlogik, APIs, Audit, Outbox, Publisher | zuerst lokale Docker-/Compose-MySQL-Topologie, danach Dogado PHP/MySQL |
 | Control Center | `apps/tag-control-center` | administrative, desktop-first Web-App ausschließlich über Plane-APIs | statisches Web-/PWA-Build, Staging auf Cloudflare |
 | TAG-App | `apps/tag-app` | öffentliche PWA, Claim-/Owner-Flows und ausschließlich öffentliche View-Rendering-Logik | Cloudflare Pages |
 | TAG Lab | `tools/tag-lab` | lokale Test- und User-Test-Fixtures, QR-Payloads, dokumentierte Testläufe | lokaler Node-Dienst |
+| Lokales Einzeltag-Drucktool (deferred) | später unter `tools/` | lokale Single-Page-Erzeugung eines PDF mit QR-Code für **eine bereits bestimmte TAG-ID** und ein explizit konfiguriertes Zweckform-Label-Format | lokaler Browser, keine Server- oder Cloudflare-Anbindung |
 | Edge Router | `apps/edge-router` | bestehende Validierung und KV-basierte Auflösung | bestehender Cloudflare Worker |
 
-Technologieentscheidungen für die Control Plane werden in Welle 0 anhand der verfügbaren Dogado-Versionen getroffen. Ohne bestätigte PHP-, MySQL-, Composer-, Cron-/Queue- und Secret-Speicher-Matrix wird keine produktionsähnliche Serverarchitektur behauptet.
+Die erste TCP-Implementierungsstufe verwendet die verifizierte lokale Docker-/Compose-MySQL-Topologie. Für diese lokale Stufe wird angenommen, dass die gewählte PHP-/MySQL-Anwendung grundsätzlich auf Dogado betrieben werden kann; diese Annahme ersetzt weder eine Dogado-Kompatibilitätsprüfung noch ein Staging-Deployment. Die noch offene Hostingmatrix ist ausschließlich ein Gate für Dogado-Deployment, echten Staging-Publish und den Status `verified`, nicht für die lokale TCP-Implementierung.
 
 ---
 
@@ -135,7 +151,7 @@ Eine User Story darf erst verlassen werden, wenn alle folgenden Punkte erfüllt 
 - Sicherheits- und Leak-Tests grün;
 - Traceability aktualisiert;
 - relevante lokale Testdaten redigiert und deterministisch;
-- erforderliche Staging-Evidenz erfolgreich;
+- erforderliche Staging-Evidenz erfolgreich, sofern die Story einen echten Staging-Schritt enthält; für W1L–W3L sind stattdessen Fake-Adapter-, Contract- und lokale Compose-MySQL-Nachweise erforderlich;
 - Komponenten-`STATUS.md` und Orchestrierungs-`STATUS.md` aktualisiert.
 
 **Regel:** Alle Stories eines zusammenhängenden Story-Gates müssen erfolgreich getestet sein, bevor eine abhängige Story begonnen wird. Unabhängige Arbeiten innerhalb derselben Welle dürfen nur verschränkt erfolgen, wenn die Contract-Version bereits festgeschrieben und getestet ist.
@@ -209,10 +225,10 @@ Die Reihenfolge basiert auf fachlichen Voraussetzungen; sie ist ausdrücklich ni
 5. Die verifizierte lokale PHP-/MySQL-Docker-Topologie unter [`tools/local-php-mysql/`](../../../tools/local-php-mysql/README.md) für alle künftigen PHP-Anwendungskomponenten verwenden: isoliertes MySQL, PHP mit `pdo_mysql`, synthetische Testsecrets, Fake-Cloudflare-Adapter und reproduzierbarer PDO-Selbsttest.
 6. TAG Lab um eine versionierte, ausschließlich nichtproduktive Testtag-Katalogstruktur vorbereiten.
 
-**Gate W0:** Contract-Review, lokale Toolchain, Ressourcenmatrix und Testtag-Policy dokumentiert.  
-**Nächste Welle erst nach:** Schließen oder explizitem Freigeben der Blocker `CP-BLK-001`, `CP-BLK-003`, `CP-BLK-005`, `CP-BLK-006`.
+**Gate W0:** Contract-Review, lokale Toolchain und Testtag-Policy dokumentiert. Die Ressourcenmatrix wird als nachgelagerter Deployment-Backlog fortgeführt.  
+**Nächste lokale Stufe:** `CP-BLK-001`, `CP-BLK-005` und `CP-BLK-006` sperren weder die Anlage noch die lokale Implementierung und Testausführung der TCP. Sie bleiben zwingende Gates vor Dogado-Deployment, echtem Staging-KV-Publish, einer Staging-Read-API und jedem Status `verified`. Das Testsecret-Konzept `CP-BLK-003` ist entschieden; in lokalen Tests dürfen ausschließlich synthetische, Git-ignorierte Werte und Fake-Adapter verwendet werden.
 
-### Welle 1 – Control-Plane-Fundament und Admin-Sicherheitsrahmen
+### Welle 1L – Lokales Control-Plane-Fundament und Admin-Sicherheitsrahmen
 
 **Control Plane:** `CP-US-001`, `CP-US-002` / `CP-I01`.  
 **Control Center:** nur die dafür nötigen Teile von `CC-US-001` bis `CC-US-004`: sichere Session- und Rollen-UX gegen reale Plane-Auth-Contracts, keine Fachmutation ohne Backend.  
@@ -224,10 +240,10 @@ Ergebnisse:
 - `apps/tag-control-center` als minimale Admin-App mit Login, Logout, Rollenansicht, CSRF-geschützten Requests und Audit-Viewer-Skelett;
 - lokale MySQL-Integrationstests und CSRF/AuthZ/Leak-Negativtests.
 
-**Gate W1:** `CP-G1`; alle erwähnten CP- und CC-Stories getestet.  
-**Kein Staging-Publish und keine fachliche TAG-Vergabe vor W1.**
+**Gate W1L:** `CP-G1`; alle erwähnten CP- und CC-Stories lokal gegen Compose-MySQL getestet.  
+**Lokale Freigabe:** `apps/tag-control-plane` darf in dieser Welle angelegt und umgesetzt werden. Reale Dogado-Verbindungen, reale Cloudflare-Tokens, echter Staging-Publish und fachliche TAG-Vergabe außerhalb synthetischer lokaler Testdaten bleiben gesperrt.
 
-### Welle 2 – Ranges, Pools, Reservierung, Status und Control-Center-Verwaltung
+### Welle 2L – Lokale Ranges, Pools, Reservierung, Status und Control-Center-Verwaltung
 
 **Control Plane:** `CP-US-010` bis `CP-US-013`, `CP-US-011`, `CP-US-012`.  
 **Control Center:** `CC-US-010` bis `CC-US-015`, `CC-US-012`, `CC-US-013`.  
@@ -241,8 +257,8 @@ Ergebnisse:
 - Control-Center-Ansichten für Entwurf, Pool, Range, Reservierung und Status;
 - keine Cloudflare-Veröffentlichung.
 
-**Gate W2:** `CP-G2`; Parallel-, Retry-, Slot-, Status- und Rollen-Negativtests grün.  
-**Testtag-Vorbereitung:** ausschließlich reservierte Staging-IDs; keine KV-Projektion vor Welle 4.
+**Gate W2L:** `CP-G2`; Parallel-, Retry-, Slot-, Status- und Rollen-Negativtests lokal grün.  
+**Testtag-Vorbereitung:** lokale synthetische Reservierungen sind zulässig. Staging-IDs und jede KV-Projektion bleiben bis zur nachgelagerten Deploymentstufe gesperrt.
 
 ### Welle 3 – Routing-Projektion, Publisher und realer Staging-Scan
 
@@ -253,13 +269,16 @@ Ergebnisse:
 
 Ergebnisse:
 
+- fertiger und getesteter `tag-routing-projection-v1`-Contract einschließlich exaktem KV-Dokumentformat, erlaubten Keys, Datenminimierung, Revision und Unpublish-Semantik;
 - Feature-Validierung und minimale Projektion;
 - atomare Fachmutation + Audit + Outbox;
-- idempotenter Staging-KV-Publisher mit Fake-Cloudflare-Testadapter;
+- idempotenter Publisher mit Fake-Cloudflare-Testadapter und lokalen Publish-/Retry-/Unpublish-Tests;
 - Control-Center-Projektionsdiff, Publish-/Retry-/Unpublish-Status;
-- realer Staging-Publish und Unpublish ausschließlich im bestätigten Staging-Namespace;
+- erst nach einem separaten Deployment-Gate: realer Staging-Publish und Unpublish ausschließlich im bestätigten Staging-Namespace;
 - `tools/tag-lab` erzeugt QR-Payload und dokumentiert Test-URL für veröffentlichte Staging-Tags.
 
+**Lokales Gate W3L:** Contract-, Fake-Publisher-, Outbox-, Idempotenz-, Retry- und Unpublish-Tests grün.  
+**Deployment-Gate vor echtem KV-Write:** (1) aktiver Staging-Scan-Worker und sein `TAG_CONFIG`-Namespace bestätigt, (2) minimaler separater Staging-API-Token mit ausschließlich KV-Schreibrechten für genau diesen Namespace erstellt, (3) Token ausschließlich serverseitig sicher abgelegt, (4) Dogado-Deployment- und Secret-Speicherweg bestätigt, (5) reservierter nichtproduktiver Staging-Testtag samt Cleanup-Regel vorhanden und (6) redigierter Publish-/Redirect-/Unpublish-Nachweis geplant.  
 **Gate W3:** `CP-G4`, positiver und negativer Router-Redirect; `APP-US-006` grün.  
 **Sperre:** Kein Produktionsnamespace, keine Produktionsroute, keine manuellen KV-Fachänderungen.
 
@@ -285,7 +304,7 @@ Ergebnisse:
 ### Welle 5 – Claiming, Besitzanker, Collections und Support
 
 **Control Plane:** `CP-US-025` bis `CP-US-029`, `CP-US-033`, `CP-US-034`.  
-**Control Center:** `CC-US-016`, `CC-US-017`; Druck-/Produktionsanteile nur nach den freigegebenen Policies.  
+**Control Center:** `CC-US-016`, `CC-US-017`; vertrauliche Export-/Produktionsanteile nur nach den freigegebenen Policies.
 **TAG-App:** `APP-US-016`, `APP-US-017`, `APP-US-064`, `APP-US-072`, `APP-US-065`.  
 **Contracts:** `public-tag-claim-v1`, `collection-api-v1`, Owner-Setup-Contract.
 
@@ -300,14 +319,17 @@ Ergebnisse:
 
 **Gate W5:** Parallelclaim-, Lockout-, Reset-, Claim-Leak-, Session- und Collection-Isolationstests grün; reale Staging-Tests nur mit eigens bereitgestellten Test-TAGs.
 
-### Welle 6 – Herstellung, Druck, QA und Übergabe
+### Welle 6 – Kontrollierter Druckexport, QA und Übergabe
 
 **Control Plane:** `CP-US-020` bis `CP-US-024`, `CP-US-027`.  
-**Control Center:** `CC-US-014`, verbleibende Ausgabe-/Druckansichten.  
-**TAG-App:** nur notwendige Capability-Darstellung, keine Drucklogik.  
-**Contracts:** Druck-/Snapshot- und QA-Exportvertrag, klar als vertraulich klassifiziert.
+**Control Center:** eigenständige Exportfunktion nach lauffähigem TCC-/TCP-Fundament: autorisierte Auswahl einer einzelnen bereits reservierten TAG-ID oder eines zulässigen Ranges, kontrollierte Freigabe sowie unveränderlicher Snapshot-/Exportdatensatz. Der Export enthält nur die für die externe Aufbereitung nötigen, kanonischen Daten, insbesondere TAG-ID, Scan-URL, QR-Payload, Vorlagen-/Exportversion, Umfang, Zeitpunkt, Akteur, Prüfsumme und Audit-/Korrelationsreferenz. Er ist bewusst von der TAG-Verwaltung entkoppelt und wird nicht in deren frühe Iterationen vorgezogen.  
+**Nicht Bestandteil von TCC/TCP:** PDF- oder Label-Layout, Druckeransteuerung, Druckwarteschlange, druckerspezifische Rückmeldungen, physischer Druck und die technische Druckaufbereitung.  
+**TAG-App:** nur notwendige Capability-Darstellung, keine Export- oder Drucklogik.  
+**Contracts:** vertraulicher Snapshot-/Druckexportvertrag sowie getrennte QA-/Übergabeverträge.
 
-**Gate W6:** `CP-G3`; Snapshot-Determinismus, Credential-Schutz, QA-/Ausschuss-/Nachdruck-/Übergabe-Gates und Staging-Probe belegt.
+**Vorläufig zurückgestellt:** Ein getrenntes lokales Tool unter `tools/` verarbeitet ausschließlich einen kontrolliert erzeugten TCC-/TCP-Exportdatensatz und bereitet ihn lokal als PDF mit QR-Code für ein konkret versioniertes Zweckform-Label-Format auf. Es kann anschließend über den lokalen Browser-/Betriebssystemdruckdialog gedruckt werden, besitzt aber keine TAG-Vergabe, keine Range-Auswahl, keine Claim-/Ownerdaten außerhalb des freigegebenen Exports, keine Datenbank, keine TCC-/TCP-API, keine Cloudflare-Credentials und keine Publish-/Aktivierungswirkung. Der TCC-/TCP-Export löst selbst weder Druck noch Publish oder Aktivierung aus.
+
+**Gate W6:** `CP-G3`; Snapshot-Determinismus, Exportdatenminimierung und Credential-Schutz sowie getrennte QA-/Ausschuss-/Nachdruck-/Übergabe-Gates und Staging-Probe belegt.
 
 ### Welle 7 – Owner-Inhaltsverwaltung, Produkte, Organisationen und POI
 
@@ -336,7 +358,7 @@ Lifecycle-/Sichtbarkeitszustand, benötigte Publish-Revision, Cleanup-Regel
 
 Regeln:
 
-- nur kanonische, reservierte **Staging**-TAGs;
+- lokale Tests nutzen ausschließlich kanonische, synthetische lokale Testtags; Staging-TAGs sind erst nach dem W3D-Deployment-Gate zulässig;
 - keine realen Kunden-, Owner-, Organisations- oder Credentialdaten;
 - reale Claim-Secrets ausschließlich kurzzeitig in freigegebenem Testkanal, nie im Repository;
 - `stagv001` bleibt als bestehende Router→PWA-Fixture nur solange der Edge-Testvertrag dies vorsieht;

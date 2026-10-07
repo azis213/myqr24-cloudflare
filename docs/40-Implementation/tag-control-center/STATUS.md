@@ -15,6 +15,7 @@
 | `CC-I04` | Öffentlicher Basis-Vault | veröffentlichte Basisinhalte, öffentliche Read-API, CORS/Cache/Rate-Limits, TAG-App-Adaptervertrag | API-Origin, TAG-App-Integration, Staging-Deployment | planned |
 | `CC-I05` | Produktklassen, Organisationen und POI | Produktpolicies, Organisationsrollen, POI-Onboarding, Nachweise, Review, Meldungen und Moderationsdefaults | verbindliche Produkt-, Retention- und POI-Entscheidungen | planned |
 | `CC-I06` | Erweiterte Vault- und Betriebsfunktionen | Owner-/Empfängerfreigaben, Medienpipeline, Reporting, Retention und operative Workflows | R2/API-Architektur, Datenschutz- und Sicherheitsfreigaben | deferred |
+| `CC-I07` | Kontrollierter JSON-Druckexport | Nach lauffähigem TCC-/TCP-Fundament: Exportauftrag für eine logische TAG-Range, Download eines unveränderlichen JSON-Snapshots mit Auftrags-ID, erneuter Download/Ausgabe, Audit sowie fachliche QA-/Ausschuss-/Nachdruck-/Übergabeworkflows | CP-I03, versionierte Export-/Claim-/QA-Policy, autoritative Reservierungs- und Statusdaten | deferred |
 
 ## Arbeitspakete
 
@@ -26,7 +27,9 @@
 | `CC-WP-04` | Allocation-Pool-, Range-, Gruppen- und Feature-Verwaltung | CC-I02 | planned | CC-TC-POOL-*, CC-TC-RANGE-*, CC-TC-FEATURE-* |
 | `CC-WP-05` | Control-Plane-gestützte TAG-Vergabe und Lebenszyklusverwaltung | CC-I02 | planned | CC-TC-ALLOC-*, CC-TC-LIFECYCLE-* |
 | `CC-WP-05A` | Claim-Strategie, Vorabzuweisung und Claim-Support-UX | CC-I02 | planned | CC-TC-CLAIM-*, CC-TC-PREASSIGN-*; keine Credential-/Hash-Fachlogik in der UI |
-| `CC-WP-06` | QR-Code-, Druck- und vertrauliche Exportvorbereitung | CC-I02 | planned | CC-TC-PRINT-*; keine produktive TAG-Ausgabe ohne Staging-Abnahme |
+| `CC-WP-06` | QR-Code- und Scan-URL-Vorbereitung für reservierte TAGs | CC-I02 | planned | kanonische URL-/QR-Daten ohne Druckfreigabe, Produktion, Range-Export oder Aktivierungswirkung |
+| `CC-WP-16` | Kontrollierter TCC-JSON-Druckexport für logische TAG-Ranges | CC-I07 | deferred | Berechtigungsprüfung, Anlegen eines persistenten Exportauftrags für eine `decodedValue`-Range, Download und erneuter Download eines unveränderlichen JSON-Snapshots mit Auftrags-ID, Datenminimierung, Ablauf und Audit. Der JSON-Snapshot enthält je TAG ID, kanonische Scan-URL, QR-Payload und – nur sofern der TAG nicht organisationsgebunden freigeschaltet ist – die zugehörige Claim-PIN. Keine PDF-/Label-Aufbereitung, Druckeransteuerung oder physische Ausgabe. |
+| `LOCAL-PRINT-TOOL` | Lokales PDF-/Label-Aufbereitungstool als spätere Single-Page-Anwendung unter `tools/` | außerhalb TCC-Iterationen | deferred | verarbeitet ausschließlich einen freigegebenen JSON-Exportauftrag lokal zu versionierten Zweckform-PDF-Labels mit QR-Code und übernimmt dessen `exportOrderId` als PDF-Header; die Ausgabe erfolgt ausschließlich über den lokalen Browser-/Betriebssystemdruckdialog. Keine API, DB, Reservierung, Range-Auswahl oder Aktivierungswirkung. |
 | `CC-WP-07` | Routing-Projektionsgenerator und Schema-Validierung | CC-I03 | planned | CC-TC-PROJECTION-*; Vergleich mit `DOMAIN_RULES.md` |
 | `CC-WP-08` | Outbox, idempotenter Cloudflare-KV-Publisher und Retry | CC-I03 | planned | CC-TC-PUBLISH-*, isolierter Staging-KV-Namespace |
 | `CC-WP-09` | Publish-/Unpublish-UX, Diff und Audit | CC-I03 | planned | CC-TC-PUBLISH-*, CC-TC-AUDIT-* |
@@ -44,7 +47,7 @@
 | Dokumentation | Control-Plane-Architektur und Fachregeln sind vorhanden; dieser Implementierungsplan ergänzt den Nachweisstrang | kein umgesetztes PHP-Projekt |
 | Edge Router | Cloudflare-Worker-Code und Testbasis existieren | keine Verwaltungslogik oder Fachdaten im Worker/KV |
 | TAG-App | öffentlicher Fixture-MVP auf Cloudflare Pages existiert | keine autoritative API, keine Owner- oder Vault-Verwaltung |
-| Control Center | keine Anwendung, keine Migrationen, keine DB oder API im Repository | erst nach Plan- und Produktfreigabe implementieren |
+| Control Center | keine Anwendung, keine Migrationen, keine DB oder API im Repository | erst nach Plan- und Produktfreigabe implementieren; Druck ist keine frühe TAG-Verwaltungsfunktion |
 | Cloudflare-Publishing | als Zielprozess dokumentiert | keine Browser-Tokens, keine manuelle KV-Fachpflege |
 | Produktion | keine Control-Center-Produktivfreigabe | Staging-Abnahme ist zwingend vorgeschaltet |
 
@@ -58,6 +61,7 @@
 | `CC-BLK-004` | CC-I03 | Der aktive Staging-Worker und sein tatsächlich gebundener `TAG_CONFIG`-Namespace müssen vor jeder echten KV-Änderung identifiziert werden. | Cloudflare-Ressourcenzuordnung, Least-Privilege-Token und Testnamespace sind dokumentiert. |
 | `CC-BLK-005` | CC-I04 | Die endgültige Origin der öffentlichen PHP-Read-API und die CORS-Allowlist für die TAG-App sind noch offen. | Staging-Origin, HTTPS/TLS, CORS-Policy, Rate-Limit- und Cache-Policy sind freigegeben. |
 | `CC-BLK-006` | CC-I05 | Laufzeiten, Quoten, Verlängerungsregeln, POI-Nachweisform, Retention und Moderations-SLAs sind noch Produktentscheidungen. | Versionierte Produktpolicy und rechtlich/operativ bestätigte POI- und Löschregeln liegen vor. |
+| `CC-BLK-007` | CC-I07 / `LOCAL-PRINT-TOOL` | JSON-Exportschema, Freigabe, logische Range-Auswahl, persistente Exportaufträge, Wiederausgabe, PIN-Verschlüsselung, QA, Nachdruck und Übergabe sind noch nicht als Produktionsprozess freigegeben. PDF-/Label-Vorlagenversion und lokale Aufbereitungsregeln sind getrennt festzulegen. Das lokale Tool verarbeitet ausschließlich einen freigegebenen JSON-Export ohne Autoritäts- oder Aktivierungswirkung. | Versionierte Export-/QA-/Übergabepolicy, TCC-/TCP-JSON-Exportcontract einschließlich PIN-Schutz- und Wiederausgaberegeln; für das lokale Tool zusätzlich ein konkret versioniertes Zweckform-Format und lokale Sicherheits-/Datenminimierungsprüfung. |
 
 ## Aktualisierungsregel
 

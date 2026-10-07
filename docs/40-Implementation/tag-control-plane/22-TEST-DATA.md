@@ -9,7 +9,7 @@
 2. Echte Personen, Kontakte, Betreiber, Standorte, Genehmigungen, Bestellungen, Zahlungsinformationen und Produktionsdaten sind verboten.
 3. Feistel-/HMAC-Secrets, Cloudflare-Tokens, Datenbankzugänge, MFA-Secrets und Cookie-/Sessionwerte werden niemals versioniert.
 4. Kryptografische Tests verwenden einen isolierten lokalen/CI-Secret-Provider oder freigegebene nichtproduktive Testvektoren außerhalb allgemeiner Fixtures.
-5. Staging und Produktion verwenden getrennte Datenbanken, Namespace-IDs, Tokens, Druckvorlagen, Hosts und Secret Stores.
+5. Staging und Produktion verwenden getrennte Datenbanken, Namespace-IDs, Tokens, JSON-Exportversionen, Hosts und Secret Stores.
 6. Nicht geheime Fixture-Daten dürfen keine Datenfelder enthalten, die später durch KV oder öffentliche API ausgeschlossen sein müssen, außer in ausdrücklich markierten Negativfixtures.
 7. Jeder Testlauf nutzt Rollback oder eine isolierte, anschließend bereinigte Datenbank bzw. Sandbox.
 
@@ -20,7 +20,7 @@
 | `CP-TD-001` | Range/Gruppe | Range- und Referenzprüfung | kleine kanonische Testbereiche, synthetische Gruppen-/Feature-IDs | Produktionsranges, geheime Derivate |
 | `CP-TD-002` | Allocator | Reservierung, Konkurrenz, Retry | Testkorrelationen, Startwerte, reservierte Testobjekte | echte Ausgabelose, Secrets |
 | `CP-TD-003` | TAG-Lifecycle | Statusautomat und Sperren | synthetische TAG-Stati, begründete Testaktionen | reale Owner- oder Kundendaten |
-| `CP-TD-004` | Produktion/Druck | Lose, Positionen, Snapshot und QA | erfundene Produktklasse, Vorlagenversion, Positionsnummern, QR-Testpayloads | echte Druckdateien, Produktionsserien, private Lieferdaten |
+| `CP-TD-004` | JSON-Exportauftrag | logische Range, einmalige TAG-Zuordnung, unveränderlicher Snapshot und externe QA-Referenzen | erfundene Produktklasse, Export-/Vorlagenversion, `exportOrderId`, QR-Testpayloads | echte Druckdateien, Produktionsserien, private Lieferdaten |
 | `CP-TD-005` | Routing-Projektion | Edge-Contract | minimaler Index, Gruppen, Regeln, sichere Feature-Dokumente | Audit, Produktions-, Owner-, POI-, Vault- oder Secretdaten |
 | `CP-TD-006` | Publisher-Sandbox | Retry, Publish und Unpublish | Fake-Cloudflare-Adapter, simulierte 429/5xx/Timeouts | Produktionsnamespace, echte API-Tokens |
 | `CP-TD-007` | PublicTagView | Public-API-Contract | frei erfundene öffentliche Titel, Texte, Testbild- und Link-URLs | Entwürfe, Ownerdaten, Upload-Keys, Auditdaten |
@@ -51,23 +51,23 @@ Konkrete Zahlenwerte entstehen erst bei Implementierung auf Basis des kanonische
 
 Ein Pool-Fixture repräsentiert ausschließlich einen synthetischen Pool im kanonischen `decodedValue`-Raum, etwa `private-retail-test`, `partner-test` oder `enterprise-test`. Es enthält Poolstatus, zulässige Claim-/Produktpolicy, Kapazitätsgrenzen und optional eine künstliche Organisationsreferenz, jedoch keine echten Kundendaten.
 
-Claim-Fixtures dürfen Klartext-PINs oder -Passwörter ausschließlich im isolierten lokalen/CI-Secret-Provider führen. Versionierte Fixture-Dateien enthalten nur eine nicht rückrechenbare Testreferenz, den erwarteten Hash-Algorithmus sowie künstliche Fehlversuchs-, Lockout- und Besitzstatus. Bogen-/Chargen-PIN-Tests erzeugen für jeden zugehörigen Test-TAG einen eigenständigen Hashdatensatz.
+Claim-Fixtures dürfen Klartext-PINs oder -Passwörter ausschließlich im isolierten lokalen/CI-Secret-Provider führen. Versionierte Fixture-Dateien enthalten nur eine nicht rückrechenbare Testreferenz, den erwarteten Hash-Algorithmus, eine künstliche Verschlüsselungsreferenz sowie Fehlversuchs-, Lockout- und Besitzstatus. Jeder nicht organisationsgebunden freigeschaltete claimbare Test-TAG erhält einen eigenen Prüfhash und einen eigenen verschlüsselten PIN-Wert; Bogen-/Chargen-PIN-Tests dürfen dabei denselben künstlichen PIN-Wert je TAG getrennt verschlüsseln. Organisationsgebunden vorab zugewiesene oder freigeschaltete Test-TAGs besitzen keine Claim-PIN.
 
-### 3.3 Produktionslos und Drucksnapshot (`CP-TD-004`)
+### 3.3 JSON-Exportauftrag und Snapshot (`CP-TD-004`)
 
-Ein Testproduktionslos enthält nur:
+Ein Testexportauftrag enthält nur:
 
 - eine eindeutig als Test gekennzeichnete Produktklasse;
 - Staging- oder lokale Umgebung;
-- eine synthetische Druckvorlagen-ID samt Version;
-- mehrere autoritativ reservierte Test-TAGs;
-- fortlaufende Positionsnummern;
+- eine synthetische Export-/Vorlagenversion;
+- eine künstliche `exportOrderId`;
+- eine zulässige logische `decodedValue`-Range mit mehreren autoritativ reservierten Test-TAGs;
 - kanonische Scan-URLs auf `.invalid` oder geschützte Staging-Konfiguration;
-- erfundene QA-Ergebnisse, Fehlergründe und Übergabereferenzen.
+- erfundene externe QA-Ergebnisse, Fehlergründe und Übergabereferenzen.
 
-Ein regulärer Snapshot darf ausschließlich die für Herstellung nötigen öffentlichen Daten enthalten: TAG-ID, kanonische Scan-URL, QR-Payload, Vorlagen-/Positionsinformationen sowie Prüfsummenmetadaten. Er darf keine Secrets, Ownerdaten, Cloudflare-Token, internen Admin-URLs oder Vault-Inhalte enthalten.
+Ein JSON-Snapshot enthält ausschließlich `exportOrderId`, Schema-/Export-/Vorlagenversion, Umgebung, logische Range, Freigabe-/Prüfsummenmetadaten sowie pro TAG `tagId`, kanonische Scan-URL und QR-Payload. Er enthält keine Secrets, Ownerdaten, Cloudflare-Token, internen Admin-URLs, Credential-Hashes, Fehlversuchszähler oder Vault-Inhalte.
 
-Ein gesonderter, vertraulicher Claim-/Self-Print-Export darf zusätzlich nur den zum Druck erforderlichen künstlichen Test-Credentialwert enthalten. Er ist nicht versioniert, zeitlich begrenzt, zugriffsgeschützt und wird nie als Test-Evidenz, KV-Dokument, API-Response, Auditmetadatum oder Log übernommen.
+Ein autorisierter, vertraulicher Testdownload darf zusätzlich den künstlichen Claim-PIN für nicht organisationsgebunden freigeschaltete claimbare Test-TAGs enthalten. Der PIN wird ausschließlich aus dem isolierten Test-Secret-Provider in den Snapshotprozess eingebracht und muss beim erneuten Download derselben `exportOrderId` identisch sein. Er wird nie als Test-Evidenz, KV-Dokument, reguläre API-Response, Auditmetadatum oder Log übernommen; vorab organisationsgebunden freigeschaltete Test-TAGs enthalten keine Claim-PIN.
 
 ### 3.4 Routing-Projektion (`CP-TD-005`)
 
@@ -118,6 +118,6 @@ Fehlt ein Secret oder passt ein Umgebungsmarker nicht, muss der betroffene Contr
 ## 5. Bereinigung und Evidenz
 
 - DB-Tests verwenden Transaktionsrollback oder isolierte Testdatenbanken.
-- Drucksnapshot- und Publisher-Sandboxdaten werden nach Tests zurückgesetzt.
+- JSON-Exportauftrag-/Snapshot- und Publisher-Sandboxdaten werden nach Tests zurückgesetzt.
 - Staging-Evidenz redigiert Token, Cookies, sensible Header, private IDs und personenbezogene Angaben.
 - Vor Commit und Deployment werden Fixtures, Logs und Evidence-Artefakte auf Secretmuster geprüft.

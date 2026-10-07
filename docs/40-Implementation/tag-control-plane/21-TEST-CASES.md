@@ -40,9 +40,9 @@
 
 | ID | Bezug | Testfall | Erwartetes Ergebnis | Ebene |
 | --- | --- | --- | --- | --- |
-| `CP-TC-CLAIM-PREP-001` | CP-US-025 | Credential pro TAG erzeugen | nur individueller gesalzener Hash und Claim-Metadaten werden persistiert; Klartext fehlt nach Freigabe | Integration/Security |
-| `CP-TC-CLAIM-PREP-002` | CP-US-025 | einen Bogen-/Chargen-PIN für mehrere TAGs verwenden | jeder TAG besitzt dennoch eigenen Hash, Status und Fehlversuchszähler | Integration |
-| `CP-TC-CLAIM-PREP-003` | CP-US-025 | Credential-/Hash-/Claim-Gruppendaten in KV, Public API, Audit oder Log | Leak-Test blockiert bzw. findet keine Daten | Security |
+| `CP-TC-CLAIM-PREP-001` | CP-US-025 | Claim-Credential pro nicht organisationsgebunden freigeschalteten TAG erzeugen | gesalzener Prüfhash, verschlüsselter TAG-bezogener PIN-Wert und Claim-Metadaten entstehen atomar; kein Klartext liegt unverschlüsselt vor | Integration/Security |
+| `CP-TC-CLAIM-PREP-002` | CP-US-025 | einen Bogen-/Chargen-PIN für mehrere TAGs verwenden | jeder TAG besitzt trotz identischem PIN-Wert eigenen Hash, verschlüsselten Wert, Status und Fehlversuchszähler | Integration |
+| `CP-TC-CLAIM-PREP-003` | CP-US-025 | Credential-/Hash-/PIN-/Claim-Gruppendaten in KV, Public API, Audit oder Log | Leak-Test blockiert bzw. findet keine Daten; entschlüsselte PIN ist nur im autorisierten JSON-Exportprozess verfügbar | Security |
 | `CP-TC-CLAIM-001` | CP-US-026 | korrektes Credential für claimbaren TAG | Owner-Zuordnung, Verbrauch, Besitzstatus und Audit entstehen atomar | Integration |
 | `CP-TC-CLAIM-002` | CP-US-026 | zwei parallele erfolgreiche Claim-Anfragen | exakt eine Owner-Zuordnung wird erfolgreich; zweiter Versuch bleibt neutral | Integration |
 | `CP-TC-CLAIM-003` | CP-US-026 | falsches Credential bis zum Policy-Limit | Fehlversuche, progressive Sperre und neutraler Fehler werden korrekt gesetzt | Integration/Security |
@@ -54,13 +54,13 @@
 | `CP-TC-PREASSIGN-001` | CP-US-027 | Bestellung mit Owner-/Organisation vorab zuweisen | reservierte Menge erhält atomar private `preassigned`-Zuordnung | Integration |
 | `CP-TC-PREASSIGN-002` | CP-US-027 | vertrauliche Self-Print-Liste erzeugen | zeitlich begrenzter auditierter Export ohne Secrets/Tokens; Ownerdaten nur nach Policy | Integration/Security |
 | `CP-TC-PREASSIGN-003` | CP-US-027 | Widerruf/Ersatz bei vorab zugeordnetem TAG | keine Doppelzuweisung; Status, Audit und ggf. Sperrwirkung konsistent | Integration |
-| `CP-TC-PRODUCTION-001` | CP-US-020 | Produktionslos mit Menge erstellen | konkrete, eindeutige TAG-Positionen werden atomar reserviert | Integration |
-| `CP-TC-PRODUCTION-002` | CP-US-020 | Fehler während Loserzeugung | keine unklare Teilmenge reservierter Positionen bleibt zurück | Integration |
-| `CP-TC-PRODUCTION-003` | CP-US-020 | TAG gleichzeitig in zweites offenes Los aufnehmen | Zuordnung wird verweigert | Integration |
-| `CP-TC-SNAPSHOT-001` | CP-US-021 | freigegebenen Drucksnapshot erzeugen | Snapshot enthält ID, URL, QR-Payload, Vorlage, Freigabe und Prüfsumme | Integration |
-| `CP-TC-SNAPSHOT-002` | CP-US-021 | denselben freigegebenen Export erneut abrufen | identischer Inhalt und identische Prüfsumme; keine Neuberechnung | Integration |
-| `CP-TC-SNAPSHOT-003` | CP-US-021 | regulären Drucksnapshot auf Leaks prüfen | keine Secrets, Cloudflare-Tokens, Owner- oder Vaultdaten; Claim-Klartext nur im freigegebenen vertraulichen Credential-Export | Security |
-| `CP-TC-SNAPSHOT-004` | CP-US-021 | Druckposition nach Freigabe ändern | Änderung wird verweigert oder erzeugt neuen freizugebenden Auftrag | Integration |
+| `CP-TC-PRODUCTION-001` | CP-US-020 | JSON-Exportauftrag für zulässige logische `decodedValue`-Range anlegen | `exportOrderId`, konkrete einmalige TAG-Menge, Snapshot-Grundlage, Claim-Datensätze und Audit entstehen atomar | Integration |
+| `CP-TC-PRODUCTION-002` | CP-US-020 | Fehler während der Exportauftragserzeugung | kein unklarer Auftrag, keine unauswertbare TAG-Teilmenge und keine isolierten Claim-Datensätze bleiben zurück | Integration |
+| `CP-TC-PRODUCTION-003` | CP-US-020 | TAG gleichzeitig in zweiten offenen Exportauftrag aufnehmen | Zuordnung wird verweigert, außer eine autorisierte Nachdruck-/Ersatzpolicy erlaubt den referenzierenden Folgeauftrag | Integration |
+| `CP-TC-SNAPSHOT-001` | CP-US-021 | freigegebenen JSON-Snapshot erzeugen | JSON enthält `exportOrderId`, Range, TAG-ID, kanonische URL, QR-Payload, Version, Freigabe, Audit-/Korrelationsreferenz und Prüfsumme; Claim-PIN nur für nicht organisationsgebunden freigeschaltete claimbare TAGs | Integration |
+| `CP-TC-SNAPSHOT-002` | CP-US-021 | denselben freigegebenen JSON-Export über `exportOrderId` erneut herunterladen | identischer Inhalt und identische Prüfsumme; keine Neuberechnung, neue PIN-Generierung oder neue Auftrags-ID | Integration |
+| `CP-TC-SNAPSHOT-003` | CP-US-021 | JSON-Snapshot auf Leaks und PIN-Ausnahmen prüfen | keine Secrets, Cloudflare-Tokens, Owner-, Vault-, Hash- oder Fehlversuchsdaten; Claim-PIN nur im autorisierten vertraulichen Download und nie bei organisationsgebunden freigeschalteten TAGs | Security |
+| `CP-TC-SNAPSHOT-004` | CP-US-021 | Range, TAG-Menge oder Claim-Modell nach Freigabe ändern | Änderung wird verweigert oder erzeugt einen neuen autorisiert freizugebenden Exportauftrag | Integration |
 | `CP-TC-QA-001` | CP-US-022 | Druck-/QA-Statusfolge positiv | nur zulässige Statuswechsel von `reserved` bis `quality-checked` | Unit/Integration |
 | `CP-TC-QA-002` | CP-US-022 | Teilproduktion mit fehlerhaften Positionen | Auftrag wird `partially-completed`; Fehlerpositionen bleiben nachvollziehbar | Integration |
 | `CP-TC-QA-003` | CP-US-022 | Ausschuss markieren | TAG bleibt belegt und wird nicht wieder frei | Integration |

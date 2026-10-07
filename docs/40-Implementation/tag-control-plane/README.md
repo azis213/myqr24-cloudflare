@@ -4,7 +4,7 @@
 
 Dieser Teilbereich plant die künftige **TAG Control Plane** als autoritatives, serverseitiges PHP-/MySQL-Backend auf dem Dogado-Hosting.
 
-Die Control Plane implementiert die fachliche Wahrheit und die sicherheitskritischen Prozesse für Allocation Pools und TAG-Ranges, Vergabe, Claiming, Owner-Vorabzuweisung, Herstellung, Druck, Lebenszyklus, Routing-Publishing und öffentliche Basisdaten. Sie stellt dafür interne Verwaltungs-APIs bzw. serverseitige Anwendungsdienste für das [TAG Control Center](../tag-control-center/README.md) sowie eine strikt beschränkte öffentliche Claim-Schnittstelle für die TAG-App bereit.
+Die Control Plane implementiert die fachliche Wahrheit und die sicherheitskritischen Prozesse für Allocation Pools und TAG-Ranges, Vergabe, Claiming, Owner-Vorabzuweisung, persistente JSON-Exportaufträge, Lebenszyklus, Routing-Publishing und öffentliche Basisdaten. Sie stellt dafür interne Verwaltungs-APIs bzw. serverseitige Anwendungsdienste für das [TAG Control Center](../tag-control-center/README.md) sowie eine strikt beschränkte öffentliche Claim-Schnittstelle für die TAG-App bereit. PDF-/Label-Aufbereitung, Druckeransteuerung und physische Herstellung liegen ausdrücklich außerhalb der Control Plane.
 
 Dieses Verzeichnis enthält zunächst ausschließlich Planungs-, Qualitäts- und Rückverfolgbarkeitsartefakte. Es erzeugt weder Anwendungscode noch Datenbankmigrationen, Cloudflare-Konfigurationen oder produktive Daten.
 
@@ -22,13 +22,13 @@ Fach- und Architekturregel
 
 | Komponente | Verantwortung | Nicht verantwortlich für |
 | --- | --- | --- |
-| **TAG Control Plane** | PHP-/MySQL-Domänenlogik, DB-Transaktionen, AuthZ-Durchsetzung, Pool-/Range- und TAG-Vergabe, Claim-Prüfung, Owner-Zuordnung, Produktionslose, Druck-Snapshots, Qualitätsstatus, Audit, Outbox, Publisher, öffentliche Read-API | Benutzeroberfläche, browserseitige Sicherheitsentscheidung, öffentliche Edge-Auflösung |
+| **TAG Control Plane** | PHP-/MySQL-Domänenlogik, DB-Transaktionen, AuthZ-Durchsetzung, Pool-/Range- und TAG-Vergabe, Claim-Prüfung, Owner-Zuordnung, persistente JSON-Exportaufträge und unveränderliche Snapshots, Qualitäts-/Übergabereferenzen, Audit, Outbox, Publisher, öffentliche Read-API | Benutzeroberfläche, browserseitige Sicherheitsentscheidung, öffentliche Edge-Auflösung sowie PDF-/Label-Aufbereitung, Druckeransteuerung und physische Herstellung |
 | **TAG Control Center** | administrative UI, Formulare, Listen, Vorschau, Pool-/Chargen-/Claim-Konfiguration und Bedienung der freigegebenen Control-Plane-Funktionen | fachliche Autorität, direkte DB-Zugriffe, Claim-Prüfung, Cloudflare-Tokens, Umgehung von AuthZ oder Workflow-Guards |
 | **Cloudflare KV** | minimale, abgeleitete und nicht geheime Routing-Projektion | Stammdaten, Produktionsdaten, Owner-/POI-Daten, Audit, Vault-Inhalte, Secrets |
 | **Edge Router** | Scan-URL- und TAG-Kryptografievalidierung sowie Auflösung der KV-Projektion | Range-Verwaltung, Vergabe, Herstellung, Druck, Admin-Workflows |
 | **TAG-App / spätere Runtime-API** | öffentliche Darstellung und Laufzeit-Features | Verwaltungsautorität, Produktionsprozesse, KV-Publishing |
 
-Das Control Center kann eine Action anbieten, etwa „Produktionslos freigeben“ oder „nach Staging publizieren“. Die Control Plane entscheidet jedoch serverseitig, ob diese Aktion zulässig ist, erzeugt die atomaren Datenänderungen und schreibt Audit- sowie Outbox-Ereignisse.
+Das Control Center kann eine Action anbieten, etwa „JSON-Exportauftrag freigeben“ oder „nach Staging publizieren“. Die Control Plane entscheidet jedoch serverseitig, ob diese Aktion zulässig ist, erzeugt die atomaren Datenänderungen und schreibt Audit- sowie Outbox-Ereignisse.
 
 ## Verantwortungsmodell der Control Plane
 
@@ -38,8 +38,8 @@ Control Center (Admin-Browser)
           ▼
 Control-Plane API / Application Service
           │ AuthZ + Workflow + DB-Transaktion
-          ├── MySQL: Stammdaten, Pool-/Claim-/Produktionsdaten, Audit, Outbox
-          ├── Druckexport: unveränderlicher, vertraulicher Snapshot
+          ├── MySQL: Stammdaten, Pool-/Claim-/Exportauftragsdaten, Audit, Outbox
+          ├── JSON-Export: unveränderlicher, vertraulicher Snapshot mit `exportOrderId`
           ├── Publisher: minimaler Cloudflare-KV-Diff
           ├── Public Read API: ausschließlich veröffentlichte Basisdaten
           └── Public Claim API: PIN-/Passwortprüfung und atomare Owner-Zuordnung
@@ -51,14 +51,14 @@ Control-Plane API / Application Service
 2. **Serverseitige Durchsetzung.** Rollen, Produktpolicies, Statusautomaten, Range-Prüfungen und Freigabegates werden ausschließlich in der Control Plane geprüft.
 3. **Atomare TAG-Vergabe.** Öffentliche `tagId` und `(length, decodedValue)` besitzen eindeutige Constraints. Sechs- und achtstellige TAGs werden unter DB-Sperren bzw. gleichwertiger Transaktionssicherheit reserviert.
 4. **Allocation Pools vor Vergabe.** Pools reservieren gültige `decodedValue`-Ranges für Zielgruppe, Produkt-/Claim-Policy und optional Organisation. Sie werden im kanonischen Raum verwaltet, nicht anhand sichtbar fortlaufender Feistel-`tagId`-Strings.
-5. **Produktion vor Aktivierung.** Physische TAGs werden als konkrete Druckpositionen eines Produktionsloses reserviert, gesnapshottet, gedruckt und qualitätsgeprüft. Sie werden nicht stillschweigend durch Druckergebnisse neu vergeben.
-6. **Claiming ist serverseitig.** Für jeden claimbaren TAG speichert die Plane eine Claim-Policy, einen individuellen gesalzenen Credential-Hash, Fehlversuche, Sperrung und Besitzstatus. Auch bei gleichem Bogen-/Chargen-PIN besitzt jeder TAG einen eigenen Claimdatensatz.
-7. **Unveränderliche vertrauliche Druck-Snapshots.** Nach Freigabe bleibt die Zuordnung von TAG-ID, Scan-URL, QR-Payload, Vorlage, Position und auszugebendem Claim-Credential versioniert und prüfsummenbelegt. Der Klartextwert ist nur beim kontrollierten Druckexport verfügbar.
+5. **Kontrollierter Export vor Aktivierung.** Physische TAGs werden für einen persistenten JSON-Exportauftrag einer konkreten logischen `decodedValue`-Range einmalig zugeordnet. Externe QA-, Übergabe-, Ausschuss- und Nachdruckprozesse referenzieren diesen Auftrag; sie vergeben keine TAGs stillschweigend neu.
+6. **Claiming ist serverseitig.** Für jeden nicht organisationsgebunden freigeschalteten claimbaren TAG speichert die Plane eine Claim-Policy, einen individuellen gesalzenen Credential-Prüfhash, einen TAG-bezogen verschlüsselten auszugebenden PIN-Wert, Fehlversuche, Sperrung und Besitzstatus. Auch bei gleichem Bogen-/Chargen-PIN besitzt jeder TAG einen eigenen Claimdatensatz.
+7. **Unveränderliche vertrauliche JSON-Snapshots.** Nach Freigabe bleibt die Zuordnung von `exportOrderId`, TAG-ID, Scan-URL, QR-Payload, Version und auszugebender Claim-PIN versioniert und prüfsummenbelegt. Der autorisierte Wiederdownload liefert denselben Snapshot; PIN-Werte werden dafür ausschließlich innerhalb des Exportprozesses entschlüsselt und fehlen bei organisationsgebunden vorab zugewiesenen oder freigeschalteten TAGs.
 8. **Outbox vor Publisher.** Fachmutation, Audit und Publish-/Unpublish-Auftrag entstehen innerhalb derselben DB-Transaktion. Der Publisher markiert Erfolg erst nach bestätigter Cloudflare-Antwort.
 9. **Keine Secrets außerhalb des Servers.** Feistel-/HMAC-Secrets, Cloudflare-Tokens und Claim-Credential-Hashes bleiben im umgebungsgetrennten Secret Store bzw. der autoritativen DB; sie erscheinen nie in KV, öffentlichen APIs, Logs oder Fixtures.
 10. **Minimale Datenveröffentlichung.** KV enthält nur erlaubte Ranges, Gruppen, Regelzuweisungen und Feature-Dokumente. Die öffentliche Read-API liefert nur explizit veröffentlichte Felder.
-11. **Staging getrennt von Produktion.** Datenbanken, Token, KV-Namespaces, Hosts, Druckvorlagen und Freigabegates sind je Umgebung getrennt.
-12. **Auditierbarkeit.** Kritische Fach-, Pool-, Claim-, Produktions-, Druck-, Qualitäts- und Publish-Ereignisse sind unveränderbar nachvollziehbar.
+11. **Staging getrennt von Produktion.** Datenbanken, Token, KV-Namespaces, Hosts, JSON-Exportversionen und Freigabegates sind je Umgebung getrennt.
+12. **Auditierbarkeit.** Kritische Fach-, Pool-, Claim-, Exportauftrags-, Download/Wiederausgabe-, Qualitäts- und Publish-Ereignisse sind unveränderbar nachvollziehbar.
 
 ## Dokumente
 
@@ -66,7 +66,7 @@ Control-Plane API / Application Service
 | --- | --- |
 | [STATUS.md](STATUS.md) | Iterationen, Arbeitspakete, Abhängigkeiten, Blocker und Ausgangsstatus |
 | [10-USER-STORIES.md](10-USER-STORIES.md) | Backend- und Domänenstories mit Akzeptanzkriterien |
-| [20-TEST-STRATEGY.md](20-TEST-STRATEGY.md) | Testpyramide, Sicherheits-, Produktions- und Publishing-Gates |
+| [20-TEST-STRATEGY.md](20-TEST-STRATEGY.md) | Testpyramide, Sicherheits-, JSON-Export- und Publishing-Gates |
 | [21-TEST-CASES.md](21-TEST-CASES.md) | konkrete, zukünftige Control-Plane-Testfälle |
 | [22-TEST-DATA.md](22-TEST-DATA.md) | Fixture-Klassen, Testvektoren und Secret-Grenzen |
 | [30-TRACEABILITY.md](30-TRACEABILITY.md) | Story → Arbeitspaket → Test → Testdaten → Evidenz |

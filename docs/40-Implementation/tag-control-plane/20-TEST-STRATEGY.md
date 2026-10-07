@@ -1,31 +1,31 @@
 # Teststrategie: TAG Control Plane
 
 **Planungsstand:** 2026-10-06  
-**Geltungsbereich:** zukünftige PHP-/MySQL-Domänenlogik, Persistenz, interne Control-Plane-Schnittstellen, Druckexport, Publisher und öffentliche Basis-Read-API.  
+**Geltungsbereich:** zukünftige PHP-/MySQL-Domänenlogik, Persistenz, interne Control-Plane-Schnittstellen, kontrollierter JSON-Export, Publisher und öffentliche Basis-Read-API.
 **Nicht Gegenstand:** Die Admin-UI wird im TAG-Control-Center-Strang, Edge-Kryptografie im Edge-Router-Strang und PWA-Rendering im TAG-App-Strang getestet.
 
 ## 1. Qualitätsziele
 
 1. **Autorität:** Fachentscheidungen stammen aus MySQL und serverseitiger Domänenlogik, nie aus Browser oder KV.
-2. **Eindeutigkeit:** Keine doppelte TAG-ID, Claim-Zuordnung, Druckposition oder widersprüchliche Aktivierung bei Parallelität und Retry.
-3. **Claim-Sicherheit:** Credentials sind je TAG sicher gehasht; Fehlversuche, Sperren und Drosselung verhindern massenhaftes Durchprobieren.
-4. **Produktionsintegrität:** Druckdaten sind nach Freigabe reproduzierbar, prüfsummenbelegt und – abgesehen vom ausdrücklich erforderlichen Credential im vertraulichen Export – frei von Secrets.
+2. **Eindeutigkeit:** Keine doppelte TAG-ID, Claim-Zuordnung, Exportauftragszuordnung oder widersprüchliche Aktivierung bei Parallelität und Retry.
+3. **Claim-Sicherheit:** Credentials besitzen je TAG einen sicheren Prüfhash und – für erneut herunterladbare autorisierte JSON-Exportaufträge – einen verschlüsselten PIN-Wert; Fehlversuche, Sperren und Drosselung verhindern massenhaftes Durchprobieren.
+4. **Exportintegrität:** JSON-Exportdaten sind nach Freigabe mit `exportOrderId` reproduzierbar und prüfsummenbelegt. Claim-PINs sind ausschließlich im autorisierten vertraulichen JSON-Download für nicht organisationsgebunden freigeschaltete TAGs zulässig.
 5. **Fail closed:** Ungültige Pools/Ranges, Statuswechsel, Claims, Produktgates oder Projektionen werden nicht ausgeführt.
 6. **Datenminimierung:** KV, Public Read API, Logs und reguläre Auditmetadaten enthalten keine privaten, produktionsbezogenen oder geheimen Daten.
 7. **Betriebssicherheit:** Outbox, Claim- und Publisher-Prozesse verkraften Abbruch, Timeout, Rate Limit und Wiederholung.
-8. **Nachvollziehbarkeit:** Audit verbindet Pool, TAG, Claim, Produktionslos, Druckposition, QA, Übergabe und Publish-Ergebnis.
+8. **Nachvollziehbarkeit:** Audit verbindet Pool, TAG, Claim, Exportauftrag, JSON-Download/Wiederausgabe, externe QA-/Übergabereferenz und Publish-Ergebnis.
 9. **Umgebungstrennung:** Tests können nicht versehentlich Produktion, Produktions-KV oder Produktionssecrets verwenden.
 
 ## 2. Testpyramide
 
 | Ebene | Zweck | Beispiele | Ausführung |
 | --- | --- | --- | --- |
-| Unit | deterministische Fachlogik | Range-Invarianten, Statusautomaten, Slotberechnung, Snapshot-Prüfsumme | bei jedem Commit |
-| Service | Domänenservices und Policies | Allocator, Produktionslos, QA-Gate, Projektionsgenerator | bei jedem Commit |
+| Unit | deterministische Fachlogik | Range-Invarianten, Statusautomaten, Slotberechnung, JSON-Snapshot-Prüfsumme | bei jedem Commit |
+| Service | Domänenservices und Policies | Allocator, JSON-Exportauftrag, PIN-Schutz, QA-Gate, Projektionsgenerator | bei jedem Commit |
 | Integration | MySQL, Transaktionen, Locks, Outbox und Adapter | Parallelreservierung, Migrationslauf, Retry, Publish-Markierung | CI mit isolierter DB |
 | Contract | Grenzen zu Edge Router, Control Center und TAG-App | KV-Schema, interne Commands, `PublicTagView` | CI vor Staging |
 | Security | negative Zugriffs-, Leak- und Missbrauchsfälle | Rechteeskalation, Injection, Secret-Leak, CORS/CSRF | je Freigabe |
-| Staging / Betrieb | reale Systemkette | Drucksnapshot, Staging-KV, Scan → PWA → Read API | je Iterationsgate |
+| Staging / Betrieb | reale Systemkette | JSON-Snapshot, Staging-KV, Scan → PWA → Read API | je Iterationsgate |
 
 ### 2.1 Verbindliche lokale PHP-/MySQL-Ausführung
 
@@ -57,17 +57,17 @@ Die gemeinsame [lokale PHP-/MySQL-Testtopologie](../../../tools/local-php-mysql/
 - Idempotente Wiederholung nach Client- oder Prozessabbruch.
 - Gültige und ungültige Statusübergänge, insbesondere Aktivierung ohne Produktionsfreigabe.
 
-### 3.3 CP-I03 – Herstellung, Claiming und Druck
+### 3.3 CP-I03 – Claiming und kontrollierter JSON-Export
 
-- Atomare Erstellung eines Produktionsloses samt konkreter reservierter Druckpositionen.
-- Claim-Credentials mit individuellem Hash pro TAG bei Einzel- und Bogen-/Chargen-PIN.
+- Atomare Erstellung eines persistenten Exportauftrags für eine zulässige logische `decodedValue`-Range samt konkreter einmaliger TAG-Zuordnung.
+- Claim-Credentials mit individuellem Prüfhash und TAG-bezogen verschlüsseltem PIN-Wert pro nicht organisationsgebunden freigeschaltetem TAG, auch bei gemeinsamem Bogen-/Chargen-PIN.
 - Öffentlicher Claim: atomare Credential-Prüfung, Owner-Zuordnung, Verbrauch und Parallelclaim-Schutz.
 - Höchstversuche, progressive Sperre, Client-/IP-Drosselung und auditierter Support-Reset.
 - Vorabzugewiesene Bestellungen und Self-Print-Serien ohne Einzelclaim.
-- Snapshot-Determinismus: gleicher freigegebener Auftrag liefert denselben Export und dieselbe Prüfsumme.
-- Exportprüfung auf kanonische URLs und Abwesenheit von Secrets, Owner- und Vaultdaten; Klartext-Credentials sind nur im vertraulichen freigegebenen Druck-/Self-Print-Export zulässig.
-- Statussequenz von Druckauftrag und Position sowie Teilproduktion.
-- QA-Proben, Ausschuss, Nachdruck, Ersatz-ID, Verlust-/Diebstahlsperre und Übergabegate.
+- Snapshot-Determinismus: derselbe freigegebene Auftrag liefert unter derselben `exportOrderId` denselben JSON-Inhalt und dieselbe Prüfsumme.
+- Exportprüfung auf kanonische URLs sowie Abwesenheit von Secrets, Owner-, Vault-, Hash- und Fehlversuchsdaten; entschlüsselte Claim-PINs sind nur im autorisierten JSON-Download für nicht organisationsgebunden freigeschaltete TAGs zulässig.
+- Änderungen an Range, TAG-Menge oder Claim-Modell erzeugen einen neuen freizugebenden Auftrag.
+- Externe QA-Proben, Ausschuss, Nachdruck, Ersatz-ID, Verlust-/Diebstahlsperre und Übergabegate referenzieren den Exportauftrag; TCP erzeugt weder PDF noch Druckauftrag oder Druckeransteuerung.
 - Kein ausgemusterter oder zerstörter TAG wird erneut frei vergeben.
 
 ### 3.4 CP-I04 – Projektion und Publisher
@@ -103,7 +103,7 @@ Jede sicherheitsrelevante Funktion erhält mindestens einen Test für:
 - manipulierte Objekt-, Organisations- oder Status-ID;
 - parallelen bzw. wiederholten Ausführungsversuch;
 - fehlerhafte DB-Transaktion oder Prozessabbruch;
-- ungültigen Pool, Range, Claim-Status, Featurekonfiguration, URL oder Druckvorlage;
+- ungültigen Pool, Range, Claim-Status, Exportauftrag, Featurekonfiguration oder URL;
 - Claim mit falschem Credential, erschöpften Fehlversuchen, Lockout, Parallelität oder fremder Owner-Referenz;
 - Freigabe/Aktivierung ohne QA oder Übergabe;
 - Secret-/personenbezogenes Feld im regulären Export, KV-Dokument, API-Response, Audit oder Log;
@@ -116,13 +116,13 @@ Jede sicherheitsrelevante Funktion erhält mindestens einen Test für:
 | --- | --- | --- |
 | CP-G1 – Fundament | CP-I01-Tests erfolgreich | Migration, Rollback, AuthZ-/Audit-/Secret-Prüfung |
 | CP-G2 – Vergabe | CP-G1 erfüllt | Parallelitäts-, Slot-, Retry- und Lifecycle-Tests |
-| CP-G3 – Claim und Druck | CP-G2 erfüllt | atomare Losbildung, Credential-Hashing, Parallelclaim, Lockout, Snapshot, QA, Ausschuss und Nachdruck |
+| CP-G3 – Claim und JSON-Export | CP-G2 erfüllt | atomare Exportauftragsanlage, Prüfhash-/PIN-Verschlüsselung, Parallelclaim, Lockout, unveränderlicher JSON-Snapshot mit Wiederdownload, QA-/Ausschuss-/Nachdruckreferenzen |
 | CP-G4 – Publishing | CP-G3 erfüllt, Staging-KV bestätigt | Projektion, Retry, Publish und Unpublish im isolierten Namespace |
 | CP-G5 – Public API | CP-G4 erfüllt | Contract-, Leak-, CORS-, Cache- und Rate-Limit-Tests |
 | CP-G6 – E2E | CP-G5 erfüllt | positiver und neutraler realer Staging-Scan |
 | Produktion | CP-G1 bis CP-G6 erfüllt | getrennte Produktionskonfiguration, Betriebs- und Sicherheitsfreigabe |
 
-Es darf weder eine Produktionsdruckfreigabe noch ein Produktions-Publish erfolgen, solange die vorausgehenden Gates nicht erfüllt sind.
+Es darf weder ein produktiver vertraulicher JSON-Export noch ein Produktions-Publish erfolgen, solange die vorausgehenden Gates nicht erfüllt sind. PDF-Erzeugung, Druckfreigabe und physische Ausgabe liegen außerhalb der Control Plane.
 
 ## 6. Evidenz
 

@@ -102,10 +102,11 @@
 **Akzeptanzkriterien**
 
 1. Credential-Typen mindestens `pin` und `password` sowie die Verteilungsmodelle `per-tag` und `shared-batch` sind policygesteuert abbildbar.
-2. Auch bei einem gemeinsamen Bogen-/Chargenwert erhält jeder TAG einen eigenen gesalzenen Credential-Hash, Claim-Status, Fehlversuchszähler und Lockout-Zeitpunkt.
-3. Klartext-Credentials sind nach kontrollierter Druckfreigabe nicht wieder aus der Control Plane abrufbar.
-4. Credential-Hashes, Fehlversuche, Claim-Gruppen, Ownerdaten und interne Druckreferenzen gelangen nie in KV, Public Read API, Auditmetadaten oder Logs.
-5. Credential-Anlage, Druckfreigabe, Sperrung und Reset werden auditiert.
+2. Auch bei einem gemeinsamen Bogen-/Chargenwert erhält jeder claimbare TAG einen eigenen gesalzenen Credential-Hash, Claim-Status, Fehlversuchszähler und Lockout-Zeitpunkt.
+3. Für jeden nicht organisationsgebunden freigeschalteten claimbaren TAG wird zusätzlich zum Prüfhash der auszugebende PIN-Wert verschlüsselt, TAG-bezogen und nur in der autoritativen TCP-Datenbank gespeichert. Ein gemeinsamer PIN-Wert für alle TAGs eines Exportauftrags ist zulässig, bleibt aber je TAG als verschlüsselter Wert zugeordnet.
+4. Der verschlüsselte PIN-Wert ist ausschließlich zur Erstellung und erneuten Ausgabe eines autorisierten, vertraulichen JSON-Exportauftrags entschlüsselbar; er erscheint nie in regulären TAG-Abfragen, Support-Claim-Flows, KV, Public Read API, Auditmetadaten oder Logs.
+5. Credential-Hashes, Fehlversuche, Claim-Gruppen, Ownerdaten und interne Exportreferenzen gelangen nie in KV, Public Read API, Auditmetadaten oder Logs.
+6. Credential-Anlage, Exportfreigabe, Download/Wiederausgabe, Sperrung und Reset werden auditiert.
 
 ### CP-US-026 – Claim atomar über den freigegebenen Einstieg ausführen
 
@@ -152,33 +153,34 @@
 4. Pool-, Produkt-, QA-, Übergabe- und Aktivierungspolicy werden vor Ausgabe durchgesetzt.
 5. Widerruf, Ersatz oder Besitzerwechsel hinterlassen keine unklare Doppelzuweisung und werden auditiert.
 
-### CP-US-020 – Produktionslos mit reservierten Druckpositionen erzeugen
+### CP-US-020 – JSON-Exportauftrag für eine logische TAG-Range erzeugen
 
-**Als** Produktionsprozess  
-**möchte ich** ein Produktionslos mit eindeutig reservierten TAG-Druckpositionen erzeugen,  
-**damit** Herstellung und physische Einheiten eindeutig der autoritativen Datenbasis folgen.
+**Als** berechtigter Exportprozess  
+**möchte ich** für eine zulässige logische `decodedValue`-TAG-Range einen eindeutigen, persistenten JSON-Exportauftrag erzeugen,  
+**damit** eine unabhängige Druckaufbereitung oder externe Druckerei mit einer reproduzierbaren, auditierbaren TAG-Menge arbeiten kann.
 
 **Akzeptanzkriterien**
 
-1. Ein Produktionslos enthält Produktklasse, Umgebung, Pool-/Range-Kontext, Druckvorlage, Claim-/Vorabzuweisungsmodell und konkrete Druckpositionen.
-2. Jede Position referenziert genau einen reservierten TAG.
-3. Die Reservierung erfolgt atomar; Teilfehler hinterlassen keine unklare Menge.
-4. Ein TAG kann nicht gleichzeitig in mehreren offenen Druckpositionen liegen.
-5. Staging- und Produktionslose sind fachlich und technisch getrennt.
+1. Ein Exportauftrag enthält mindestens `exportOrderId`, Umgebung, Pool-/Range-Kontext, die konkrete logische Start-/Endgrenze im `decodedValue`-Raum, Export-/Vorlagenversion, Claim-/Vorabzuweisungsmodell, Erstellzeitpunkt, Akteur, Freigabestatus und Prüfsumme.
+2. Der Auftrag umfasst ausschließlich konkret reservierte TAGs der ausgewählten logischen Range; jeder enthaltene TAG ist einmalig zugeordnet.
+3. Anlage, TAG-Zuordnung, Claim-Datensätze, Audit-Ereignis und Snapshot-Grundlage entstehen atomar; Teilfehler hinterlassen keinen unklaren Auftrag oder unauswertbare Teilmenge.
+4. Ein TAG kann nicht gleichzeitig in mehreren offenen Exportaufträgen liegen, sofern eine explizite Nachdruck-/Ersatzpolicy keinen neuen referenzierenden Auftrag zulässt.
+5. Staging- und Produktionsaufträge sind fachlich und technisch getrennt. Das Anlegen eines Exportauftrags löst weder PDF-Erzeugung, Druck, Publish noch Aktivierung aus.
 
-### CP-US-021 – Unveränderlichen Druck-Snapshot erstellen
+### CP-US-021 – Unveränderlichen JSON-Export-Snapshot herunterladen und wieder ausgeben
 
 **Als** Control-Plane-Service  
-**möchte ich** einen freigegebenen Druckauftrag als versionierten, prüfsummenbelegten Snapshot exportieren,  
-**damit** Druckdaten reproduzierbar bleiben und nach Freigabe nicht unbemerkt manipuliert werden können.
+**möchte ich** einen freigegebenen Exportauftrag als versionierten, prüfsummenbelegten JSON-Snapshot herunterladen und jederzeit erneut ausgeben,  
+**damit** externe Druckaufbereitung und Nachdruck mit derselben `exportOrderId` und unveränderten Daten reproduzierbar bleiben.
 
 **Akzeptanzkriterien**
 
-1. Snapshot enthält Druckauftrags-/Los-ID, Position, TAG-ID, kanonische Scan-URL, QR-Payload, Vorlagenversion und bei offenen Chargen das auszugebende Claim-Credential.
-2. Snapshot und Export erhalten eine Prüfsumme sowie Freigabezeitpunkt und Akteur.
-3. Ein erneuter Download liefert denselben freigegebenen Snapshot, keine Neuberechnung.
-4. Export enthält keine Secrets, Cloudflare-Tokens, Ownerdaten oder privaten Vault-Inhalte; Claim-Credentials sind ausschließlich im als vertraulich klassifizierten Druck-/Selbstdruckexport zulässig.
-5. Änderungen nach Freigabe erzeugen einen neuen, autorisiert freizugebenden Auftrag statt stiller Manipulation.
+1. Der JSON-Snapshot enthält als Kopf mindestens `exportOrderId`, Schema-/Export-/Vorlagenversion, Umgebung, logische `decodedValue`-Range, Freigabezeitpunkt, Akteur, Prüfsumme und Audit-/Korrelationsreferenz. Jeder TAG-Eintrag enthält `tagId`, kanonische Scan-URL und QR-Payload.
+2. Für jeden nicht organisationsgebunden freigeschalteten claimbaren TAG enthält der JSON-Snapshot zusätzlich dessen Claim-PIN. Organisationsgebunden vorab zugewiesene oder freigeschaltete TAGs enthalten keine Claim-PIN.
+3. Snapshot und JSON-Download werden genau einem Exportauftrag zugeordnet; ein erneuter Download mit derselben `exportOrderId` liefert denselben Inhalt und dieselbe Prüfsumme, keine Neuberechnung.
+4. Die Entschlüsselung einer gespeicherten Claim-PIN ist ausschließlich innerhalb der autorisierten JSON-Snapshot-Erzeugung erlaubt. Sie wird weder separat abrufbar noch in Audit, Logs, Browserpersistenz, KV oder Public APIs abgelegt.
+5. Der Export enthält keine Feistel-/HMAC-Secrets, Cloudflare-Tokens, Ownerdaten, privaten Vault-Inhalte, Credential-Hashes, Fehlversuchszähler oder internen Schlüsselmaterialien.
+6. Änderungen an Range, TAG-Menge, Claim-Modell oder Exportdaten erzeugen einen neuen, autorisiert freizugebenden Exportauftrag statt stiller Manipulation des bestehenden Snapshots.
 
 ### CP-US-022 – Druck-, QA- und Ausschussstatus führen
 

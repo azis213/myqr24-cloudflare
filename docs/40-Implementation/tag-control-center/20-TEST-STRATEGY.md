@@ -47,7 +47,7 @@ Die Teststrategie sichert insbesondere:
 - Sichtbarkeitstests: Credential-Hashes und nach der Freigabe nicht mehr abrufbare Klartextwerte erscheinen nie in UI, Fehlern, Auditansicht oder Browser-Storage.
 - Test für den vertraulichen Druck-/Self-Print-Export: erneute Berechtigung, Zweck/Umfang/Ablaufzeit, Audit-Referenz und keine unzulässige Browserpersistenz.
 - Statusautomaten- und Contract-Tests für erlaubte und verbotene Übergänge.
-- QR-/Drucktest: nur dokumentierte Hosts/Pfade und kanonisch kleingeschriebene TAG-IDs.
+- QR-Vorschautest: ausschließlich dokumentierte Hosts/Pfade und kanonisch kleingeschriebene TAG-IDs; kein Export, PDF-Layout, Druckauftrag oder physischer Druck.
 
 ### 3.3 CC-I03 – Projektion und Publishing
 
