@@ -71,7 +71,7 @@ Ich möchte nun eine TAG-APP im Ordner tools\tag-gen erstellen, die als Tool fü
 8. Vor einer Generierung wird ausgewählt, wie die öffentliche TAG-ID in die QR-URL eingesetzt wird:
    - **Base36/Base45 – Großschreibung:** gesamte QR-Nutzlast-URL wird in Großbuchstaben eingesetzt, damit alle Buchstaben der Nutzlast Base45-konform sind.
    - **Binär-Codec – Kleinschreibung:** Basis-URL und öffentliche ID werden klein geschrieben eingesetzt.
-   Der gewählte Modus wird mit der Konfiguration und der erzeugten TAG-Liste gespeichert, damit QR-Nutzlasten nachvollziehbar bleiben.
+     Der gewählte Modus wird mit der Konfiguration und der erzeugten TAG-Liste gespeichert, damit QR-Nutzlasten nachvollziehbar bleiben.
 
 ## Zusatz – Dateien, QR-Profile und Bereichsversionen
 
@@ -82,3 +82,12 @@ Ich möchte nun eine TAG-APP im Ordner tools\tag-gen erstellen, die als Tool fü
 5. Die QR-Generierung, Einzelvorschau, Druckvorschau und PDF-Ausgabe verwenden immer das QR-Profil der jeweiligen Range. Erzwungene QR-Versionen werden vor dem Generieren validiert; ist die Nutzlast zu groß, wird ein verständlicher Fehler ausgegeben.
 6. Ein Klick auf eine Range in der Tabelle lädt deren Werte in den Bereichseditor. „Bereich hinzufügen“ speichert anschließend bewusst eine neue Range mit neuer ID, neuem Zeitstempel und fortlaufender Versionsbezeichnung; die bestehende Range bleibt unverändert erhalten.
 7. Eine Versionsbezeichnung folgt dem Muster `Name – Version N`; die erste Kopie erhält `Version 2`, weitere Kopien erhöhen die größte vorhandene Version desselben Basisnamens.
+
+## Zusatz – Direkte PDF-Vorschau vor dem Download
+
+1. In der Ansicht „Druckvorschau & PDF“ gibt es zusätzlich zur Download-Aktion eine Schaltfläche **„PDF-Vorschau öffnen“**.
+2. Die Anwendung erzeugt dafür aus dem aktuellen Druckauftrag dieselbe maßhaltige DIN-A4-PDF wie für den Download, öffnet sie jedoch zunächst als lokale Browser-PDF-Vorschau in einem neuen Tab oder Fenster.
+3. Die PDF-Vorschau wird ausschließlich aus einem temporären Browser-`Blob` erzeugt. Es werden weder Daten noch Geheimnisse hochgeladen oder per Netzwerk übertragen.
+4. Die Vorschau berücksichtigt immer die aktuell ausgewählte Vorlage, TAG-Liste, Startzeile und Startspalte einschließlich Kopf-/Fußtexten und QR-Profilen.
+5. Der Download bleibt eine getrennte, explizite Benutzeraktion. Aus der Browser-PDF-Vorschau kann der Benutzer außerdem die Funktionen des integrierten PDF-Viewers verwenden, beispielsweise Speichern oder Drucken.
+6. Falls der Browser das Öffnen eines neuen Tabs oder Fensters blockiert, meldet die Anwendung dies verständlich und bietet weiterhin den regulären PDF-Download an

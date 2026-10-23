@@ -147,6 +147,20 @@ function download(name: string, content: string | Blob): void {
   URL.revokeObjectURL(url);
 }
 
+function openPdfPreviewWindow(): Window | undefined {
+  const previewWindow = window.open("", "_blank");
+  if (!previewWindow) return undefined;
+
+  previewWindow.document.title = "myQR24 TAG-Generator – PDF-Vorschau";
+  previewWindow.document.body.innerHTML = "<p>PDF-Vorschau wird erzeugt …</p>";
+  return previewWindow;
+}
+
+function showPdfInPreview(previewWindow: Window, pdf: Blob): void {
+  const url = URL.createObjectURL(pdf);
+  previewWindow.location.replace(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 async function readFile(input: HTMLInputElement): Promise<string | undefined> {
   const file = input.files?.[0];
   if (!file) return undefined;
@@ -490,13 +504,13 @@ function renderTemplates(): void {
       <div class="label-editor">
         <div class="label-stage" id="label-stage" style="${labelStyle}">
           <div class="editable-element qr-element" data-element="qr" style="left:${template.elements.qr.xMm * labelScale}px;top:${template.elements.qr.yMm * labelScale}px;width:${template.elements.qr.widthMm * labelScale}px;height:${template.elements.qr.heightMm * labelScale}px;">QR</div>
-          <div class="editable-element text-element" data-element="text" style="left:${template.elements.text.xMm * labelScale}px;top:${template.elements.text.yMm * labelScale}px;width:${template.elements.text.widthMm * labelScale}px;height:${template.elements.text.heightMm * labelScale}px;">${escapeHtml(generatedTags[0]?.labelText || "Etikettentext")}</div>
-          <div class="editable-element tag-id-element" data-element="tagIdText" style="left:${template.elements.tagIdText.xMm * labelScale}px;top:${template.elements.tagIdText.yMm * labelScale}px;width:${template.elements.tagIdText.widthMm * labelScale}px;height:${template.elements.tagIdText.heightMm * labelScale}px;">${escapeHtml(generatedTags[0]?.tagId || "TAG-ID")}</div>
+          <div class="editable-element text-element" data-element="text" style="${editorTextStyle(template.elements.text, labelScale)}">${escapeHtml(generatedTags[0]?.labelText || "Etikettentext")}</div>
+          <div class="editable-element tag-id-element" data-element="tagIdText" style="${editorTextStyle(template.elements.tagIdText, labelScale)}">${escapeHtml(generatedTags[0]?.tagId || "TAG-ID")}</div>
         </div>
         <div class="element-fields">
           <h3>QR-Code</h3>${elementFields("qr", template.elements.qr)}
-          <h3>Freies Textfeld</h3>${elementFields("text", template.elements.text)}
-          <h3>Lesbare TAG-ID</h3>${elementFields("tagIdText", template.elements.tagIdText)}
+          <h3>Freies Textfeld</h3>${elementFields("text", template.elements.text)}${textAppearanceFields("text", template.elements.text)}
+          <h3>Lesbare TAG-ID</h3>${elementFields("tagIdText", template.elements.tagIdText)}${textAppearanceFields("tagIdText", template.elements.tagIdText)}
           <p class="hint">Größe und Position werden in Millimetern gespeichert. QR-Code bleibt quadratisch.</p>
         </div>
       </div>
@@ -549,7 +563,18 @@ function renderTemplates(): void {
     renderTemplates();
   });
   bindElementFields(template);
+  bindTextAppearanceFields(template);
   bindDrag(template, labelScale);
+}
+
+function editorTextStyle(
+  element: LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"],
+  scale: number,
+): string {
+  const cssFamily = element.fontFamily === "times-roman" ? "Times New Roman, serif" : element.fontFamily === "courier" ? "Courier New, monospace" : "Helvetica, Arial, sans-serif";
+  const fontStyle = element.fontStyle.includes("italic") ? "italic" : "normal";
+  const fontWeight = element.fontStyle.includes("bold") ? "700" : "400";
+  return `left:${element.xMm * scale}px;top:${element.yMm * scale}px;width:${element.widthMm * scale}px;height:${element.heightMm * scale}px;font-family:${cssFamily};font-size:${element.fontSizePt * 1.333}px;font-style:${fontStyle};font-weight:${fontWeight};`;
 }
 
 function elementFields(kind: "qr" | "text" | "tagIdText", element: { xMm: number; yMm: number; widthMm: number; heightMm: number }): string {
@@ -558,6 +583,17 @@ function elementFields(kind: "qr" | "text" | "tagIdText", element: { xMm: number
     <label>Y mm${numberControl(`position-${kind}-y`, element.yMm, { min: 0, step: 0.1, position: `${kind}:yMm` })}</label>
     <label>Breite mm${numberControl(`position-${kind}-width`, element.widthMm, { min: 1, step: 0.1, position: `${kind}:widthMm` })}</label>
     <label>Höhe mm${numberControl(`position-${kind}-height`, element.heightMm, { min: 1, step: 0.1, position: `${kind}:heightMm` })}</label>
+  </div>`;
+}
+
+function textAppearanceFields(
+  kind: "text" | "tagIdText",
+  element: LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"],
+): string {
+  return `<div class="compact-form element-form">
+    <label>Schriftart<select data-text-appearance="${kind}:fontFamily"><option value="helvetica" ${element.fontFamily === "helvetica" ? "selected" : ""}>Helvetica</option><option value="times-roman" ${element.fontFamily === "times-roman" ? "selected" : ""}>Times Roman</option><option value="courier" ${element.fontFamily === "courier" ? "selected" : ""}>Courier</option></select></label>
+    <label>Schriftgröße pt${numberControl(`text-${kind}-font-size`, element.fontSizePt, { min: 4, step: 0.5, position: `${kind}:fontSizePt` })}</label>
+    <label>Schrifttyp<select data-text-appearance="${kind}:fontStyle"><option value="normal" ${element.fontStyle === "normal" ? "selected" : ""}>Normal</option><option value="bold" ${element.fontStyle === "bold" ? "selected" : ""}>Fett</option><option value="italic" ${element.fontStyle === "italic" ? "selected" : ""}>Kursiv</option><option value="bold-italic" ${element.fontStyle === "bold-italic" ? "selected" : ""}>Fett kursiv</option></select></label>
   </div>`;
 }
 
@@ -573,6 +609,24 @@ function bindElementFields(template: LabelTemplate): void {
     if (kind === "qr" && (property === "widthMm" || property === "heightMm")) {
       template.elements.qr.widthMm = parseLayoutNumber(input.value);
       template.elements.qr.heightMm = parseLayoutNumber(input.value);
+    }
+    template.updatedAt = now();
+    renderTemplates();
+  }));
+}
+
+function bindTextAppearanceFields(template: LabelTemplate): void {
+  app.querySelectorAll<HTMLSelectElement>("[data-text-appearance]").forEach((input) => input.addEventListener("change", () => {
+    const [kind, property] = input.dataset.textAppearance!.split(":") as [
+      "text" | "tagIdText",
+      "fontFamily" | "fontStyle",
+    ];
+    const element = template.elements[kind];
+    if (property === "fontFamily") {
+      element.fontFamily = input.value as typeof element.fontFamily;
+    } else {
+      element.fontStyle = input.value as typeof element.fontStyle;
+      element.fontWeight = element.fontStyle.includes("bold") ? "bold" : "normal";
     }
     template.updatedAt = now();
     renderTemplates();
@@ -610,23 +664,52 @@ async function renderPrint(): Promise<void> {
   renderShell(`
     <section class="card print-controls"><div><p class="eyebrow">DRUCKAUFTRAG</p><h2>Startposition & PDF</h2><p>Der Download erzeugt ein echtes DIN-A4-PDF mit festen Millimeterkoordinaten. Nicht verwendete Etiketten vor der Startposition bleiben auf Seite 1 frei.</p></div>
       <div class="compact-form"><label>Startzeile<input id="start-row" type="number" min="1" max="${template.grid.rows}" value="${startRow}"></label><label>Startspalte<input id="start-column" type="number" min="1" max="${template.grid.columns}" value="${startColumn}"></label></div>
-      <div class="pdf-actions"><button class="primary" id="download-pdf" ${generatedTags.length ? "" : "disabled"}>Maßhaltiges DIN-A4-PDF herunterladen</button><small id="pdf-progress" class="hint"></small></div></section>
+      <div class="pdf-actions"><button class="secondary" id="preview-pdf" ${generatedTags.length ? "" : "disabled"}>PDF-Vorschau öffnen</button><button class="primary" id="download-pdf" ${generatedTags.length ? "" : "disabled"}>Maßhaltiges DIN-A4-PDF herunterladen</button><small id="pdf-progress" class="hint"></small></div></section>
     <section class="card"><div class="card-heading"><div><p class="eyebrow">SEITENVORSCHAU</p><h2>${pages.length} A4-Seite(n)</h2></div><span class="status neutral">${generatedTags.length} TAGs</span></div>
       <div id="print-pages" class="print-pages">${pagePreviews.join("")}</div></section>
   `);
   app.querySelector("#start-row")?.addEventListener("change", (event) => { configuration.printSettings = { templateId: template.id, startRow: Number((event.target as HTMLInputElement).value), startColumn }; renderPrint(); });
   app.querySelector("#start-column")?.addEventListener("change", (event) => { configuration.printSettings = { templateId: template.id, startRow, startColumn: Number((event.target as HTMLInputElement).value) }; renderPrint(); });
+  const createCurrentPdf = (progress: HTMLElement | null) => createTagPdf(generatedTags, template, startRow, startColumn, {
+    onProgress: ({ completed, total }) => {
+      if (progress) progress.textContent = `${completed.toLocaleString("de-DE")} / ${total.toLocaleString("de-DE")} TAGs werden in das PDF geschrieben …`;
+    },
+  });
+
+  app.querySelector("#preview-pdf")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    const progress = app.querySelector<HTMLElement>("#pdf-progress");
+    const previewWindow = openPdfPreviewWindow();
+
+    if (!previewWindow) {
+      notice = "Die PDF-Vorschau konnte nicht geöffnet werden. Bitte erlauben Sie Pop-ups für diese lokale Anwendung oder laden Sie das PDF herunter.";
+      if (progress) progress.textContent = "PDF-Vorschau durch den Browser blockiert.";
+      return;
+    }
+
+    try {
+      button.disabled = true;
+      if (progress) progress.textContent = "PDF-Vorschau wird erzeugt …";
+      const pdf = await createCurrentPdf(progress);
+      showPdfInPreview(previewWindow, pdf);
+      notice = `PDF-Vorschau mit ${pages.length} Seite(n) in einem neuen Tab geöffnet.`;
+      if (progress) progress.textContent = "PDF-Vorschau geöffnet.";
+    } catch (error) {
+      previewWindow.close();
+      notice = error instanceof Error ? error.message : "Die PDF-Vorschau konnte nicht erzeugt werden.";
+      if (progress) progress.textContent = "PDF-Erzeugung fehlgeschlagen.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   app.querySelector("#download-pdf")?.addEventListener("click", async (event) => {
     const button = event.currentTarget as HTMLButtonElement;
     const progress = app.querySelector<HTMLElement>("#pdf-progress");
     try {
       button.disabled = true;
       if (progress) progress.textContent = "PDF wird erzeugt …";
-      const pdf = await createTagPdf(generatedTags, template, startRow, startColumn, {
-        onProgress: ({ completed, total }) => {
-          if (progress) progress.textContent = `${completed.toLocaleString("de-DE")} / ${total.toLocaleString("de-DE")} TAGs werden in das PDF geschrieben …`;
-        },
-      });
+      const pdf = await createCurrentPdf(progress);
       download(`myqr24-tags-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.pdf`, pdf);
       notice = `Maßhaltiges DIN-A4-PDF mit ${pages.length} Seite(n) heruntergeladen.`;
       if (progress) progress.textContent = "Download gestartet.";
@@ -643,6 +726,8 @@ async function renderPagePreview(cells: ReturnType<typeof paginateTags>[number],
   const gridStyle = `grid-template-columns:repeat(${template.grid.columns},1fr);grid-template-rows:repeat(${template.grid.rows},1fr);padding:${template.grid.topMarginMm / 2.97}% ${Math.max(1, template.grid.leftMarginMm / 2.1)}%;gap:${template.grid.verticalGapMm / 2.97}% ${template.grid.horizontalGapMm / 2.1}%;`;
   const positionStyle = (element: PositionedElement): string =>
     `left:${element.xMm}mm;top:${element.yMm}mm;width:${element.widthMm}mm;height:${element.heightMm}mm;`;
+  const printTextStyle = (element: LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"]): string =>
+    `${positionStyle(element)}${editorTextStyle(element, 1).split(";").slice(4).join(";")}`;
   const header = template.pageLayout.header;
   const footer = template.pageLayout.footer;
   const footerTopMm = 297 - footer.bottomOffsetMm - footer.heightMm;
@@ -652,7 +737,7 @@ async function renderPagePreview(cells: ReturnType<typeof paginateTags>[number],
   const cellsHtml = await Promise.all(cells.map(async (cell) => {
     if (!cell.tag) return `<div class="print-label"></div>`;
     const svg = await qrSvg(cell.tag.url, cell.tag.qrProfile);
-    return `<div class="print-label"><div class="mini-qr positioned-print-element" style="${positionStyle(template.elements.qr)}">${svg}</div><div class="mini-text positioned-print-element" style="${positionStyle(template.elements.text)}">${escapeHtml(cell.tag.labelText)}</div><div class="mini-tag-id positioned-print-element" style="${positionStyle(template.elements.tagIdText)}">${escapeHtml(cell.tag.tagId)}</div></div>`;
+    return `<div class="print-label"><div class="mini-qr positioned-print-element" style="${positionStyle(template.elements.qr)}">${svg}</div><div class="mini-text positioned-print-element" style="${printTextStyle(template.elements.text)}">${escapeHtml(cell.tag.labelText)}</div><div class="mini-tag-id positioned-print-element" style="${printTextStyle(template.elements.tagIdText)}">${escapeHtml(cell.tag.tagId)}</div></div>`;
   }));
 
   return `<div class="print-page-with-chrome"><div class="page-text page-header" style="${pageTextStyle(header.leftMm, header.topOffsetMm, header.widthMm, header.heightMm)}">${escapeHtml(header.text)}</div><div class="print-page" style="${gridStyle}">${cellsHtml.join("")}</div><div class="page-text page-footer" style="${pageTextStyle(footer.leftMm, footerTopMm, footer.widthMm, footer.heightMm)}">${escapeHtml(footer.text)}</div></div>`;

@@ -3,6 +3,8 @@ export type InputLocale = "de-DE" | "en-US";
 export type QrIdCase = "upper" | "lower";
 export type QrErrorCorrectionLevel = "L" | "M" | "Q" | "H";
 export type QrVersion = "auto" | number;
+export type LabelFontFamily = "helvetica" | "times-roman" | "courier";
+export type LabelFontStyle = "normal" | "bold" | "italic" | "bold-italic";
 
 export interface QrProfile {
   version: QrVersion;
@@ -81,7 +83,9 @@ export interface LabelTemplate {
       errorCorrectionLevel: "M" | "Q" | "H";
     };
     text: PositionedElement & {
+      fontFamily: LabelFontFamily;
       fontSizePt: number;
+      fontStyle: LabelFontStyle;
       fontWeight: "normal" | "bold";
       horizontalAlign: "left" | "center" | "right";
       verticalAlign: "top" | "middle" | "bottom";
@@ -89,7 +93,9 @@ export interface LabelTemplate {
       overflow: "shrink" | "ellipsis" | "clip";
     };
     tagIdText: PositionedElement & {
+      fontFamily: LabelFontFamily;
       fontSizePt: number;
+      fontStyle: LabelFontStyle;
       fontWeight: "normal" | "bold";
       horizontalAlign: "left" | "center" | "right";
       verticalAlign: "top" | "middle" | "bottom";
@@ -461,7 +467,9 @@ export function defaultTemplate(): LabelTemplate {
         yMm: 3,
         widthMm: 34,
         heightMm: 16,
+        fontFamily: "helvetica",
         fontSizePt: 9,
+        fontStyle: "normal",
         fontWeight: "normal",
         horizontalAlign: "left",
         verticalAlign: "middle",
@@ -473,7 +481,9 @@ export function defaultTemplate(): LabelTemplate {
         yMm: 20,
         widthMm: 34,
         heightMm: 8,
+        fontFamily: "helvetica",
         fontSizePt: 11,
+        fontStyle: "bold",
         fontWeight: "bold",
         horizontalAlign: "left",
         verticalAlign: "middle",
@@ -573,10 +583,23 @@ function migrateTemplate(template: LabelTemplate): LabelTemplate {
     widthMm: template.elements.text.widthMm,
   };
 
+  const migrateTextElement = <T extends LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"]>(element: T): T => ({
+    ...element,
+    fontFamily: element.fontFamily === "times-roman" || element.fontFamily === "courier" ? element.fontFamily : "helvetica",
+    fontStyle:
+      element.fontStyle === "bold" || element.fontStyle === "italic" || element.fontStyle === "bold-italic"
+        ? element.fontStyle
+        : element.fontWeight === "bold" ? "bold" : "normal",
+  });
+
   return {
     ...template,
     pageLayout: template.pageLayout ?? defaults.pageLayout,
-    elements: { ...template.elements, tagIdText },
+    elements: {
+      ...template.elements,
+      text: migrateTextElement(template.elements.text),
+      tagIdText: migrateTextElement(tagIdText),
+    },
   };
 }
 

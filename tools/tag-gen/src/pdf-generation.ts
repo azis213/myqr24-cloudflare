@@ -1,6 +1,8 @@
 import QRCode from "qrcode";
 import {
   type GeneratedTag,
+  type LabelFontFamily,
+  type LabelFontStyle,
   type LabelTemplate,
   type PageCell,
   type PositionedElement,
@@ -50,24 +52,23 @@ export async function createTagPdf(
   document.setSubject("Maßhaltiger DIN-A4-Etikettendruck");
   document.setProducer("myQR24 TAG-Generator");
 
-  const regularFont = await document.embedFont(StandardFonts.Helvetica);
-  const boldFont = await document.embedFont(StandardFonts.HelveticaBold);
+  const textFonts = await embedTextFonts(document);
   const total = tags.length;
   let completed = 0;
 
   for (const cells of pages) {
     const page = document.addPage([mm(A4_WIDTH_MM), mm(A4_HEIGHT_MM)]);
-    drawPageText(page, template.pageLayout.header, template.pageLayout.header.topOffsetMm, regularFont);
+    drawPageText(page, template.pageLayout.header, template.pageLayout.header.topOffsetMm, textFonts.helvetica.normal);
     drawPageText(
       page,
       template.pageLayout.footer,
       A4_HEIGHT_MM - template.pageLayout.footer.bottomOffsetMm - template.pageLayout.footer.heightMm,
-      regularFont,
+      textFonts.helvetica.normal,
     );
 
     for (const cell of cells) {
       if (!cell.tag) continue;
-      await drawLabel(document, page, cell, template, regularFont, boldFont);
+      await drawLabel(document, page, cell, template, textFonts);
       completed += 1;
       options.onProgress?.({ completed, total });
     }
@@ -95,13 +96,37 @@ function labelOrigin(cell: PageCell, template: LabelTemplate): { xMm: number; yM
   };
 }
 
+type EmbeddedTextFonts = Record<LabelFontFamily, Record<LabelFontStyle, PDFFont>>;
+
+async function embedTextFonts(document: PDFDocument): Promise<EmbeddedTextFonts> {
+  return {
+    helvetica: {
+      normal: await document.embedFont(StandardFonts.Helvetica),
+      bold: await document.embedFont(StandardFonts.HelveticaBold),
+      italic: await document.embedFont(StandardFonts.HelveticaOblique),
+      "bold-italic": await document.embedFont(StandardFonts.HelveticaBoldOblique),
+    },
+    "times-roman": {
+      normal: await document.embedFont(StandardFonts.TimesRoman),
+      bold: await document.embedFont(StandardFonts.TimesRomanBold),
+      italic: await document.embedFont(StandardFonts.TimesRomanItalic),
+      "bold-italic": await document.embedFont(StandardFonts.TimesRomanBoldItalic),
+    },
+    courier: {
+      normal: await document.embedFont(StandardFonts.Courier),
+      bold: await document.embedFont(StandardFonts.CourierBold),
+      italic: await document.embedFont(StandardFonts.CourierOblique),
+      "bold-italic": await document.embedFont(StandardFonts.CourierBoldOblique),
+    },
+  };
+}
+
 async function drawLabel(
   document: PDFDocument,
   page: PDFPage,
   cell: PageCell,
   template: LabelTemplate,
-  regularFont: PDFFont,
-  boldFont: PDFFont,
+  textFonts: EmbeddedTextFonts,
 ): Promise<void> {
   const tag = cell.tag!;
   const origin = labelOrigin(cell, template);
@@ -122,8 +147,8 @@ async function drawLabel(
     height: mm(qr.heightMm),
   });
 
-  drawElementText(page, tag.labelText, origin, template.elements.text, regularFont, boldFont);
-  drawElementText(page, tag.tagId, origin, template.elements.tagIdText, regularFont, boldFont);
+  drawElementText(page, tag.labelText, origin, template.elements.text, textFonts);
+  drawElementText(page, tag.tagId, origin, template.elements.tagIdText, textFonts);
 }
 
 function drawPageText(
@@ -154,8 +179,7 @@ function drawElementText(
   content: string,
   origin: { xMm: number; yMm: number },
   element: LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"],
-  regularFont: PDFFont,
-  boldFont: PDFFont,
+  textFonts: EmbeddedTextFonts,
 ): void {
   if (!content || element.widthMm <= 0 || element.heightMm <= 0) return;
   drawTextInBox(page, content, {
@@ -163,9 +187,9 @@ function drawElementText(
     topMm: origin.yMm + element.yMm,
     widthMm: element.widthMm,
     heightMm: element.heightMm,
-    font: element.fontWeight === "bold" ? boldFont : regularFont,
+    font: textFonts[element.fontFamily][element.fontStyle],
     fontSizePt: element.fontSizePt,
-    fontWeight: element.fontWeight,
+    fontWeight: element.fontStyle.includes("bold") ? "bold" : "normal",
     horizontalAlign: element.horizontalAlign,
     verticalAlign: element.verticalAlign,
     lineHeight: element.lineHeight,

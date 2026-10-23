@@ -356,7 +356,7 @@ Die Anwendung richtet sich an Desktopnutzung ab 1.024 CSS-Pixel Breite. Sie besi
 | Bereiche & Generierung | Basis-URL, Bereiche, Geheimnisse und Generierungsstart |
 | Generierte TAGs | Ergebnisliste, Suche, QR-Einzelvorschau, TAG-Export |
 | Etikettenvorlagen | A4-Raster, Einzeletikett-Editor, Vorlage speichern |
-| Druckvorschau & PDF | Startposition, Seitenvorschau, PDF-Download |
+| Druckvorschau & PDF | Startposition, Seitenvorschau, PDF-Vorschau in neuem Tab/Fenster und PDF-Download |
 | Import & Export | Konfigurationen und TAG-Listen ein-/auslesen |
 | Hilfe & Datenschutz | Bereichsregeln, Codec, Geheimnis- und Exporthinweise |
 
@@ -517,13 +517,19 @@ capacityNextPages = columns * rows
 - Jede Zelle enthält QR-Code und Bereichstext gemäß Vorlage.
 - Nicht belegte Zellen bleiben sichtbar leer.
 - Die PDF verwendet exakt dieselben mm-Koordinaten wie der Vorlageneditor.
+- Neben dem Download steht die explizite Aktion **„PDF-Vorschau öffnen“** zur Verfügung.
+- Diese Aktion erzeugt die PDF mit identischen Eingabedaten und derselben Erzeugungsfunktion wie der Download (Vorlage, TAG-Liste, Startposition, QR-Profile sowie Kopf-/Fußbereiche).
+- Die erzeugte PDF wird als temporärer `Blob` und zugehörige Object-URL in einem neuen Browser-Tab oder Fenster geöffnet. Es erfolgen dabei keine Netzwerkzugriffe, Uploads oder Persistierungen.
+- Die Object-URL bleibt bis zum vollständigen Öffnen durch den neuen Tab gültig und wird danach freigegeben. Die Anwendung verwaltet keinen dauerhaften PDF-Zwischenspeicher.
+- Kann der Browser den neuen Tab bzw. das Fenster wegen eines Popup-Blockers nicht öffnen, zeigt die Anwendung eine verständliche Statusmeldung. Die reguläre Download-Aktion bleibt verfügbar.
+- Die PDF-Vorschau löst keinen Download aus. Speichern oder Drucken innerhalb des Browser-PDF-Viewers bleibt eine bewusste Benutzeraktion.
 - Downloadname:
 
   ```text
   myqr24-tags-YYYY-MM-DD-HHMM.pdf
   ```
 
-- Eine Druckfunktion wird nicht implementiert; der PDF-Download ist das Druckartefakt.
+- Eine eigene Druckdialogfunktion wird nicht implementiert; der Download und die vom Browser bereitgestellte PDF-Vorschau sind die Druckartefakte.
 
 ---
 
@@ -636,6 +642,9 @@ Optionaler Modus „lokal mit erneut eingegebenen Secrets verifizieren“ dekodi
 6. Startzeile/-spalte lässt vorherige Zellen der ersten Seite frei.
 7. Folgeseiten beginnen wieder an der ersten Zelle.
 8. PDF-Seiten entsprechen dem A4-Raster und enthalten dieselben Daten wie die Vorschau.
+9. „PDF-Vorschau öffnen“ öffnet die aus dem aktuellen Druckauftrag erzeugte PDF in einem neuen Tab oder Fenster, ohne einen Download auszulösen.
+10. Die Vorschau-PDF und die heruntergeladene PDF verwenden dieselben Eingabedaten und sind bezüglich Seitenanzahl, A4-Format, Positionen und gerenderten TAGs inhaltsgleich.
+11. Wird das Öffnen durch einen Popup-Blocker verhindert, erscheint eine verständliche Meldung; der PDF-Download bleibt nutzbar.
 
 ### 14.5 Qualitätsprüfung vor Abschluss der Implementierung
 
@@ -833,7 +842,18 @@ Die TAG-Ergebnisliste markiert einen gewählten Eintrag. Ein Klick auf eine Tabe
 - QR-Parameter werden einer Range zugerechnet, damit ein Druckauftrag mit mehreren Ranges für jede Nutzlast die korrekten Kodierungsparameter beibehält.
 - Die „Bereich fortführen“-Bedienung ist append-only: Historische Ranges und deren QR-Profile bleiben nachvollziehbar erhalten.
 
-## 19. Implementierungsreihenfolge
+## 19. Ergänzung: Direkte PDF-Vorschau
+
+Die Druckansicht erzeugt bei der Aktion „PDF-Vorschau öffnen“ das PDF ausschließlich im Browser mit der bestehenden clientseitigen PDF-Erzeugung. Die resultierenden Bytes werden in einen `Blob` mit dem MIME-Type `application/pdf` überführt und über eine Object-URL in einem neuen Tab oder Fenster geöffnet.
+
+- Die neue Ansicht wird unmittelbar im Klick-Handler geöffnet, damit gängige Browser sie nicht als unerwünschtes Popup behandeln.
+- Während die PDF asynchron erzeugt wird, zeigt das geöffnete Fenster einen neutralen Ladehinweis.
+- Nach erfolgreicher Erzeugung navigiert die Anwendung das Vorschaufenster zur Object-URL der PDF.
+- Falls das Fenster nicht erzeugt werden kann, wird die PDF-Erzeugung nicht fortgesetzt und die Anwendung erläutert den blockierten Vorgang in der Statusmeldung.
+- Für die Vorschau werden keine zusätzlichen Datenmodelle, Exportformate oder Geheimnisfelder eingeführt.
+- Der Download erzeugt weiterhin eine Datei mit dem festgelegten Downloadnamen und bleibt technisch sowie in der Bedienung eine getrennte Aktion.
+
+## 20. Implementierungsreihenfolge
 
 1. Vite-/TypeScript-Grundprojekt unter `tools/tag-gen/` erstellen.
 2. Referenzcodec anbinden und mit Kompatibilitätstests absichern.
