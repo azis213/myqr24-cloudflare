@@ -131,6 +131,47 @@ async function drawLabel(
   const tag = cell.tag!;
   const origin = labelOrigin(cell, template);
   const qr = template.elements.qr;
+  const labelX = mm(origin.xMm);
+  const labelY = pdfY(origin.yMm, template.grid.labelHeightMm);
+  const labelWidth = mm(template.grid.labelWidthMm);
+  const labelHeight = mm(template.grid.labelHeightMm);
+
+  page.drawRectangle({
+    x: labelX,
+    y: labelY,
+    width: labelWidth,
+    height: labelHeight,
+    color: hexToRgb(template.backgroundColor),
+  });
+
+  if (template.backgroundImage?.visible) {
+    const background = template.backgroundImage;
+    const image = background.dataUrl.startsWith("data:image/png")
+      ? await document.embedPng(background.dataUrl)
+      : await document.embedJpg(background.dataUrl);
+    page.drawImage(image, {
+      x: mm(origin.xMm + background.xMm),
+      y: pdfY(origin.yMm + background.yMm, background.heightMm),
+      width: mm(background.widthMm),
+      height: mm(background.heightMm),
+      opacity: background.opacity,
+    });
+  }
+
+  drawElementBackground(page, origin, template.elements.text);
+  drawElementBackground(page, origin, template.elements.tagIdText);
+
+  if (qr.borderWidthMm > 0) {
+    const border = qr.borderWidthMm;
+    page.drawRectangle({
+      x: mm(origin.xMm + qr.xMm - border),
+      y: pdfY(origin.yMm + qr.yMm - border, qr.heightMm + border * 2),
+      width: mm(qr.widthMm + border * 2),
+      height: mm(qr.heightMm + border * 2),
+      color: hexToRgb(qr.borderColor),
+    });
+  }
+
   const qrProfile = tag.qrProfile ?? defaultQrProfile();
   const qrPng = await QRCode.toDataURL(tag.url, {
     ...(qrProfile.version === "auto" ? {} : { version: qrProfile.version }),
@@ -149,6 +190,27 @@ async function drawLabel(
 
   drawElementText(page, tag.labelText, origin, template.elements.text, textFonts);
   drawElementText(page, tag.tagId, origin, template.elements.tagIdText, textFonts);
+}
+
+function hexToRgb(color: string): ReturnType<typeof rgb> {
+  const value = Number.parseInt(color.slice(1), 16);
+  return rgb(((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255);
+}
+
+function drawElementBackground(
+  page: PDFPage,
+  origin: { xMm: number; yMm: number },
+  element: LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"],
+): void {
+  if (!element.visible || !element.background.enabled) return;
+  page.drawRectangle({
+    x: mm(origin.xMm + element.xMm),
+    y: pdfY(origin.yMm + element.yMm, element.heightMm),
+    width: mm(element.widthMm),
+    height: mm(element.heightMm),
+    color: hexToRgb(element.background.color),
+    opacity: element.background.opacity,
+  });
 }
 
 function drawPageText(
@@ -181,7 +243,7 @@ function drawElementText(
   element: LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"],
   textFonts: EmbeddedTextFonts,
 ): void {
-  if (!content || element.widthMm <= 0 || element.heightMm <= 0) return;
+  if (!element.visible || !content || element.widthMm <= 0 || element.heightMm <= 0) return;
   drawTextInBox(page, content, {
     xMm: origin.xMm + element.xMm,
     topMm: origin.yMm + element.yMm,

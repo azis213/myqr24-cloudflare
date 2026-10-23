@@ -5,6 +5,13 @@ export type QrErrorCorrectionLevel = "L" | "M" | "Q" | "H";
 export type QrVersion = "auto" | number;
 export type LabelFontFamily = "helvetica" | "times-roman" | "courier";
 export type LabelFontStyle = "normal" | "bold" | "italic" | "bold-italic";
+export type HexColor = `#${string}`;
+
+export interface ElementBackground {
+  enabled: boolean;
+  color: HexColor;
+  opacity: number;
+}
 
 export interface QrProfile {
   version: QrVersion;
@@ -50,6 +57,12 @@ export interface PositionedElement {
   heightMm: number;
 }
 
+export interface BackgroundImage extends PositionedElement {
+  visible: boolean;
+  dataUrl: string;
+  opacity: number;
+}
+
 export interface PageTextArea {
   text: string;
   leftMm: number;
@@ -77,12 +90,18 @@ export interface LabelTemplate {
     verticalGapMm: number;
   };
   pageLayout: PageLayout;
+  backgroundColor: HexColor;
+  backgroundImage?: BackgroundImage;
   elements: {
     qr: PositionedElement & {
       quietZoneModules: number;
       errorCorrectionLevel: "M" | "Q" | "H";
+      borderWidthMm: number;
+      borderColor: HexColor;
     };
     text: PositionedElement & {
+      visible: boolean;
+      background: ElementBackground;
       fontFamily: LabelFontFamily;
       fontSizePt: number;
       fontStyle: LabelFontStyle;
@@ -93,6 +112,8 @@ export interface LabelTemplate {
       overflow: "shrink" | "ellipsis" | "clip";
     };
     tagIdText: PositionedElement & {
+      visible: boolean;
+      background: ElementBackground;
       fontFamily: LabelFontFamily;
       fontSizePt: number;
       fontStyle: LabelFontStyle;
@@ -373,6 +394,8 @@ export function validateTemplate(template: LabelTemplate): ValidationResult<Labe
   const gridBottomMm = usedHeight;
   const { header, footer } = template.pageLayout;
   const footerTopMm = 297 - footer.bottomOffsetMm - footer.heightMm;
+  const isHexColor = (value: unknown): value is HexColor => typeof value === "string" && /^#[\da-f]{6}$/i.test(value);
+  const validOpacity = (value: unknown): boolean => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 
   if (!template.name.trim()) errors.push("Ein Vorlagenname ist erforderlich.");
   if (!Number.isInteger(grid.columns) || grid.columns < 1) errors.push("Mindestens eine Spalte ist erforderlich.");
@@ -423,6 +446,17 @@ export function validateTemplate(template: LabelTemplate): ValidationResult<Labe
   validateElement(elements.qr, "QR-Code");
   validateElement(elements.text, "Freies Textfeld");
   validateElement(elements.tagIdText, "TAG-ID-Feld");
+  if (!isHexColor(template.backgroundColor)) errors.push("Die Etiketten-Hintergrundfarbe muss ein Hex-Farbwert sein.");
+  if (!isHexColor(elements.qr.borderColor) || !Number.isFinite(elements.qr.borderWidthMm) || elements.qr.borderWidthMm < 0) errors.push("QR-Randfarbe und -breite sind ungültig.");
+  for (const [label, element] of [["Freies Textfeld", elements.text], ["TAG-ID-Feld", elements.tagIdText]] as const) {
+    if (!isHexColor(element.background.color) || !validOpacity(element.background.opacity)) errors.push(`${label}: Hintergrundfarbe oder Transparenz ist ungültig.`);
+  }
+  if (template.backgroundImage) {
+    validateElement(template.backgroundImage, "Hintergrundbild");
+    if (!validOpacity(template.backgroundImage.opacity) || !/^data:image\/(?:png|jpeg);base64,/i.test(template.backgroundImage.dataUrl)) {
+      errors.push("Hintergrundbild muss ein lokales PNG- oder JPEG-Bild mit gültiger Transparenz sein.");
+    }
+  }
 
   if (Math.abs(elements.qr.widthMm - elements.qr.heightMm) > 0.001) errors.push("Der QR-Code muss quadratisch sein.");
   if (elements.qr.widthMm < 10) errors.push("Der QR-Code muss mindestens 10 mm groß sein.");
@@ -450,6 +484,7 @@ export function defaultTemplate(): LabelTemplate {
       header: { text: "", leftMm: 7, widthMm: 196, heightMm: 6, topOffsetMm: 3 },
       footer: { text: "", leftMm: 7, widthMm: 196, heightMm: 6, bottomOffsetMm: 3 },
     },
+    backgroundColor: "#ffffff",
     grid: {
       columns: 3,
       rows: 8,
@@ -461,12 +496,14 @@ export function defaultTemplate(): LabelTemplate {
       verticalGapMm: 0,
     },
     elements: {
-    qr: { xMm: 2, yMm: 2, widthMm: 22, heightMm: 22, quietZoneModules: 4, errorCorrectionLevel: "M" },
+    qr: { xMm: 2, yMm: 2, widthMm: 22, heightMm: 22, quietZoneModules: 4, errorCorrectionLevel: "M", borderWidthMm: 0, borderColor: "#101828" },
       text: {
         xMm: 26,
         yMm: 3,
         widthMm: 34,
         heightMm: 16,
+        visible: true,
+        background: { enabled: false, color: "#ffffff", opacity: 1 },
         fontFamily: "helvetica",
         fontSizePt: 9,
         fontStyle: "normal",
@@ -481,6 +518,8 @@ export function defaultTemplate(): LabelTemplate {
         yMm: 20,
         widthMm: 34,
         heightMm: 8,
+        visible: true,
+        background: { enabled: false, color: "#ffffff", opacity: 1 },
         fontFamily: "helvetica",
         fontSizePt: 11,
         fontStyle: "bold",
@@ -585,6 +624,12 @@ function migrateTemplate(template: LabelTemplate): LabelTemplate {
 
   const migrateTextElement = <T extends LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"]>(element: T): T => ({
     ...element,
+    visible: element.visible !== false,
+    background: {
+      enabled: element.background?.enabled === true,
+      color: /^#[\da-f]{6}$/i.test(element.background?.color ?? "") ? element.background.color : "#ffffff",
+      opacity: typeof element.background?.opacity === "number" && element.background.opacity >= 0 && element.background.opacity <= 1 ? element.background.opacity : 1,
+    },
     fontFamily: element.fontFamily === "times-roman" || element.fontFamily === "courier" ? element.fontFamily : "helvetica",
     fontStyle:
       element.fontStyle === "bold" || element.fontStyle === "italic" || element.fontStyle === "bold-italic"
@@ -595,8 +640,17 @@ function migrateTemplate(template: LabelTemplate): LabelTemplate {
   return {
     ...template,
     pageLayout: template.pageLayout ?? defaults.pageLayout,
+    backgroundColor: /^#[\da-f]{6}$/i.test(template.backgroundColor) ? template.backgroundColor : "#ffffff",
+    backgroundImage: template.backgroundImage && /^data:image\/(?:png|jpeg);base64,/i.test(template.backgroundImage.dataUrl)
+      ? { ...template.backgroundImage, visible: template.backgroundImage.visible !== false, opacity: typeof template.backgroundImage.opacity === "number" && template.backgroundImage.opacity >= 0 && template.backgroundImage.opacity <= 1 ? template.backgroundImage.opacity : 1 }
+      : undefined,
     elements: {
       ...template.elements,
+      qr: {
+        ...template.elements.qr,
+        borderWidthMm: Number.isFinite(template.elements.qr.borderWidthMm) && template.elements.qr.borderWidthMm >= 0 ? template.elements.qr.borderWidthMm : 0,
+        borderColor: /^#[\da-f]{6}$/i.test(template.elements.qr.borderColor) ? template.elements.qr.borderColor : "#101828",
+      },
       text: migrateTextElement(template.elements.text),
       tagIdText: migrateTextElement(tagIdText),
     },

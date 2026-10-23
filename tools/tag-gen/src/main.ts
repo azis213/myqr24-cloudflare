@@ -3,7 +3,6 @@ import "./styles.css";
 import {
   countRange,
   createConfigExport,
-  createLabelTemplateExport,
   defaultQrProfile,
   defaultTemplate,
   formatInteger,
@@ -14,7 +13,6 @@ import {
   paginateTags,
   resolveRangeValues,
   parseConfigExport,
-  parseLabelTemplateExport,
   type GeneratedTag,
   type LabelTemplate,
   type PositionedElement,
@@ -24,7 +22,6 @@ import {
   validateBaseUrl,
   validateQrProfile,
   validateRange,
-  validateTemplate,
 } from "./domain";
 import {
   createTagListJson,
@@ -32,6 +29,7 @@ import {
   parseTagListJson,
 } from "./tag-generation";
 import { createTagPdf } from "./pdf-generation";
+import { editorTextStyle, renderLabelDesigner } from "./label-designer";
 
 declare const __TAG_GEN_DEFAULT_SECRETS__: {
   feistelSecret: string;
@@ -70,9 +68,6 @@ let selectedTagIndex = 0;
 let draftRange = createRangeDraft();
 let rangeInputMode: RangeInputMode = "absolute";
 let rangeVersionSourceName: string | undefined;
-let dragState:
-  | { element: "qr" | "text" | "tagIdText"; startX: number; startY: number; originX: number; originY: number }
-  | undefined;
 
 function createRangeDraft(): Omit<TagRangeDefinition, "createdAt" | "updatedAt"> {
   return {
@@ -455,204 +450,19 @@ async function renderTags(): Promise<void> {
   }));
 }
 
-function numberControl(id: string, value: number, options: { min: number; step: number; position?: string }): string {
-  const dataPosition = options.position ? ` data-position="${options.position}"` : "";
-  return `<input id="${id}"${dataPosition} type="number" min="${options.min}" step="${options.step}" value="${value}">`;
-}
-
-function parseLayoutNumber(input: string): number {
-  return Number(input);
-}
-
 function renderTemplates(): void {
-  const template = selectedTemplate();
-  const layoutState = validateTemplate(template);
-  const grid = template.grid;
-  const labelScale = 5;
-  const labelStyle = `width:${grid.labelWidthMm * labelScale}px;height:${grid.labelHeightMm * labelScale}px;`;
-  renderShell(`
-    <section class="grid template-layout">
-      <article class="card"><div class="card-heading"><div><p class="eyebrow">VORLAGENEIGENSCHAFTEN</p><h2>DIN A4 Raster</h2></div><span class="status ${layoutState.ok ? "success" : "error"}">${layoutState.ok ? "druckbar" : "prüfen"}</span></div>
-      <div class="compact-form">
-        <label>Name<input id="template-name" value="${escapeHtml(template.name)}"></label>
-        <label>Spalten${numberControl("grid-columns", grid.columns, { min: 1, step: 1 })}</label><label>Zeilen${numberControl("grid-rows", grid.rows, { min: 1, step: 1 })}</label>
-        <label>Etikettbreite mm${numberControl("label-width", grid.labelWidthMm, { min: 1, step: 0.1 })}</label><label>Etiketthöhe mm${numberControl("label-height", grid.labelHeightMm, { min: 1, step: 0.1 })}</label>
-        <label>Linker Rand mm${numberControl("left-margin", grid.leftMarginMm, { min: 0, step: 0.1 })}</label><label>Oberer Rand mm${numberControl("top-margin", grid.topMarginMm, { min: 0, step: 0.1 })}</label>
-        <label>Horizontaler Abstand mm${numberControl("h-gap", grid.horizontalGapMm, { min: 0, step: 0.1 })}</label><label>Vertikaler Abstand mm${numberControl("v-gap", grid.verticalGapMm, { min: 0, step: 0.1 })}</label>
-      </div>
-      <h3>Seitenkopf (einmal je A4-Seite)</h3>
-      <div class="compact-form">
-        <label>Text<input id="header-text" value="${escapeHtml(template.pageLayout.header.text)}"></label>
-        <label>Abstand oben mm${numberControl("header-top", template.pageLayout.header.topOffsetMm, { min: 0, step: 0.1 })}</label>
-        <label>Links mm${numberControl("header-left", template.pageLayout.header.leftMm, { min: 0, step: 0.1 })}</label>
-        <label>Breite mm${numberControl("header-width", template.pageLayout.header.widthMm, { min: 0, step: 0.1 })}</label>
-        <label>Höhe mm${numberControl("header-height", template.pageLayout.header.heightMm, { min: 0, step: 0.1 })}</label>
-      </div>
-      <h3>Seitenfuß (einmal je A4-Seite)</h3>
-      <div class="compact-form">
-        <label>Text<input id="footer-text" value="${escapeHtml(template.pageLayout.footer.text)}"></label>
-        <label>Abstand unten mm${numberControl("footer-bottom", template.pageLayout.footer.bottomOffsetMm, { min: 0, step: 0.1 })}</label>
-        <label>Links mm${numberControl("footer-left", template.pageLayout.footer.leftMm, { min: 0, step: 0.1 })}</label>
-        <label>Breite mm${numberControl("footer-width", template.pageLayout.footer.widthMm, { min: 0, step: 0.1 })}</label>
-        <label>Höhe mm${numberControl("footer-height", template.pageLayout.footer.heightMm, { min: 0, step: 0.1 })}</label>
-      </div>
-      ${!layoutState.ok ? `<div class="form-errors">${layoutState.errors.map((message) => `<div>${escapeHtml(message)}</div>`).join("")}</div>` : ""}
-      <div class="toolbar"><button class="primary" id="save-template">Vorlage übernehmen</button><button class="secondary" id="duplicate-template">Duplizieren</button><button class="secondary" id="export-template">Vorlage als Datei speichern</button><label class="file-button">Vorlage aus Datei laden<input id="import-template" type="file" accept="application/json"></label></div></article>
-      <article class="card"><div class="card-heading"><div><p class="eyebrow">A4-VORSCHAU</p><h2>${grid.columns} × ${grid.rows} Etiketten</h2></div></div><div class="a4-mini" style="--columns:${grid.columns};--rows:${grid.rows};--left:${grid.leftMarginMm / 2.1}%;--top:${grid.topMarginMm / 2.97}%;--width:${grid.labelWidthMm / 2.1}%;--height:${grid.labelHeightMm / 2.97}%;--gapx:${grid.horizontalGapMm / 2.1}%;--gapy:${grid.verticalGapMm / 2.97}%;"></div></article>
-    </section>
-    <section class="card"><div class="card-heading"><div><p class="eyebrow">EINZELETIKETT</p><h2>QR-Code und Text positionieren</h2></div><span class="hint">Ziehen Sie die Bereiche im Etikett. Präzise Werte stehen rechts.</span></div>
-      <div class="label-editor">
-        <div class="label-stage" id="label-stage" style="${labelStyle}">
-          <div class="editable-element qr-element" data-element="qr" style="left:${template.elements.qr.xMm * labelScale}px;top:${template.elements.qr.yMm * labelScale}px;width:${template.elements.qr.widthMm * labelScale}px;height:${template.elements.qr.heightMm * labelScale}px;">QR</div>
-          <div class="editable-element text-element" data-element="text" style="${editorTextStyle(template.elements.text, labelScale)}">${escapeHtml(generatedTags[0]?.labelText || "Etikettentext")}</div>
-          <div class="editable-element tag-id-element" data-element="tagIdText" style="${editorTextStyle(template.elements.tagIdText, labelScale)}">${escapeHtml(generatedTags[0]?.tagId || "TAG-ID")}</div>
-        </div>
-        <div class="element-fields">
-          <h3>QR-Code</h3>${elementFields("qr", template.elements.qr)}
-          <h3>Freies Textfeld</h3>${elementFields("text", template.elements.text)}${textAppearanceFields("text", template.elements.text)}
-          <h3>Lesbare TAG-ID</h3>${elementFields("tagIdText", template.elements.tagIdText)}${textAppearanceFields("tagIdText", template.elements.tagIdText)}
-          <p class="hint">Größe und Position werden in Millimetern gespeichert. QR-Code bleibt quadratisch.</p>
-        </div>
-      </div>
-    </section>
-  `);
-
-  const numeric = (id: string): number => parseLayoutNumber(app.querySelector<HTMLInputElement>(`#${id}`)?.value ?? "0");
-  app.querySelector("#save-template")?.addEventListener("click", () => {
-    template.name = app.querySelector<HTMLInputElement>("#template-name")?.value ?? template.name;
-    Object.assign(template.grid, {
-      columns: numeric("grid-columns"), rows: numeric("grid-rows"), labelWidthMm: numeric("label-width"), labelHeightMm: numeric("label-height"),
-      leftMarginMm: numeric("left-margin"), topMarginMm: numeric("top-margin"), horizontalGapMm: numeric("h-gap"), verticalGapMm: numeric("v-gap"),
-    });
-    Object.assign(template.pageLayout.header, {
-      text: app.querySelector<HTMLInputElement>("#header-text")?.value ?? "",
-      topOffsetMm: numeric("header-top"),
-      leftMm: numeric("header-left"),
-      widthMm: numeric("header-width"),
-      heightMm: numeric("header-height"),
-    });
-    Object.assign(template.pageLayout.footer, {
-      text: app.querySelector<HTMLInputElement>("#footer-text")?.value ?? "",
-      bottomOffsetMm: numeric("footer-bottom"),
-      leftMm: numeric("footer-left"),
-      widthMm: numeric("footer-width"),
-      heightMm: numeric("footer-height"),
-    });
-    template.updatedAt = now();
-    const result = validateTemplate(template);
-    notice = result.ok ? "Etikettenvorlage aktualisiert." : result.errors.join(" ");
-    renderTemplates();
+  renderLabelDesigner({
+    app,
+    getConfiguration: () => configuration,
+    getGeneratedTags: () => generatedTags,
+    selectedTemplate,
+    renderShell,
+    escapeHtml,
+    download,
+    readFile,
+    getNotice: () => notice,
+    setNotice: (value) => { notice = value; },
   });
-  app.querySelector("#duplicate-template")?.addEventListener("click", () => {
-    const copy = structuredClone(template);
-    copy.id = makeId(); copy.name = `${copy.name} – Kopie`; copy.createdAt = now(); copy.updatedAt = now();
-    configuration.labelTemplates.push(copy); configuration.selectedTemplateId = copy.id; notice = "Vorlage dupliziert."; renderTemplates();
-  });
-  app.querySelector("#export-template")?.addEventListener("click", () => {
-    download(`myqr24-label-template-${template.name.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "template"}.json`, createLabelTemplateExport(template));
-    notice = "Etikettenvorlage als JSON-Datei exportiert.";
-  });
-  app.querySelector<HTMLInputElement>("#import-template")?.addEventListener("change", async (event) => {
-    const text = await readFile(event.target as HTMLInputElement);
-    if (!text) return;
-    const parsed = parseLabelTemplateExport(text);
-    if (!parsed.ok) { notice = parsed.errors.join(" "); renderTemplates(); return; }
-    configuration.labelTemplates.push(parsed.value);
-    configuration.selectedTemplateId = parsed.value.id;
-    notice = `Etikettenvorlage „${parsed.value.name}“ importiert.`;
-    renderTemplates();
-  });
-  bindElementFields(template);
-  bindTextAppearanceFields(template);
-  bindDrag(template, labelScale);
-}
-
-function editorTextStyle(
-  element: LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"],
-  scale: number,
-): string {
-  const cssFamily = element.fontFamily === "times-roman" ? "Times New Roman, serif" : element.fontFamily === "courier" ? "Courier New, monospace" : "Helvetica, Arial, sans-serif";
-  const fontStyle = element.fontStyle.includes("italic") ? "italic" : "normal";
-  const fontWeight = element.fontStyle.includes("bold") ? "700" : "400";
-  return `left:${element.xMm * scale}px;top:${element.yMm * scale}px;width:${element.widthMm * scale}px;height:${element.heightMm * scale}px;font-family:${cssFamily};font-size:${element.fontSizePt * 1.333}px;font-style:${fontStyle};font-weight:${fontWeight};`;
-}
-
-function elementFields(kind: "qr" | "text" | "tagIdText", element: { xMm: number; yMm: number; widthMm: number; heightMm: number }): string {
-  return `<div class="compact-form element-form">
-    <label>X mm${numberControl(`position-${kind}-x`, element.xMm, { min: 0, step: 0.1, position: `${kind}:xMm` })}</label>
-    <label>Y mm${numberControl(`position-${kind}-y`, element.yMm, { min: 0, step: 0.1, position: `${kind}:yMm` })}</label>
-    <label>Breite mm${numberControl(`position-${kind}-width`, element.widthMm, { min: 1, step: 0.1, position: `${kind}:widthMm` })}</label>
-    <label>Höhe mm${numberControl(`position-${kind}-height`, element.heightMm, { min: 1, step: 0.1, position: `${kind}:heightMm` })}</label>
-  </div>`;
-}
-
-function textAppearanceFields(
-  kind: "text" | "tagIdText",
-  element: LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"],
-): string {
-  return `<div class="compact-form element-form">
-    <label>Schriftart<select data-text-appearance="${kind}:fontFamily"><option value="helvetica" ${element.fontFamily === "helvetica" ? "selected" : ""}>Helvetica</option><option value="times-roman" ${element.fontFamily === "times-roman" ? "selected" : ""}>Times Roman</option><option value="courier" ${element.fontFamily === "courier" ? "selected" : ""}>Courier</option></select></label>
-    <label>Schriftgröße pt${numberControl(`text-${kind}-font-size`, element.fontSizePt, { min: 4, step: 0.5, position: `${kind}:fontSizePt` })}</label>
-    <label>Schrifttyp<select data-text-appearance="${kind}:fontStyle"><option value="normal" ${element.fontStyle === "normal" ? "selected" : ""}>Normal</option><option value="bold" ${element.fontStyle === "bold" ? "selected" : ""}>Fett</option><option value="italic" ${element.fontStyle === "italic" ? "selected" : ""}>Kursiv</option><option value="bold-italic" ${element.fontStyle === "bold-italic" ? "selected" : ""}>Fett kursiv</option></select></label>
-  </div>`;
-}
-
-function bindElementFields(template: LabelTemplate): void {
-  app.querySelectorAll<HTMLInputElement>("[data-position]").forEach((input) => input.addEventListener("change", () => {
-    const [kind, property] = input.dataset.position!.split(":") as [
-      "qr" | "text" | "tagIdText",
-      keyof PositionedElement,
-    ];
-    const element: PositionedElement =
-      kind === "qr" ? template.elements.qr : kind === "text" ? template.elements.text : template.elements.tagIdText;
-    element[property] = parseLayoutNumber(input.value);
-    if (kind === "qr" && (property === "widthMm" || property === "heightMm")) {
-      template.elements.qr.widthMm = parseLayoutNumber(input.value);
-      template.elements.qr.heightMm = parseLayoutNumber(input.value);
-    }
-    template.updatedAt = now();
-    renderTemplates();
-  }));
-}
-
-function bindTextAppearanceFields(template: LabelTemplate): void {
-  app.querySelectorAll<HTMLSelectElement>("[data-text-appearance]").forEach((input) => input.addEventListener("change", () => {
-    const [kind, property] = input.dataset.textAppearance!.split(":") as [
-      "text" | "tagIdText",
-      "fontFamily" | "fontStyle",
-    ];
-    const element = template.elements[kind];
-    if (property === "fontFamily") {
-      element.fontFamily = input.value as typeof element.fontFamily;
-    } else {
-      element.fontStyle = input.value as typeof element.fontStyle;
-      element.fontWeight = element.fontStyle.includes("bold") ? "bold" : "normal";
-    }
-    template.updatedAt = now();
-    renderTemplates();
-  }));
-}
-
-function bindDrag(template: LabelTemplate, scale: number): void {
-  const stage = app.querySelector<HTMLElement>("#label-stage");
-  if (!stage) return;
-
-  app.querySelectorAll<HTMLElement>("[data-element]").forEach((element) => element.addEventListener("pointerdown", (event) => {
-    const kind = element.dataset.element as "qr" | "text" | "tagIdText";
-    const target = template.elements[kind];
-    dragState = { element: kind, startX: event.clientX, startY: event.clientY, originX: target.xMm, originY: target.yMm };
-    element.setPointerCapture(event.pointerId);
-  }));
-  stage.addEventListener("pointermove", (event) => {
-    if (!dragState) return;
-    const target = template.elements[dragState.element];
-    const maxX = template.grid.labelWidthMm - target.widthMm;
-    const maxY = template.grid.labelHeightMm - target.heightMm;
-    target.xMm = Math.max(0, Math.min(maxX, Math.round((dragState.originX + (event.clientX - dragState.startX) / scale) * 10) / 10));
-    target.yMm = Math.max(0, Math.min(maxY, Math.round((dragState.originY + (event.clientY - dragState.startY) / scale) * 10) / 10));
-    renderTemplates();
-  });
-  stage.addEventListener("pointerup", () => { dragState = undefined; });
 }
 
 async function renderPrint(): Promise<void> {
@@ -737,7 +547,19 @@ async function renderPagePreview(cells: ReturnType<typeof paginateTags>[number],
   const cellsHtml = await Promise.all(cells.map(async (cell) => {
     if (!cell.tag) return `<div class="print-label"></div>`;
     const svg = await qrSvg(cell.tag.url, cell.tag.qrProfile);
-    return `<div class="print-label"><div class="mini-qr positioned-print-element" style="${positionStyle(template.elements.qr)}">${svg}</div><div class="mini-text positioned-print-element" style="${printTextStyle(template.elements.text)}">${escapeHtml(cell.tag.labelText)}</div><div class="mini-tag-id positioned-print-element" style="${printTextStyle(template.elements.tagIdText)}">${escapeHtml(cell.tag.tagId)}</div></div>`;
+    const backgroundImage = template.backgroundImage?.visible
+      ? `<div class="print-background-image" style="${positionStyle(template.backgroundImage)}opacity:${template.backgroundImage.opacity};background-image:url('${template.backgroundImage.dataUrl}');"></div>`
+      : "";
+    const qrBorder = template.elements.qr.borderWidthMm > 0
+      ? `border:${template.elements.qr.borderWidthMm}mm solid ${template.elements.qr.borderColor};box-sizing:border-box;`
+      : "";
+    const text = template.elements.text.visible
+      ? `<div class="mini-text positioned-print-element" style="${printTextStyle(template.elements.text)}">${escapeHtml(cell.tag.labelText)}</div>`
+      : "";
+    const tagId = template.elements.tagIdText.visible
+      ? `<div class="mini-tag-id positioned-print-element" style="${printTextStyle(template.elements.tagIdText)}">${escapeHtml(cell.tag.tagId)}</div>`
+      : "";
+    return `<div class="print-label" style="background-color:${template.backgroundColor}">${backgroundImage}<div class="mini-qr positioned-print-element" style="${positionStyle(template.elements.qr)}${qrBorder}">${svg}</div>${text}${tagId}</div>`;
   }));
 
   return `<div class="print-page-with-chrome"><div class="page-text page-header" style="${pageTextStyle(header.leftMm, header.topOffsetMm, header.widthMm, header.heightMm)}">${escapeHtml(header.text)}</div><div class="print-page" style="${gridStyle}">${cellsHtml.join("")}</div><div class="page-text page-footer" style="${pageTextStyle(footer.leftMm, footerTopMm, footer.widthMm, footer.heightMm)}">${escapeHtml(footer.text)}</div></div>`;

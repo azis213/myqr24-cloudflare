@@ -91,3 +91,26 @@ Ich möchte nun eine TAG-APP im Ordner tools\tag-gen erstellen, die als Tool fü
 4. Die Vorschau berücksichtigt immer die aktuell ausgewählte Vorlage, TAG-Liste, Startzeile und Startspalte einschließlich Kopf-/Fußtexten und QR-Profilen.
 5. Der Download bleibt eine getrennte, explizite Benutzeraktion. Aus der Browser-PDF-Vorschau kann der Benutzer außerdem die Funktionen des integrierten PDF-Viewers verwenden, beispielsweise Speichern oder Drucken.
 6. Falls der Browser das Öffnen eines neuen Tabs oder Fensters blockiert, meldet die Anwendung dies verständlich und bietet weiterhin den regulären PDF-Download an
+
+## Zusatz – Erweiterte Etikettengestaltung
+
+1. Beide Textfelder des Einzeletiketts (freier Bereichstext und lesbare TAG-ID) erhalten unabhängig voneinander Einstellungen für horizontale Ausrichtung (`links`, `zentriert`, `rechts`), vertikale Ausrichtung (`oben`, `mittig`, `unten`) und Sichtbarkeit. Ein ausgeblendetes Textfeld wird weder in der Etiketten- noch in der Druck-/PDF-Vorschau ausgegeben.
+2. Jedes Textfeld erhält optional eine Hintergrundfarbe mit frei wählbarem Hex-Farbwert und Transparenz. Die Hintergrundfarbe kann mit einer Checkbox vollständig ausgeschaltet werden.
+3. Für die gesamte Etikettenfläche kann eine frei wählbare Hintergrundfarbe festgelegt werden.
+4. Eine Vorlage kann ein optionales lokales Hintergrundbild enthalten. Für das Bild sind Sichtbarkeit, X-/Y-Position, Breite, Höhe und Blässe/Deckkraft einstellbar. Das Bild darf hinter QR-Code und Textfeldern liegen.
+5. Hintergrundbilder werden ausschließlich aus einer vom Benutzer ausgewählten lokalen Bilddatei übernommen. Die Bilddaten werden als Teil der Vorlage lokal gespeichert bzw. exportiert; es gibt keine Bild-URLs und keine Netzwerkübertragung.
+6. Für den QR-Code sind Randbreite und Randfarbe konfigurierbar. Die Randfarbe wird auch in Browser- und PDF-Ausgabe identisch angewendet.
+7. Farbeingaben bestehen jeweils aus einem klickbaren nativen Farbfeld und einem editierbaren Hex-Farbwert. Bei ungültigem Hex-Wert wird der zuletzt gültige Wert beibehalten und ein verständlicher Hinweis angezeigt.
+8. Der Einzeletikett-Editor besitzt eine Zoom-Funktion von 75 % bis 400 %, damit QR-Code, Textfelder und Hintergrundbild für die Positionierung vergrößert oder verkleinert dargestellt werden können. Zoom verändert niemals die gespeicherten Millimeterwerte oder die PDF-Maße.
+9. Die Designvorschau steht im Einzeletikett-Editor oberhalb der Konfigurationsfelder. Bei hohen Zoomstufen bleibt sie in einem eigenen Scrollbereich vollständig erreichbar.
+10. Die Konfigurationsblöcke für QR-Code, Hintergrundbild, freies Textfeld und lesbare TAG-ID stehen bei ausreichend breitem Fenster nebeneinander. Bei abnehmender Breite ordnen sie sich responsiv untereinander an.
+11. Alle neuen Designwerte werden mit der Etikettenvorlage gespeichert, beim Vorlagenexport mitgegeben und in der Browser-Druckvorschau, PDF-Vorschau sowie heruntergeladenen PDF gleich umgesetzt.
+
+## Zusatz – Technische Modulgrenze Etiketten-Designer
+
+1. Die Ansicht „Etikettenvorlagen“ wird als eigenständiges, flaches Frontend-Modul in `src/label-designer.ts` umgesetzt.
+2. Das Feature verantwortet ausschließlich die Vorlagenbearbeitung: A4-Rasterformular, Einzeletikett-Editor, Zoom, Drag-Interaktion, Designfelder sowie Vorlagenimport/-export.
+3. `src/main.ts` bleibt der schlanke Application Host. Er besitzt den globalen Anwendungszustand, Navigation, Shell, Speicher-/Datei-Utilities, TAG-Generierung, Druckauftrag und die viewübergreifende Auswahl der aktiven Vorlage.
+4. Der Host übergibt dem Feature nur einen expliziten UI-Kontext (Konfiguration, TAG-Vorschauwerte, Shell-Renderer und lokale Datei-/Download-Adapter). Das Feature führt weder globale Navigation noch Persistenz von Geheimnissen ein.
+5. Gemeinsame, reine Darstellungslogik für Textfelder wird aus dem Feature exportiert und von der Druckvorschau verwendet, damit Editor und Vorschau die gleichen Schrift-, Ausrichtungs- und Hintergrundwerte interpretieren.
+6. Das Domainmodell, seine Validierung und die PDF-Erzeugung bleiben eigenständige, UI-unabhängige Module. Dadurch bleiben Layout- und Exportregeln testbar, ohne die Vorlagenansicht zu rendern.

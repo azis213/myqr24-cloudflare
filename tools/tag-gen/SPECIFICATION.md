@@ -758,6 +758,8 @@ tools/tag-gen/
 ├── src/
 │   ├── domain.ts
 │   ├── tag-generation.ts
+│   ├── pdf-generation.ts
+│   ├── label-designer.ts
 │   ├── main.ts
 │   └── styles.css
 └── test/
@@ -866,3 +868,92 @@ Die Druckansicht erzeugt bei der Aktion „PDF-Vorschau öffnen“ das PDF aussc
 9. Automatisierte Tests, Fehlerfälle und manuelle Abnahme ausführen.
 
 Diese Spezifikation ist die Grundlage für die nachfolgende Implementierung; Änderungen an Codec, Geheimnisbehandlung oder Exportformaten müssen vor Umsetzung hier nachvollziehbar aktualisiert werden.
+
+## 21. Ergänzung: Erweiterte Etikettengestaltung
+
+### 21.1 Vorlagenmodell und Kompatibilität
+
+Jede Etikettenvorlage enthält zusätzlich folgende Designwerte:
+
+```ts
+type HexColor = `#${string}`;
+
+interface TextAppearance {
+  visible: boolean;
+  fontFamily: "helvetica" | "times-roman" | "courier";
+  fontSizePt: number;
+  fontStyle: "normal" | "bold" | "italic" | "bold-italic";
+  horizontalAlign: "left" | "center" | "right";
+  verticalAlign: "top" | "middle" | "bottom";
+  background: { enabled: boolean; color: HexColor; opacity: number };
+}
+
+interface BackgroundImage extends PositionedElement {
+  visible: boolean;
+  dataUrl: string;
+  opacity: number; // 0 = vollständig blass, 1 = deckend
+}
+```
+
+- `elements.text` und `elements.tagIdText` erweitern ihre bisherigen Textoptionen um `visible` und `background`.
+- `elements.qr` erweitert seine bisherigen Optionen um `borderWidthMm` und `borderColor`.
+- `LabelTemplate` erweitert sich um `backgroundColor: HexColor` und `backgroundImage?: BackgroundImage`.
+- Hintergrundbilddaten sind ausschließlich eingebettete lokale `data:`-URLs für PNG oder JPEG. Externe Bild-URLs sind unzulässig.
+- Fehlende Werte früherer Vorlagen werden beim Laden deterministisch migriert: sichtbare Texte, deaktivierte Text-Hintergründe, weißer Etikettenhintergrund, kein Hintergrundbild sowie kein QR-Rand.
+
+### 21.2 Editor und Bedienung
+
+Der Elementinspektor bietet für beide Textfelder jeweils:
+
+- Checkbox für Sichtbarkeit,
+- horizontale und vertikale Ausrichtung,
+- Checkbox für den Texthintergrund,
+- nativen Farbwähler plus editierbares Hex-Feld,
+- Transparenz als Prozentwert von `0` bis `100`.
+
+Der Vorlagenbereich bietet zusätzlich:
+
+- Farbwähler und Hex-Feld für die Etiketten-Hintergrundfarbe,
+- lokale PNG-/JPEG-Dateiauswahl für ein Hintergrundbild,
+- Checkbox für dessen Sichtbarkeit, Positions- und Größenfelder sowie Blässe in Prozent,
+- Eingaben für Randbreite und Randfarbe des QR-Codes,
+- Zoomauswahl von `75 %` bis `400 %` für den Einzeletikett-Canvas. Der Zoom beeinflusst ausschließlich die Editordarstellung, niemals gespeicherte Millimeterwerte oder PDF-Ausgabe.
+- Die Einzeletikett-Designvorschau wird oberhalb der Konfigurationsbereiche angezeigt. Bei hohen Zoomstufen bleibt sie innerhalb eines eigenen Scrollbereichs vollständig bedienbar.
+- Die Konfigurationsbereiche für QR-Code, Hintergrundbild, freien Text und lesbare TAG-ID verwenden ein responsives Grid: Bei ausreichend breiter Ansicht stehen sie nebeneinander, bei reduzierter Breite ordnen sie sich untereinander an.
+
+### 21.3 Renderreihenfolge und PDF-Gleichheit
+
+Je Etikett wird in folgender Reihenfolge gerendert:
+
+1. Etiketten-Hintergrundfarbe,
+2. sichtbares Hintergrundbild mit konfigurierter Deckkraft,
+3. sichtbare Textfeld-Hintergründe mit eigener Deckkraft,
+4. QR-Code mit optionalem Rand,
+5. sichtbarer freier Text und sichtbare TAG-ID.
+
+Browser-Druckvorschau, PDF-Vorschau und PDF-Download müssen dieselben gespeicherten Optionen verwenden. PNG- und JPEG-Hintergrundbilder werden clientseitig in das PDF eingebettet. Nicht unterstützte Bildtypen werden vor Übernahme abgewiesen.
+
+### 21.4 Akzeptanzkriterien
+
+1. Ausgeblendete Textfelder und Hintergrundbilder erscheinen weder im Editor-Preview noch in der Druck- oder PDF-Ausgabe.
+2. Für alle konfigurierbaren Farben sind ein klickbares Farbfeld und ein editierbares Hex-Feld vorhanden; gültige Änderungen bleiben synchron.
+3. Hintergrundfarbe, Bildblässe und Textfeldtransparenz werden in Browser- und PDF-Vorschau sichtbar gleich umgesetzt.
+4. Das Hintergrundbild bleibt innerhalb seiner konfigurierten Millimeter-Box und liegt hinter QR-Code und Text.
+5. QR-Randbreite und -farbe werden in Browser- und PDF-Ausgabe gleich angewendet.
+6. Änderungen am Editorzoom verändern weder die gespeicherten Koordinaten noch die erzeugte PDF.
+7. Vorhandene Vorlagen ohne Designwerte lassen sich weiterhin laden, bearbeiten, exportieren und als PDF erzeugen.
+
+## 22. Ergänzung: Modulgrenze Etiketten-Designer
+
+Die Vorlagenansicht ist als flaches Modul in `src/label-designer.ts` abgegrenzt.
+
+| Modul | Verantwortung |
+| --- | --- |
+| `src/main.ts` | Application Host: globaler Konfigurations- und TAG-Zustand, Navigation, Shell, Persistenz-/Datei-Adapter, TAG-Generierung und Druckauftrag |
+| `src/label-designer.ts` | A4-Raster, Vorlageneigenschaften, Einzeletikett-Editor, Zoom, Drag-Interaktion, Designfelder sowie Vorlagenimport/-export |
+| `src/domain.ts` | Vorlagenmodell, Migration, Validierung und portable Import-/Exportformate ohne UI-Abhängigkeit |
+| `src/pdf-generation.ts` | Maßhaltige PDF-Ausgabe auf Grundlage einer validierten Vorlage und TAG-Liste |
+
+Der Host übergibt dem Etiketten-Designer einen expliziten `LabelDesignerContext`. Dieser enthält nur die für die Ansicht notwendigen Datenzugriffe sowie Shell-, Download- und Datei-Adapter. Das Feature führt keine globale Navigation und speichert keine Geheimnisse.
+
+`editorTextStyle()` ist eine exportierte, reine Darstellungsfunktion des Features. Die Browser-Druckvorschau verwendet diese Funktion ebenfalls, damit Textschrift, Stil, Ausrichtung und Transparenz im Editor und in der Vorschau konsistent interpretiert werden.
