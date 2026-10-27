@@ -35,6 +35,28 @@ interface GlowStyle {
   blendMode: "source-over" | "screen" | "overlay";
 }
 
+type ReliefMode = "none" | "raised" | "inset";
+
+interface ReliefStyle {
+  mode: ReliefMode;
+  depth: number;
+  angle: number;
+  softness: number;
+  strength: number;
+  highlightColor: string;
+  shadowColor: string;
+}
+
+const defaultRelief = (): ReliefStyle => ({
+  mode: "none",
+  depth: 8,
+  angle: 315,
+  softness: 3,
+  strength: .7,
+  highlightColor: "#ffffff",
+  shadowColor: "#07111e",
+});
+
 interface TextObject extends BaseObject {
   type: "text";
   text: string;
@@ -44,6 +66,7 @@ interface TextObject extends BaseObject {
   align: CanvasTextAlign;
   shadow: boolean;
   glow: GlowStyle;
+  relief: ReliefStyle;
 }
 
 interface ShapeObject extends BaseObject {
@@ -91,7 +114,7 @@ interface LabelFormatConfig {
 }
 
 interface Design {
-  schemaVersion: 4;
+  schemaVersion: 5;
   kind: "myqr24.label-designer.document";
   name: string;
   width: number;
@@ -113,6 +136,7 @@ interface Design {
   borderA: string;
   borderB: string;
   borderTexture: Texture;
+  borderRelief: ReliefStyle;
   objects: DesignObject[];
 }
 
@@ -125,11 +149,16 @@ const imageCache = new Map<string, HTMLImageElement>();
 let scale = 0.38;
 let activeTool: Tool = "select";
 let selectedIds = new Set<string>();
-type TextStyleClipboard = Pick<TextObject, "opacity" | "fill" | "stroke" | "strokeWidth" | "fontSize" | "fontFamily" | "fontWeight" | "align" | "shadow" | "glow">;
+type TextStyleClipboard = Pick<TextObject, "opacity" | "fill" | "stroke" | "strokeWidth" | "fontSize" | "fontFamily" | "fontWeight" | "align" | "shadow" | "glow" | "relief">;
 let textStyleClipboard: TextStyleClipboard | undefined;
-let drag: { startX: number; startY: number; origins: Map<string, { x: number; y: number }>; moved: boolean; deselectOnClick: boolean } | undefined;
+type ObjectDrag = { mode: "objects"; startX: number; startY: number; origins: Map<string, { x: number; y: number }>; moved: boolean; deselectOnClick: boolean };
+type ImageContentDrag = { mode: "image-content"; startX: number; startY: number; imageId: string; offsetX: number; offsetY: number; moved: boolean; deselectOnClick: false };
+let drag: ObjectDrag | ImageContentDrag | undefined;
 let marquee: { startX: number; startY: number; x: number; y: number } | undefined;
 let toastTimer: number | undefined;
+let inlineTextEditor: HTMLTextAreaElement | undefined;
+let inlineTextEditorId: string | undefined;
+let inlineTextOriginal: string | undefined;
 const INPUT_PREVIEW_DELAY = 400;
 const DRAG_THRESHOLD = 4;
 const FALLBACK_LABEL_FORMATS: LabelFormatConfig = {
@@ -170,7 +199,7 @@ const selectedOne = (): DesignObject | undefined => selectedIds.size === 1 ? get
 const isText = (item: DesignObject | undefined): item is TextObject => item?.type === "text";
 
 let design: Design = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   kind: "myqr24.label-designer.document",
   name: "Mein Lost-&-Found Label",
   width: 1828,
@@ -192,6 +221,7 @@ let design: Design = {
   borderA: "#71f6e0",
   borderB: "#236aa8",
   borderTexture: "metal",
+  borderRelief: defaultRelief(),
   objects: [
     textObject("Titel", 640, 180, 970, 155, "VERLOREN?", 112, "#f7fbff", false),
     textObject("Untertitel", 640, 340, 970, 150, "GEFUNDEN!", 108, "#8ffbec", true),
@@ -205,6 +235,7 @@ function textObject(name: string, x: number, y: number, width: number, height: n
     visible: true, locked: false, text, fontSize, fontFamily: fontSize > 50 ? "Arial Black, Impact, sans-serif" : "Arial, sans-serif",
     fontWeight: fontSize > 50 ? "900" : "600", align, shadow: fontSize > 50,
     glow: { enabled: glowEnabled, color: fill, intensity: 100, blur: 22, spread: 3, opacity: 1, blendMode: "screen" },
+    relief: defaultRelief(),
   };
 }
 
@@ -214,7 +245,7 @@ function html(): void {
       <header class="topbar">
         <div class="brand"><span class="brand-mark">L</span><div><strong>myQR24 Label-Designer</strong><small>Lokale Gestaltung · PNG-Export</small></div></div>
         <div class="toolbar-actions">
-          <button class="button" id="new-design">Neu</button><button class="button" id="save-design">JSON speichern</button><button class="button" id="load-design">JSON laden</button><button class="button" id="import-image">Bild einfügen</button><button class="button primary" id="export-png">PNG exportieren</button>
+          <button class="button" id="new-design">Neu</button><button class="button" id="save-design">JSON speichern</button><button class="button" id="load-design">JSON laden</button><button class="button" id="import-image">Bild einfügen</button><button class="button primary" id="export-png">PNG exportieren</button><button class="button" id="export-png-save-as">PNG speichern unter</button>
         </div>
         <div class="top-actions"><button class="button icon" id="zoom-out">−</button><button class="button" id="zoom-label">38 %</button><button class="button icon" id="zoom-in">+</button></div>
       </header>
@@ -244,16 +275,26 @@ function bindShell(): void {
   app.querySelector("#load-design")?.addEventListener("click", () => importInput.click());
   app.querySelector("#import-image")?.addEventListener("click", () => imageInput.click());
   app.querySelector("#export-png")?.addEventListener("click", exportPng);
+  app.querySelector("#export-png-save-as")?.addEventListener("click", () => void exportPngSaveAs());
   app.querySelector("#zoom-in")?.addEventListener("click", () => changeZoom(.05));
   app.querySelector("#zoom-out")?.addEventListener("click", () => changeZoom(-.05));
   canvas.addEventListener("pointerdown", pointerDown);
   canvas.addEventListener("pointermove", pointerMove);
   canvas.addEventListener("pointerup", pointerUp);
   canvas.addEventListener("pointerleave", pointerUp);
+  canvas.addEventListener("dblclick", pointerDoubleClick);
   importInput.addEventListener("change", importJson);
   imageInput.addEventListener("change", importImages);
   window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") { selectedIds.clear(); marquee = undefined; setTool("select"); update(); }
+    if (event.key === "Escape") {
+      if (inlineTextEditor) cancelInlineTextEdit();
+      else { selectedIds.clear(); marquee = undefined; setTool("select"); update(); }
+    }
+    const selected = selectedOne();
+    if (event.key === "Enter" && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) && isText(selected)) {
+      event.preventDefault();
+      beginInlineTextEdit(selected);
+    }
     if ((event.key === "Delete" || event.key === "Backspace") && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) deleteSelection();
   });
 }
@@ -272,7 +313,7 @@ function setTool(tool: Tool): void {
 }
 
 function changeZoom(delta: number): void {
-  scale = clamp(scale + delta, .15, .7);
+  scale = clamp(scale + delta, .15, 3);
   app.querySelector("#zoom-label")!.textContent = `${Math.round(scale * 100)} %`;
   update();
 }
@@ -293,6 +334,7 @@ function normalizeDesignPrecision(): void {
   design.radius = roundTenths(design.radius);
   design.gradientAngle = roundTenths(design.gradientAngle);
   design.borderWidth = roundTenths(design.borderWidth);
+  normalizeRelief(design.borderRelief);
   design.objects.forEach((item) => {
     item.x = roundPixels(item.x);
     item.y = roundPixels(item.y);
@@ -308,14 +350,23 @@ function normalizeDesignPrecision(): void {
       item.fontSize = roundTenths(item.fontSize);
       item.glow.blur = roundTenths(item.glow.blur);
       item.glow.spread = roundTenths(item.glow.spread);
+      normalizeRelief(item.relief);
     }
     if (item.type === "image") {
       item.cornerRadius = roundTenths(item.cornerRadius);
-      item.imageScale = roundTenths(item.imageScale);
+      item.imageScale = roundTenths(Math.max(1, item.imageScale));
+      clampImageOffset(item);
       item.imageOffsetX = roundTenths(item.imageOffsetX);
       item.imageOffsetY = roundTenths(item.imageOffsetY);
     }
   });
+}
+
+function normalizeRelief(relief: ReliefStyle): void {
+  relief.depth = roundTenths(clamp(relief.depth, 0, 100));
+  relief.angle = roundTenths(((relief.angle % 360) + 360) % 360);
+  relief.softness = roundTenths(clamp(relief.softness, 0, 50));
+  relief.strength = roundTenths(clamp(relief.strength, 0, 1));
 }
 
 function update(): void {
@@ -346,14 +397,7 @@ function renderCanvas(context: CanvasRenderingContext2D, value: Design, editor: 
   drawTexture(context, value.texture, value.width, value.height, value.textureOpacity);
   value.objects.filter((item) => item.visible).forEach((item) => drawObject(context, item, editor && selectedIds.has(item.id)));
   context.restore();
-  if (value.borderVisible && value.borderWidth > 0) {
-    context.save();
-    roundedPath(context, value.borderWidth / 2, value.borderWidth / 2, value.width - value.borderWidth, value.height - value.borderWidth, Math.max(0, value.radius - value.borderWidth / 2));
-    context.lineWidth = value.borderWidth;
-    context.strokeStyle = fillStyle(context, "linear", value.borderA, value.borderB, 125, value.width, value.height);
-    context.stroke();
-    context.restore();
-  }
+  if (value.borderVisible && value.borderWidth > 0) drawBorder(context, value);
   if (editor && marquee) drawMarquee(context, marquee);
 }
 
@@ -411,6 +455,44 @@ function drawObject(context: CanvasRenderingContext2D, item: DesignObject, showS
   context.restore();
 }
 
+function reliefOffset(relief: ReliefStyle): { x: number; y: number } {
+  const radians = relief.angle * Math.PI / 180;
+  return { x: Math.cos(radians) * relief.depth, y: Math.sin(radians) * relief.depth };
+}
+
+function drawBorder(context: CanvasRenderingContext2D, value: Design): void {
+  const x = value.borderWidth / 2, y = value.borderWidth / 2;
+  const width = value.width - value.borderWidth, height = value.height - value.borderWidth;
+  const radius = Math.max(0, value.radius - value.borderWidth / 2);
+  const relief = value.borderRelief;
+  const maxDepth = Math.max(0, value.borderWidth / 2 - 1);
+  const depth = Math.min(relief.depth, maxDepth);
+  if (relief.mode !== "none" && depth > 0) {
+    const offset = reliefOffset({ ...relief, depth });
+    const direction = relief.mode === "raised" ? 1 : -1;
+    context.save();
+    context.lineCap = "round"; context.lineJoin = "round";
+    context.globalAlpha = relief.strength;
+    context.shadowBlur = relief.softness;
+    context.lineWidth = Math.max(1, value.borderWidth - depth);
+    context.strokeStyle = relief.shadowColor;
+    context.shadowColor = relief.shadowColor;
+    context.shadowOffsetX = -offset.x * direction; context.shadowOffsetY = -offset.y * direction;
+    roundedPath(context, x, y, width, height, radius); context.stroke();
+    context.shadowColor = relief.highlightColor;
+    context.shadowOffsetX = offset.x * direction; context.shadowOffsetY = offset.y * direction;
+    context.strokeStyle = relief.highlightColor;
+    roundedPath(context, x, y, width, height, radius); context.stroke();
+    context.restore();
+  }
+  context.save();
+  roundedPath(context, x, y, width, height, radius);
+  context.lineWidth = value.borderWidth;
+  context.strokeStyle = fillStyle(context, "linear", value.borderA, value.borderB, 125, value.width, value.height);
+  context.stroke();
+  context.restore();
+}
+
 function drawText(context: CanvasRenderingContext2D, item: TextObject): void {
   context.font = `${item.fontWeight} ${item.fontSize}px ${item.fontFamily}`;
   context.textAlign = item.align; context.textBaseline = "middle"; context.lineJoin = "round";
@@ -424,6 +506,24 @@ function drawText(context: CanvasRenderingContext2D, item: TextObject): void {
       context.shadowColor = item.glow.color; context.shadowBlur = item.glow.blur * (1 + factor) + item.glow.spread; context.shadowOffsetX = 0; context.shadowOffsetY = 0;
       context.fillStyle = item.glow.color; context.fillText(item.text, x, item.height / 2, item.width);
     }
+    context.restore();
+  }
+  if (item.relief.mode !== "none" && item.relief.depth > 0) {
+    const offset = reliefOffset(item.relief);
+    const direction = item.relief.mode === "raised" ? 1 : -1;
+    const reliefStroke = Math.max(1, item.strokeWidth * 2 + Math.min(item.relief.depth, item.fontSize / 5));
+    context.save();
+    context.globalAlpha = item.opacity * item.relief.strength;
+    context.lineWidth = reliefStroke;
+    context.shadowBlur = item.relief.softness;
+    context.shadowColor = item.relief.shadowColor;
+    context.shadowOffsetX = -offset.x * direction; context.shadowOffsetY = -offset.y * direction;
+    context.strokeStyle = item.relief.shadowColor;
+    context.strokeText(item.text, x, item.height / 2, item.width);
+    context.shadowColor = item.relief.highlightColor;
+    context.shadowOffsetX = offset.x * direction; context.shadowOffsetY = offset.y * direction;
+    context.strokeStyle = item.relief.highlightColor;
+    context.strokeText(item.text, x, item.height / 2, item.width);
     context.restore();
   }
   if (item.shadow) { context.shadowColor = "#07111e"; context.shadowBlur = 8; context.shadowOffsetX = 7; context.shadowOffsetY = 8; }
@@ -457,9 +557,23 @@ function imageDimensions(item: ImageObject, naturalWidth: number, naturalHeight:
   if (item.fitMode === "stretch" || item.fitMode === "label-fill") return { x: 0, y: 0, width: item.width, height: item.height };
   const contain = item.fitMode === "contain";
   const base = contain ? Math.min(item.width / naturalWidth, item.height / naturalHeight) : Math.max(item.width / naturalWidth, item.height / naturalHeight);
-  const factor = base * (item.fitMode === "manual" ? item.imageScale : 1);
+  // Der manuelle Modus beginnt bei Cover. Damit bleiben beim Verschieben nie leere Flächen zurück.
+  const factor = base * (item.fitMode === "manual" ? Math.max(1, item.imageScale) : 1);
   const width = naturalWidth * factor, height = naturalHeight * factor;
   return { x: (item.width - width) / 2 + item.imageOffsetX, y: (item.height - height) / 2 + item.imageOffsetY, width, height };
+}
+
+function clampImageOffset(item: ImageObject): void {
+  if (item.fitMode === "stretch" || item.fitMode === "label-fill" || !item.sourceWidth || !item.sourceHeight) {
+    item.imageOffsetX = 0;
+    item.imageOffsetY = 0;
+    return;
+  }
+  const dimensions = imageDimensions(item, item.sourceWidth, item.sourceHeight);
+  const maxX = Math.max(0, (dimensions.width - item.width) / 2);
+  const maxY = Math.max(0, (dimensions.height - item.height) / 2);
+  item.imageOffsetX = clamp(item.imageOffsetX, -maxX, maxX);
+  item.imageOffsetY = clamp(item.imageOffsetY, -maxY, maxY);
 }
 
 function drawMarquee(context: CanvasRenderingContext2D, value: NonNullable<typeof marquee>): void {
@@ -483,7 +597,8 @@ function renderProperties(): void {
       ${field("Textur-Deckkraft", "texture-opacity", design.textureOpacity, "range", "0", "1", ".05")}
     </div><div class="gradient-bar" id="gradient-preview"></div><div class="divider"></div><h3>Rand (folgt dem Eckenradius)</h3>
     <label class="checkbox"><input id="border-visible" type="checkbox" ${design.borderVisible ? "checked" : ""}> Rand anzeigen</label>
-    <div class="field-grid">${field("Dicke px", "border-width", design.borderWidth, "number")}${selectField("Randtextur", "border-texture", design.borderTexture, textures())}${colorField("Randfarbe A", "border-a", design.borderA)}${colorField("Randfarbe B", "border-b", design.borderB)}</div></section>
+    <div class="field-grid">${field("Dicke px", "border-width", design.borderWidth, "number")}${selectField("Randtextur", "border-texture", design.borderTexture, textures())}${colorField("Randfarbe A", "border-a", design.borderA)}${colorField("Randfarbe B", "border-b", design.borderB)}</div>
+    <div class="divider"></div><h3>3D-Relief Rand</h3>${reliefFields("border-relief", design.borderRelief)}</section>
     ${item ? objectProperties(item) : multi ? multiProperties() : `<section class="panel"><h2>Werkzeuge</h2><p class="hint">Bilder: über „Bild einfügen“ oder das Bildwerkzeug. Shift-Klick und Auswahlrahmen wählen mehrere Objekte. Mit Pipette und Stilpinsel werden Textstile übertragen.</p><div class="divider"></div><h3>Stil-Presets</h3><div class="preset-grid">${presetButtons()}</div></section>`}
     <section class="panel"><h2>Ebenen</h2>${[...design.objects].reverse().map(objectRow).join("") || `<p class="hint">Noch keine Objekte.</p>`}</section>`;
   bindProperties();
@@ -497,20 +612,20 @@ function objectProperties(item: DesignObject): string {
     ${field("Deckkraft", "object-opacity", item.opacity, "range", "0", "1", ".05")}${colorField("Füllfarbe", "object-fill", item.fill)}
     ${colorField("Konturfarbe", "object-stroke", item.stroke)}${field("Kontur px", "object-stroke-width", item.strokeWidth, "number")}
   </div><label class="checkbox"><input id="object-visible" type="checkbox" ${item.visible ? "checked" : ""}> Sichtbar</label><label class="checkbox"><input id="object-locked" type="checkbox" ${item.locked ? "checked" : ""}> Gesperrt</label>`;
-  const text = item.type === "text" ? `<div class="divider"></div><h3>Text & Effekte</h3><div class="field-grid">
+  const text = item.type === "text" ? `<p class="hint">Text direkt auf dem Label bearbeiten: Textobjekt doppelklicken oder auswählen und <strong>Enter</strong> drücken. <strong>Esc</strong> verwirft, <strong>Strg/Cmd + Enter</strong> übernimmt.</p><div class="divider"></div><h3>Text & Effekte</h3><div class="field-grid">
     ${textareaField("Textinhalt", "text-content", item.text)}${field("Schriftgröße px", "text-size", item.fontSize, "number")}
     ${selectField("Schrift", "text-font", item.fontFamily, fonts())}${selectField("Ausrichtung", "text-align", item.align, [["left", "Links"], ["center", "Zentriert"], ["right", "Rechts"]])}
     ${colorField("Glow-Farbe", "glow-color", item.glow.color)}${field("Glow-Intensität %", "glow-intensity", item.glow.intensity, "range", "0", "200", "5")}
     ${field("Glow-Unschärfe px", "glow-blur", item.glow.blur, "range", "0", "100", "1")}${field("Glow-Ausbreitung px", "glow-spread", item.glow.spread, "range", "0", "100", "1")}
     ${field("Glow-Deckkraft", "glow-opacity", item.glow.opacity, "range", "0", "1", ".05")}${selectField("Glow-Blend-Modus", "glow-blend", item.glow.blendMode, [["source-over", "Normal"], ["screen", "Screen"], ["overlay", "Überlagern"]])}
-  </div><label class="checkbox"><input id="text-shadow" type="checkbox" ${item.shadow ? "checked" : ""}> Schlagschatten</label><label class="checkbox"><input id="text-glow" type="checkbox" ${item.glow.enabled ? "checked" : ""}> Neon / Glow aktiv</label>` : "";
+  </div><label class="checkbox"><input id="text-shadow" type="checkbox" ${item.shadow ? "checked" : ""}> Schlagschatten</label><label class="checkbox"><input id="text-glow" type="checkbox" ${item.glow.enabled ? "checked" : ""}> Neon / Glow aktiv</label><div class="divider"></div><h3>3D-Relief Text</h3>${reliefFields("text-relief", item.relief)}` : "";
   const image = item.type === "image" ? `<div class="divider"></div><h3>Bild</h3><div class="field-grid">
     ${selectField("Fit-Modus", "image-fit", item.fitMode, [["label-fill", "Label ausfüllen"], ["cover", "Ausfüllen (Cover)"], ["contain", "Einpassen"], ["stretch", "Strecken"], ["manual", "Manuell"]])}
     ${field("Eckenradius px", "image-radius", item.cornerRadius, "number")}
-    ${field("Bild-Skalierung %", "image-scale", item.imageScale * 100, "number")}
+    ${field("Bild-Skalierung %", "image-scale", item.imageScale * 100, "number", "100")}
     ${field("Bildversatz X px", "image-offset-x", item.imageOffsetX, "number")}
     ${field("Bildversatz Y px", "image-offset-y", item.imageOffsetY, "number")}
-  </div><p class="hint">${escape(item.fileName)} · ${item.sourceWidth} × ${item.sourceHeight}px</p>` : "";
+  </div><p class="hint">Der Bildrand wird am Bildobjekt zugeschnitten. Bild skalieren und anschließend bei ausgewähltem Bild mit <strong>Shift + Drag</strong> den sichtbaren Ausschnitt verschieben. Ohne Shift wird das Bildobjekt bewegt.</p><p class="hint">${escape(item.fileName)} · ${item.sourceWidth} × ${item.sourceHeight}px</p>` : "";
   return `<section class="panel"><h2>${item.type === "text" ? "Textstil" : item.type === "image" ? "Bildobjekt" : "Objektstil"}</h2>${text}${image}<div class="divider"></div>${shared}<div class="divider"></div>${layerButtons()} <button class="button" id="duplicate-object">Duplizieren</button> <button class="button" id="delete-object">Löschen</button></section>`;
 }
 
@@ -520,6 +635,15 @@ function multiProperties(): string {
 
 function layerButtons(): string {
   return `<button class="button" data-layer="back">⇤ Ganz hinten</button> <button class="button" data-layer="down">← Hinten</button> <button class="button" data-layer="up">Vorne →</button> <button class="button" data-layer="front">Ganz vorne ⇥</button>`;
+}
+
+function reliefFields(id: string, relief: ReliefStyle): string {
+  return `<div class="field-grid">
+    ${selectField("Effekt", `${id}-mode`, relief.mode, [["none", "Aus"], ["raised", "Erhaben"], ["inset", "Vertieft"]])}${field("Tiefe px", `${id}-depth`, relief.depth, "number", "0", "100", ".1")}
+    ${field("Lichtrichtung °", `${id}-angle`, relief.angle, "number", "0", "359.9", ".1")}${field("Weichheit px", `${id}-softness`, relief.softness, "number", "0", "50", ".1")}
+    ${field("Stärke", `${id}-strength`, relief.strength, "range", "0", "1", ".05")}${colorField("Lichtfarbe", `${id}-highlight`, relief.highlightColor)}
+    ${colorField("Schattenfarbe", `${id}-shadow`, relief.shadowColor)}
+  </div>`;
 }
 
 function field(label: string, id: string, value: string | number, type: string, min = "", max = "", step = "", precision = 1): string {
@@ -556,11 +680,13 @@ function resizeDesign(width: number, height: number): void {
     item.x *= scaleX; item.y *= scaleY; item.width *= scaleX; item.height *= scaleY;
     item.strokeWidth *= uniformScale;
     if (item.type === "line") { item.x2 *= scaleX; item.y2 *= scaleY; }
-    if (item.type === "text") { item.fontSize *= uniformScale; item.glow.blur *= uniformScale; item.glow.spread *= uniformScale; }
+    if (item.type === "text") { item.fontSize *= uniformScale; item.glow.blur *= uniformScale; item.glow.spread *= uniformScale; item.relief.depth *= uniformScale; item.relief.softness *= uniformScale; }
     if (item.type === "image") { item.cornerRadius *= uniformScale; item.imageOffsetX *= scaleX; item.imageOffsetY *= scaleY; }
   });
   design.radius = clamp(design.radius * uniformScale, 0, Math.min(nextWidth, nextHeight) / 2);
   design.borderWidth *= uniformScale;
+  design.borderRelief.depth *= uniformScale;
+  design.borderRelief.softness *= uniformScale;
   design.width = nextWidth;
   design.height = nextHeight;
   fitLabelImages();
@@ -654,6 +780,7 @@ function bindProperties(): void {
   set("background-a", (input) => { design.backgroundA = input.value; }); set("background-b", (input) => { design.backgroundB = input.value; });
   setNumber("gradient-angle", (input) => { design.gradientAngle = toNumber(input.value, 0); }); set("background-texture", (input) => { design.texture = input.value as Texture; }, "change"); set("texture-opacity", (input) => { design.textureOpacity = toNumber(input.value, .35); });
   set("border-visible", (input) => { design.borderVisible = (input as HTMLInputElement).checked; }, "change"); setNumber("border-width", (input) => { design.borderWidth = clamp(toNumber(input.value, 0), 0, 200); }); set("border-texture", (input) => { design.borderTexture = input.value as Texture; }, "change"); set("border-a", (input) => { design.borderA = input.value; }); set("border-b", (input) => { design.borderB = input.value; });
+  bindReliefInputs("border-relief", design.borderRelief, set, setNumber);
 
   const item = selectedOne();
   if (item) bindObjectInputs(item, set, setNumber);
@@ -669,18 +796,114 @@ function bindProperties(): void {
   if (preview) preview.style.background = design.backgroundFill === "solid" ? design.backgroundA : design.backgroundFill === "radial" ? `radial-gradient(circle, ${design.backgroundA}, ${design.backgroundB})` : `linear-gradient(${design.gradientAngle}deg, ${design.backgroundA}, ${design.backgroundB})`;
 }
 
+function bindReliefInputs(id: string, relief: ReliefStyle, set: (id: string, callback: (input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) => void, event?: string) => void, setNumber: (id: string, callback: (input: HTMLInputElement) => void) => void): void {
+  set(`${id}-mode`, (input) => { relief.mode = input.value as ReliefMode; }, "change");
+  setNumber(`${id}-depth`, (input) => { relief.depth = clamp(toNumber(input.value, relief.depth), 0, 100); });
+  setNumber(`${id}-angle`, (input) => { relief.angle = toNumber(input.value, relief.angle); });
+  setNumber(`${id}-softness`, (input) => { relief.softness = clamp(toNumber(input.value, relief.softness), 0, 50); });
+  set(`${id}-strength`, (input) => { relief.strength = clamp(toNumber(input.value, relief.strength), 0, 1); });
+  set(`${id}-highlight`, (input) => { relief.highlightColor = input.value; });
+  set(`${id}-shadow`, (input) => { relief.shadowColor = input.value; });
+}
+
 function bindObjectInputs(item: DesignObject, set: (id: string, callback: (input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) => void, event?: string) => void, setNumber: (id: string, callback: (input: HTMLInputElement) => void) => void): void {
   set("object-name", (input) => { item.name = input.value; }); setNumber("object-x", (input) => { item.x = toNumber(input.value, item.x); }); setNumber("object-y", (input) => { item.y = toNumber(input.value, item.y); }); setNumber("object-width", (input) => { item.width = Math.max(1, toNumber(input.value, item.width)); }); setNumber("object-height", (input) => { item.height = Math.max(1, toNumber(input.value, item.height)); }); setNumber("object-rotation", (input) => { item.rotation = toNumber(input.value, item.rotation); }); set("object-opacity", (input) => { item.opacity = clamp(toNumber(input.value, item.opacity), 0, 1); }); set("object-fill", (input) => { item.fill = input.value; }); set("object-stroke", (input) => { item.stroke = input.value; }); setNumber("object-stroke-width", (input) => { item.strokeWidth = Math.max(0, toNumber(input.value, item.strokeWidth)); }); set("object-visible", (input) => { item.visible = (input as HTMLInputElement).checked; }, "change"); set("object-locked", (input) => { item.locked = (input as HTMLInputElement).checked; }, "change");
   if (item.type === "text") {
-    set("text-content", (input) => { item.text = input.value; }); setNumber("text-size", (input) => { item.fontSize = Math.max(6, toNumber(input.value, item.fontSize)); }); set("text-font", (input) => { item.fontFamily = input.value; }, "change"); set("text-align", (input) => { item.align = input.value as CanvasTextAlign; }, "change"); set("text-shadow", (input) => { item.shadow = (input as HTMLInputElement).checked; }, "change"); set("text-glow", (input) => { item.glow.enabled = (input as HTMLInputElement).checked; }, "change"); set("glow-color", (input) => { item.glow.color = input.value; }); set("glow-intensity", (input) => { item.glow.intensity = clamp(toNumber(input.value, 100), 0, 200); }); set("glow-blur", (input) => { item.glow.blur = clamp(toNumber(input.value, 0), 0, 100); }); set("glow-spread", (input) => { item.glow.spread = clamp(toNumber(input.value, 0), 0, 100); }); set("glow-opacity", (input) => { item.glow.opacity = clamp(toNumber(input.value, 1), 0, 1); }); set("glow-blend", (input) => { item.glow.blendMode = input.value as GlowStyle["blendMode"]; }, "change");
+    const textContent = app.querySelector<HTMLTextAreaElement>("#text-content");
+    if (textContent) {
+      textContent.addEventListener("input", () => { item.text = textContent.value; renderPreview(); });
+      textContent.addEventListener("change", () => { item.text = textContent.value; update(); });
+      textContent.addEventListener("keydown", (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); textContent.blur(); }
+      });
+    }
+    setNumber("text-size", (input) => { item.fontSize = Math.max(6, toNumber(input.value, item.fontSize)); }); set("text-font", (input) => { item.fontFamily = input.value; }, "change"); set("text-align", (input) => { item.align = input.value as CanvasTextAlign; }, "change"); set("text-shadow", (input) => { item.shadow = (input as HTMLInputElement).checked; }, "change"); set("text-glow", (input) => { item.glow.enabled = (input as HTMLInputElement).checked; }, "change"); set("glow-color", (input) => { item.glow.color = input.value; }); set("glow-intensity", (input) => { item.glow.intensity = clamp(toNumber(input.value, 100), 0, 200); }); set("glow-blur", (input) => { item.glow.blur = clamp(toNumber(input.value, 0), 0, 100); }); set("glow-spread", (input) => { item.glow.spread = clamp(toNumber(input.value, 0), 0, 100); }); set("glow-opacity", (input) => { item.glow.opacity = clamp(toNumber(input.value, 1), 0, 1); }); set("glow-blend", (input) => { item.glow.blendMode = input.value as GlowStyle["blendMode"]; }, "change");
+    bindReliefInputs("text-relief", item.relief, set, setNumber);
   }
   if (item.type === "image") {
-    set("image-fit", (input) => { item.fitMode = input.value as FitMode; if (item.fitMode === "label-fill") { item.x = 0; item.y = 0; item.width = design.width; item.height = design.height; } }, "change"); setNumber("image-radius", (input) => { item.cornerRadius = Math.max(0, toNumber(input.value, 0)); }); setNumber("image-scale", (input) => { item.imageScale = Math.max(.01, toNumber(input.value, 100) / 100); }); setNumber("image-offset-x", (input) => { item.imageOffsetX = toNumber(input.value, 0); }); setNumber("image-offset-y", (input) => { item.imageOffsetY = toNumber(input.value, 0); });
+    set("image-fit", (input) => {
+      item.fitMode = input.value as FitMode;
+      if (item.fitMode === "label-fill") { item.x = 0; item.y = 0; item.width = design.width; item.height = design.height; }
+      clampImageOffset(item);
+    }, "change");
+    setNumber("image-radius", (input) => { item.cornerRadius = Math.max(0, toNumber(input.value, 0)); });
+    setNumber("image-scale", (input) => {
+      item.fitMode = "manual";
+      item.imageScale = Math.max(1, toNumber(input.value, 100) / 100);
+      clampImageOffset(item);
+    });
+    setNumber("image-offset-x", (input) => { item.imageOffsetX = toNumber(input.value, 0); clampImageOffset(item); });
+    setNumber("image-offset-y", (input) => { item.imageOffsetY = toNumber(input.value, 0); clampImageOffset(item); });
   }
 }
 
 function point(event: PointerEvent): { x: number; y: number } { const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * design.width / rect.width, y: (event.clientY - rect.top) * design.height / rect.height }; }
 function hitTest(x: number, y: number): DesignObject | undefined { return [...design.objects].reverse().find((item) => item.visible && !item.locked && x >= item.x && x <= item.x + item.width && y >= item.y && y <= item.y + item.height); }
+
+function pointerDoubleClick(event: MouseEvent): void {
+  if (activeTool !== "select" || inlineTextEditor) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * design.width / rect.width;
+  const y = (event.clientY - rect.top) * design.height / rect.height;
+  const hit = hitTest(x, y);
+  if (isText(hit)) {
+    selectedIds = new Set([hit.id]);
+    beginInlineTextEdit(hit);
+  }
+}
+
+function beginInlineTextEdit(item: TextObject): void {
+  cancelInlineTextEdit(false);
+  const stage = app.querySelector<HTMLDivElement>(".stage-wrap")!;
+  const editor = document.createElement("textarea");
+  editor.className = "inline-text-editor";
+  editor.value = item.text;
+  editor.setAttribute("aria-label", `Text für ${item.name} bearbeiten`);
+  editor.style.left = `${canvas.offsetLeft + item.x * scale}px`;
+  editor.style.top = `${canvas.offsetTop + item.y * scale}px`;
+  editor.style.width = `${Math.max(48, item.width * scale)}px`;
+  editor.style.height = `${Math.max(32, item.height * scale)}px`;
+  editor.style.font = `${item.fontWeight} ${Math.max(12, item.fontSize * scale)}px ${item.fontFamily}`;
+  editor.style.color = item.fill;
+  editor.style.textAlign = item.align;
+  editor.style.transform = `rotate(${item.rotation}deg)`;
+  editor.style.transformOrigin = "center";
+  stage.append(editor);
+  inlineTextEditor = editor;
+  inlineTextEditorId = item.id;
+  inlineTextOriginal = item.text;
+  editor.addEventListener("input", () => { item.text = editor.value; renderPreview(); });
+  editor.addEventListener("blur", () => commitInlineTextEdit());
+  editor.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") { event.preventDefault(); cancelInlineTextEdit(); }
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); editor.blur(); }
+  });
+  renderPreview();
+  editor.focus();
+  editor.select();
+}
+
+function commitInlineTextEdit(): void {
+  if (!inlineTextEditor) return;
+  const item = inlineTextEditorId ? getObject(inlineTextEditorId) : undefined;
+  if (isText(item)) item.text = inlineTextEditor.value;
+  inlineTextEditor.remove();
+  inlineTextEditor = undefined;
+  inlineTextEditorId = undefined;
+  inlineTextOriginal = undefined;
+  update();
+}
+
+function cancelInlineTextEdit(restore = true): void {
+  if (!inlineTextEditor) return;
+  const item = inlineTextEditorId ? getObject(inlineTextEditorId) : undefined;
+  if (restore && isText(item) && inlineTextOriginal !== undefined) item.text = inlineTextOriginal;
+  inlineTextEditor.remove();
+  inlineTextEditor = undefined;
+  inlineTextEditorId = undefined;
+  inlineTextOriginal = undefined;
+  update();
+}
 
 function pointerDown(event: PointerEvent): void {
   const pointValue = point(event);
@@ -702,11 +925,16 @@ function pointerDown(event: PointerEvent): void {
   }
   if (activeTool !== "select") { const item = createObject(activeTool, pointValue.x, pointValue.y); design.objects.push(item); selectedIds = new Set([item.id]); setTool("select"); update(); return; }
   if (!hit) { if (!event.shiftKey) selectedIds.clear(); marquee = { startX: pointValue.x, startY: pointValue.y, x: pointValue.x, y: pointValue.y }; canvas.setPointerCapture(event.pointerId); update(); return; }
+  if (event.shiftKey && selectedIds.size === 1 && selectedIds.has(hit.id) && hit.type === "image") {
+    drag = { mode: "image-content", startX: pointValue.x, startY: pointValue.y, imageId: hit.id, offsetX: hit.imageOffsetX, offsetY: hit.imageOffsetY, moved: false, deselectOnClick: false };
+    canvas.setPointerCapture(event.pointerId);
+    return;
+  }
   if (event.shiftKey) { if (selectedIds.has(hit.id)) selectedIds.delete(hit.id); else selectedIds.add(hit.id); update(); return; }
   const deselectOnClick = selectedIds.size === 1 && selectedIds.has(hit.id);
   if (!selectedIds.has(hit.id)) selectedIds = new Set([hit.id]);
   const origins = new Map(selectedObjects().filter((item) => !item.locked).map((item) => [item.id, { x: item.x, y: item.y }]));
-  drag = { startX: pointValue.x, startY: pointValue.y, origins, moved: false, deselectOnClick }; canvas.setPointerCapture(event.pointerId); update();
+  drag = { mode: "objects", startX: pointValue.x, startY: pointValue.y, origins, moved: false, deselectOnClick }; canvas.setPointerCapture(event.pointerId); update();
 }
 
 function pointerMove(event: PointerEvent): void {
@@ -716,7 +944,18 @@ function pointerMove(event: PointerEvent): void {
   const dx = pointValue.x - drag.startX, dy = pointValue.y - drag.startY;
   if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
   drag.moved = true;
-  drag.origins.forEach((origin, id) => { const item = getObject(id); if (item) { item.x = clamp(origin.x + dx, 0, design.width - item.width); item.y = clamp(origin.y + dy, 0, design.height - item.height); } });
+  if (drag.mode === "image-content") {
+    const item = getObject(drag.imageId);
+    if (item?.type === "image") {
+      item.fitMode = "manual";
+      item.imageScale = Math.max(1, item.imageScale);
+      item.imageOffsetX = drag.offsetX + dx;
+      item.imageOffsetY = drag.offsetY + dy;
+      clampImageOffset(item);
+    }
+  } else {
+    drag.origins.forEach((origin, id) => { const item = getObject(id); if (item) { item.x = clamp(origin.x + dx, 0, design.width - item.width); item.y = clamp(origin.y + dy, 0, design.height - item.height); } });
+  }
   update();
 }
 
@@ -725,7 +964,8 @@ function pointerUp(): void {
     const x1 = Math.min(marquee.startX, marquee.x), x2 = Math.max(marquee.startX, marquee.x), y1 = Math.min(marquee.startY, marquee.y), y2 = Math.max(marquee.startY, marquee.y);
     design.objects.filter((item) => item.visible && !item.locked && item.x < x2 && item.x + item.width > x1 && item.y < y2 && item.y + item.height > y1).forEach((item) => selectedIds.add(item.id));
   }
-  if (drag?.deselectOnClick && !drag.moved) selectedIds.clear();
+  if (drag?.mode === "image-content" && !drag.moved) selectedIds.delete(drag.imageId);
+  else if (drag?.deselectOnClick && !drag.moved) selectedIds.clear();
   drag = undefined; marquee = undefined; update();
 }
 
@@ -739,12 +979,56 @@ function selectFromLayer(id: string, additive: boolean): void { if (!additive) s
 function deleteSelection(): void { if (!selectedIds.size) return; design.objects = design.objects.filter((item) => !selectedIds.has(item.id)); selectedIds.clear(); update(); }
 function duplicateSelection(): void { const copies = selectedObjects().map((item) => { const copy = structuredClone(item); copy.id = uid(); copy.name += " Kopie"; copy.x += 24; copy.y += 24; return copy; }); design.objects.push(...copies); selectedIds = new Set(copies.map((item) => item.id)); update(); }
 function moveLayer(action: "back" | "down" | "up" | "front"): void {
-  const selected = design.objects.filter((item) => selectedIds.has(item.id)); const other = design.objects.filter((item) => !selectedIds.has(item.id));
+  const selected = design.objects.filter((item) => selectedIds.has(item.id));
+  const other = design.objects.filter((item) => !selectedIds.has(item.id));
   if (!selected.length) return;
-  if (action === "front") design.objects = [...other, ...selected];
-  else if (action === "back") design.objects = [...selected, ...other];
-  else if (action === "up") for (let index = design.objects.length - 2; index >= 0; index--) if (selectedIds.has(design.objects[index].id) && !selectedIds.has(design.objects[index + 1].id)) [design.objects[index], design.objects[index + 1]] = [design.objects[index + 1], design.objects[index]];
-  else for (let index = 1; index < design.objects.length; index++) if (selectedIds.has(design.objects[index].id) && !selectedIds.has(design.objects[index - 1].id)) [design.objects[index], design.objects[index - 1]] = [design.objects[index - 1], design.objects[index]];
+
+  if (action === "front") {
+    design.objects = [...other, ...selected];
+  } else if (action === "back") {
+    design.objects = [...selected, ...other];
+  } else if (action === "up") {
+    // Jede zusammenhängende Auswahlgruppe überquert genau die direkt darüberliegende Ebene.
+    const reordered: DesignObject[] = [];
+    for (let index = 0; index < design.objects.length;) {
+      const item = design.objects[index];
+      if (!selectedIds.has(item.id)) {
+        reordered.push(item);
+        index++;
+        continue;
+      }
+
+      const start = index;
+      while (index < design.objects.length && selectedIds.has(design.objects[index].id)) index++;
+      const selectionBlock = design.objects.slice(start, index);
+      const next = design.objects[index];
+      if (next && !selectedIds.has(next.id)) {
+        reordered.push(next, ...selectionBlock);
+        index++;
+      } else {
+        reordered.push(...selectionBlock);
+      }
+    }
+    design.objects = reordered;
+  } else {
+    // Analog nach hinten: jede Auswahlgruppe überquert genau die direkt darunterliegende Ebene.
+    const reordered: DesignObject[] = [];
+    for (let index = 0; index < design.objects.length;) {
+      const item = design.objects[index];
+      const next = design.objects[index + 1];
+      if (!selectedIds.has(item.id) && next && selectedIds.has(next.id)) {
+        const start = index + 1;
+        index = start;
+        while (index < design.objects.length && selectedIds.has(design.objects[index].id)) index++;
+        reordered.push(...design.objects.slice(start, index), item);
+      } else {
+        reordered.push(item);
+        index++;
+      }
+    }
+    design.objects = reordered;
+  }
+
   update();
 }
 function fitLabelImages(): void { design.objects.forEach((item) => { if (item.type === "image" && item.fitMode === "label-fill") { item.x = 0; item.y = 0; item.width = design.width; item.height = design.height; } }); }
@@ -783,9 +1067,37 @@ function resetDesign(): void {
   design.objects = []; design.name = "Neues Label"; design.backgroundA = "#18365d"; design.backgroundB = "#45b7c5"; design.texture = "none"; selectedIds.clear(); update();
 }
 function download(name: string, blob: Blob): void { const url = URL.createObjectURL(blob), anchor = document.createElement("a"); anchor.href = url; anchor.download = name; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
+function createPngBlob(): Promise<Blob> {
+  const output = document.createElement("canvas");
+  output.width = design.width;
+  output.height = design.height;
+  renderCanvas(output.getContext("2d")!, design, false);
+  return new Promise((resolve, reject) => output.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG konnte nicht erzeugt werden.")), "image/png"));
+}
+async function exportPngSaveAs(): Promise<void> {
+  const picker = (window as Window & {
+    showSaveFilePicker?: (options: { suggestedName: string; types: { description: string; accept: Record<string, string[]> }[] }) => Promise<{ createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }> }>;
+  }).showSaveFilePicker;
+  if (!picker) {
+    showToast("Dieser Browser unterstützt keinen Speichern-unter-Dialog. Nutze „PNG exportieren“ für den Direktdownload.", true);
+    return;
+  }
+  try {
+    const handle = await picker({ suggestedName: `${fileName(design.name)}.png`, types: [{ description: "PNG-Bild", accept: { "image/png": [".png"] } }] });
+    const writable = await handle.createWritable();
+    await writable.write(await createPngBlob());
+    await writable.close();
+    showToast(`PNG ${design.width} × ${design.height} gespeichert.`);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return;
+    showToast(error instanceof Error ? error.message : "PNG konnte nicht gespeichert werden.", true);
+  }
+}
 function exportPng(): void {
-  const output = document.createElement("canvas"); output.width = design.width; output.height = design.height; renderCanvas(output.getContext("2d")!, design, false);
-  output.toBlob((blob) => { if (blob) { download(`${fileName(design.name)}.png`, blob); showToast(`PNG ${design.width} × ${design.height} exportiert.`); } }, "image/png");
+  void createPngBlob().then((blob) => {
+    download(`${fileName(design.name)}.png`, blob);
+    showToast(`PNG ${design.width} × ${design.height} exportiert.`);
+  }).catch((error: unknown) => showToast(error instanceof Error ? error.message : "PNG konnte nicht erzeugt werden.", true));
 }
 function exportJson(): void { download(`${fileName(design.name)}.json`, new Blob([JSON.stringify(design, null, 2)], { type: "application/json" })); showToast("Entwurf als JSON gespeichert."); }
 async function importJson(): Promise<void> {
@@ -803,7 +1115,7 @@ function migrate(input: Partial<Design>): Design {
   const height = clamp(Number.isFinite(draft.height) ? draft.height : 848, 100, 5000);
   return {
     ...draft,
-    schemaVersion: 4,
+    schemaVersion: 5,
     physicalUnit: draft.physicalUnit === "cm" ? "cm" : "mm",
     numberFormat: draft.numberFormat === "en-US" ? "en-US" : "de-DE",
     dpi,
@@ -811,11 +1123,12 @@ function migrate(input: Partial<Design>): Design {
     height,
     widthCm: roundCentimeters(Number.isFinite(draft.widthCm) ? draft.widthCm : pixelsToCentimeters(width, dpi)),
     heightCm: roundCentimeters(Number.isFinite(draft.heightCm) ? draft.heightCm : pixelsToCentimeters(height, dpi)),
+    borderRelief: { ...defaultRelief(), ...(draft.borderRelief ?? {}) },
     objects: draft.objects.map((item) => {
       const base = { ...item, visible: item.visible ?? true, locked: item.locked ?? false };
       if (base.type === "text") {
-        const text = base as TextObject & { glow?: boolean | GlowStyle };
-        return { ...text, glow: typeof text.glow === "object" ? text.glow : { enabled: Boolean(text.glow), color: text.fill, intensity: 100, blur: 22, spread: 3, opacity: 1, blendMode: "screen" } };
+        const text = base as TextObject & { glow?: boolean | GlowStyle; relief?: Partial<ReliefStyle> };
+        return { ...text, glow: typeof text.glow === "object" ? text.glow : { enabled: Boolean(text.glow), color: text.fill, intensity: 100, blur: 22, spread: 3, opacity: 1, blendMode: "screen" }, relief: { ...defaultRelief(), ...(text.relief ?? {}) } };
       }
       return base;
     }),

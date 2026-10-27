@@ -44,6 +44,21 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 input, select, textarea { width: 100%; min-width: 0; padding: 7px 8px; color: #eff6ff; border: 1px solid #40516c; border-radius: 6px; outline: none; background: #111b2c; }
 input:focus, select:focus, textarea:focus { border-color: #72b9fb; box-shadow: 0 0 0 2px #27669955; }
 textarea { min-height: 58px; resize: vertical; }
+.inline-text-editor {
+  position: absolute;
+  z-index: 3;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  color: #ffffff;
+  border: 1px dashed #fbbf24;
+  border-radius: 2px;
+  outline: 2px solid #fbbf2488;
+  background: #0b1523cc;
+  line-height: 1;
+  resize: both;
+}
+.inline-text-editor:focus { border-color: #fff; box-shadow: 0 0 0 3px #fbbf2466; }
 input[type="color"] { height: 33px; padding: 2px; }
 input[type="range"] { padding: 0; accent-color: #71dacb; }
 .checkbox { display: flex; align-items: center; gap: 7px; margin-top: 9px; color: #bfccdd; font-size: 12px; }

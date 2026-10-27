@@ -567,6 +567,22 @@ Unterstützte Fit-Modi:
 
 Für den manuellen Modus werden Skalierung und Bildversatz getrennt von Größe und Position des Objektcontainers gespeichert.
 
+### 10.3 Manueller Bildausschnitt und direkte Manipulation
+
+Jedes Bildobjekt ist ein zuschneidender Container: Der Renderer clippt das Quellbild zwingend an dessen rechteckige bzw. abgerundete Objektkontur. Bildinhalt außerhalb dieser Kontur wird weder in der Vorschau noch im PNG-Export dargestellt.
+
+Für ein einzeln ausgewähltes Bildobjekt gilt:
+
+- **Ziehen ohne Modifikatortaste:** verschiebt das gesamte Bildobjekt auf dem Label.
+- **`Shift` + Ziehen:** verschiebt ausschließlich den Bildinhalt innerhalb des unveränderten Bildobjekts.
+- Die Bildskalierung wird über **Bild-Skalierung %** festgelegt. Eine Änderung aktiviert den manuellen Modus.
+- Im manuellen Modus entspricht `100 %` mindestens der Cover-Skalierung. Der sichtbare Objektbereich ist daher vollständig mit Bilddaten gefüllt.
+- Der Bildversatz wird in X- und Y-Richtung auf den Bereich begrenzt, in dem das Bild den gesamten Objektcontainer noch ausfüllt. Es dürfen durch Verschieben keine transparenten oder ungefüllten Randflächen sichtbar werden.
+- Bei `stretch` und `label-fill` ist kein interner Bildversatz möglich, weil der Inhalt den Container exakt ausfüllt.
+- `Shift`-Klick ohne relevante Zeigerbewegung behält die bestehende Mehrfachauswahl-Semantik bei; die interne Bildverschiebung beginnt erst bei einer Drag-Bewegung oberhalb der üblichen Bewegungsschwelle.
+
+Die Eigenschaftenleiste dokumentiert die Geste direkt am Bildobjekt. Skalierung und Versatz bleiben nicht-destruktiv im JSON-Entwurf gespeichert.
+
 ---
 
 ## 11. Ebenen und Anordnung
@@ -1229,6 +1245,8 @@ Zusätzlich zu Abschnitt 18 gelten folgende Kriterien:
 5. Ein Nutzer kann mehrere Objekte mit `Shift` und per Auswahlrahmen selektieren und gemeinsam verschieben.
 6. Ein Nutzer kann die Neon-Intensität, Unschärfe, Ausbreitung und Deckkraft sichtbar verändern.
 7. Ein Nutzer kann per Pipette einen Textstil aufnehmen und mit dem Stilpinsel auf mindestens ein anderes Textobjekt übertragen, ohne dessen Textinhalt zu verändern.
+8. Ein Nutzer kann ein einzeln ausgewähltes, vergrößertes Bildobjekt mit `Shift` + Drag innerhalb seines Containers verschieben, ohne die Position des Bildobjekts auf dem Label zu ändern.
+9. Beim internen Verschieben eines Bildes bleiben alle Kanten des Bildobjekts vollständig mit Bilddaten gefüllt; Vorschau und PNG-Export schneiden identisch zu.
 
 ---
 
@@ -1261,6 +1279,7 @@ Die rechte Eigenschaftenleiste und die Designfläche sind eigenständige Viewpor
 Die Designfläche ist ein separat scrollbarerer Workspace mit folgenden Regeln:
 
 - Die Zoom-Steuerung bestimmt die sichtbare CSS-Größe der Canvas und begrenzt sie nicht auf die Breite des Viewports.
+- Die Zoomsteuerung arbeitet in Schritten von `5 %` und erlaubt eine Zoomspanne von `15 %` bis einschließlich `300 %`.
 - Passt das gezoomte Label nicht in den Darstellungsbereich, erscheinen horizontale und/oder vertikale Scrollbalken ausschließlich innerhalb der Designfläche.
 - Bei einer kleineren Darstellung bleibt das Label innerhalb der verfügbaren Arbeitsfläche zentriert.
 - Bei einer größeren Darstellung ist jeder Bereich des Labels durch Scrollen erreichbar.
@@ -1319,6 +1338,185 @@ Zentimeter = Pixel / DPI × 2,54
 14. Eine Änderung von `300 DPI` auf `600 DPI` verdoppelt die Pixelmaße bei unveränderten Zentimetermaßen und erhält das Layout proportional.
 15. Eine Änderung der Pixelbreite oder -höhe aktualisiert das zugehörige Zentimetermaß korrekt.
 16. Geladene ältere JSON-Dateien erhalten automatisch aus Pixelmaßen und DPI berechnete Zentimetermaße.
+
+### 23.9 Eingabepräzision und Rundung
+
+Physische und pixelbasierte Eingaben müssen verständlich, stabil und frei von sichtbaren Fließkommaartefakten dargestellt werden. Für die persistierten und gerenderten Werte gelten folgende Regeln:
+
+| Wertart | Einheit | Maximale Präzision |
+|---|---|---:|
+| physische Labelgröße | Millimeter | 1 Nachkommastelle |
+| physische Labelgröße | Zentimeter | 2 Nachkommastellen |
+| Canvas- und Objektmaße | Pixel | ganze Zahl |
+| Objektpositionen und Linienendpunkte | Pixel | ganze Zahl |
+| Eckenradien, Rahmen- und Konturstärken | Pixel | 1 Nachkommastelle |
+| Schriftgröße, Drehung, Bildskalierung und Bildversatz | Pixel bzw. Grad | 1 Nachkommastelle |
+| Glow-Unschärfe und Glow-Ausbreitung | Pixel | 1 Nachkommastelle |
+
+- Die Anwendung rundet vor dem Rendern und vor dem JSON-Export auf die jeweilige Präzision.
+- Die Anzeige verwendet das eingestellte Zahlenformat (`de-DE` oder `en-US`) und darf keine technischen Skalierungsartefakte wie lange Dezimalfolgen zeigen.
+- Millimeterwerte entsprechen intern weiterhin den in Abschnitt 23.6 definierten Zentimeter- und DPI-Umrechnungen.
+- Ganzzahlige Pixelmaße sind für Canvas und PNG-Export verpflichtend.
+
+### 23.10 Konfigurierbare Label-Formate und Startwerte
+
+Label-Standardformate werden nicht im Anwendungscode gepflegt, sondern über eine öffentliche JSON-Konfiguration geladen. Die Standarddatei lautet:
+
+```text
+tools/tag-designer/public/label-formats.json
+```
+
+Sie wird beim Start unter `/label-formats.json` geladen und bei einem Vite-Produktions-Build unverändert in das Ausgabeverzeichnis übernommen.
+
+```json
+{
+  "default": {
+    "formatId": "lost-found",
+    "dpi": 300,
+    "physicalUnit": "mm",
+    "numberFormat": "de-DE",
+    "cornerRadiusPx": 42
+  },
+  "formats": [
+    {
+      "id": "L4778-8",
+      "name": "L4778-8",
+      "widthMm": 45.7,
+      "heightMm": 21.2
+    },
+    {
+      "id": "L4773-8",
+      "name": "L4773-8",
+      "widthMm": 63.5,
+      "heightMm": 33.9
+    }
+  ]
+}
+```
+
+Die Konfiguration enthält:
+
+- `default.formatId`: ID des beim Start verwendeten Formats;
+- `default.dpi`: Startauflösung im Bereich `72–1200`;
+- `default.physicalUnit`: `"mm"` oder `"cm"`;
+- `default.numberFormat`: `"de-DE"` oder `"en-US"`;
+- `default.cornerRadiusPx`: Startwert des Label-Eckenradius in Pixeln;
+- `formats`: Liste editierbarer Formatvorlagen mit eindeutiger `id`, Anzeigename `name`, `widthMm` und `heightMm`.
+
+Das Eigenschaftenpanel stellt die Formate in einer Auswahl **Label-Format** bereit. Die Auswahl eines Formats:
+
+1. übernimmt dessen physische Breite und Höhe;
+2. berechnet bei der aktuellen DPI die Pixelmaße neu;
+3. skaliert den bestehenden Entwurf gemäß Abschnitt 23.7 proportional.
+
+Bearbeitet ein Nutzer danach physische Maße oder Pixelmaße direkt, wechselt die Auswahl auf **Benutzerdefiniert**.
+
+Ist die Konfiguration nicht erreichbar oder ungültig, startet die Anwendung mit einer eingebauten Standardkonfiguration weiter. Dadurch bleibt der lokale Designer auch bei einer fehlerhaften Bereitstellung der JSON-Datei bedienbar.
+
+### 23.11 Ergänzte Akzeptanzkriterien für Formate, Präzision und Zoom
+
+17. Der Nutzer kann bis auf `300 %` zoomen und jeden Bereich eines übergroßen Labels innerhalb der Designfläche erreichen.
+18. Die Oberfläche zeigt Millimeter mit höchstens einer und Zentimeter mit höchstens zwei Nachkommastellen; Pixelmaße und Objektpositionen werden ganzzahlig angezeigt.
+19. Die Datei `label-formats.json` kann ohne Anpassung des TypeScript-Codes um weitere Formate ergänzt werden.
+20. Das beim Start gewählte Standardformat, DPI, Maßeinheit, Zahlenformat und Eckenradius werden aus der JSON-Konfiguration übernommen.
+21. Die Formatauswahl enthält mindestens `L4778-8: 45,7 × 21,2 mm` sowie `L4773-8: 63,5 × 33,9 mm` und übernimmt die jeweiligen Abmessungen.
+22. Bei ungültiger oder nicht verfügbarer Formatkonfiguration bleibt der Designer mit einer eingebauten Standardkonfiguration funktionsfähig.
+
+### 23.12 3D-Relief für Texte und Labelrand
+
+Textobjekte und der Labelrand unterstützen einen nicht-destruktiven 3D-Reliefeffekt. Für beide Einsatzbereiche stehen die Modi **Aus**, **Erhaben** und **Vertieft** zur Verfügung.
+
+Ein Relief besitzt die folgenden editierbaren Werte:
+
+| Eigenschaft | Bereich | Bedeutung |
+|---|---:|---|
+| Modus | Aus, Erhaben, Vertieft | aktiviert den Effekt und bestimmt die Kantenführung |
+| Tiefe | `0–100 px` | räumliche Stärke des Reliefs |
+| Lichtrichtung | `0–359,9°` | Richtung der hervorgehobenen Kante |
+| Weichheit | `0–50 px` | Unschärfe der Licht- und Schattenkante |
+| Stärke | `0–100 %` | Deckkraft des Reliefs |
+| Lichtfarbe | Farbe | Farbe der hervorgehobenen Kante |
+| Schattenfarbe | Farbe | Farbe der Schattenkante |
+
+**Textrelief:**
+
+- Bei **Erhaben** zeichnet der Renderer eine helle Kante in Lichtrichtung und eine dunkle Gegenkante. Der Text wirkt dadurch aufgelegt oder geprägt.
+- Bei **Vertieft** wird die Kantenrichtung umgekehrt, sodass der Text in die Hintergrundoberfläche eingelassen wirkt.
+- Das Relief wird nach Glow, jedoch vor optionalem Schlagschatten, Textkontur und Textfüllung gerendert. Dadurch bleiben Füllung, Kontur und bestehende Texteffekte sichtbar.
+- Stil-Pipette und Stilpinsel übernehmen den vollständigen Reliefstil zusammen mit dem übrigen Textstil.
+
+**Randrelief:**
+
+- Bei **Erhaben** ergänzt der Renderer den bestehenden Rand um Licht- und Schattenkanten, die einen aufgesetzten Rahmen erzeugen.
+- Bei **Vertieft** werden die Kanten umgekehrt gerendert und erzeugen den Eindruck einer eingelassenen Rille.
+- Das Relief folgt stets dem Label-Eckenradius.
+- Die nutzbare Tiefe ist auf weniger als die halbe Randbreite begrenzt, damit der Effekt nicht über die Randfläche hinausläuft.
+- Die bestehende Randfüllung wird nach dem Relief gerendert und bleibt als sichtbare Hauptoberfläche erhalten.
+
+Reliefwerte werden mit maximal einer Nachkommastelle gespeichert. Bei einer DPI- oder Formatänderung skalieren Tiefe und Weichheit proportional zum Entwurf. Ältere JSON-Dateien erhalten für Text und Rand den sicheren Standardmodus `Aus`.
+
+### 23.13 Datenmodell-Ergänzung für 3D-Relief
+
+```ts
+type ReliefMode = "none" | "raised" | "inset";
+
+interface ReliefStyle {
+  mode: ReliefMode;
+  depth: number;
+  angle: number;
+  softness: number;
+  strength: number;
+  highlightColor: string;
+  shadowColor: string;
+}
+
+interface TextObject extends ObjectBase {
+  relief: ReliefStyle;
+}
+
+interface LabelDesignDocument {
+  schemaVersion: 5;
+  borderRelief: ReliefStyle;
+}
+```
+
+### 23.14 Ergänzte Akzeptanzkriterien für 3D-Relief
+
+23. Der Nutzer kann für jedes Textobjekt zwischen deaktiviertem, erhabenem und vertieftem Relief wählen und Tiefe, Lichtrichtung, Weichheit, Stärke sowie Licht- und Schattenfarbe festlegen.
+24. Ein erhabener Text zeigt bei gleicher Konfiguration eine helle und eine dunkle Kante in entgegengesetzter Richtung; beim vertieften Text ist diese Kantenführung umgekehrt.
+25. Der Labelrand kann unabhängig vom Text mit erhabenem oder vertieftem Relief versehen werden und zeigt an abgerundeten Ecken keine sichtbaren Unterbrechungen.
+26. Die Reliefdarstellung der Editorvorschau und des PNG-Exports ist identisch.
+27. Bei einem Export und erneuten Laden eines Entwurfs bleiben alle Reliefwerte erhalten; ältere Entwürfe ohne Reliefwerte bleiben weiterhin ladbar und verwenden den Modus `Aus`.
+28. Bei Format- oder DPI-Änderungen bleiben Tiefe und Weichheit des Reliefs proportional zur Labelgröße erhalten.
+
+### 23.15 Textbearbeitung und Dateiauswahl beim PNG-Export
+
+Die Bearbeitung des Eigenschaftenfelds **Textinhalt** darf das Eigenschaftenpanel während der Tastatureingabe nicht neu erzeugen. Jeder eingegebene Text wird unmittelbar auf der Canvas-Vorschau dargestellt; Fokus, Cursorposition und mehrzeiliger Inhalt des Eingabefelds bleiben dabei erhalten. Ein vollständiges Panel-Update erfolgt erst beim Verlassen bzw. Bestätigen des Felds.
+
+Zusätzlich ist eine direkte Bearbeitung auf der Designfläche verfügbar:
+
+- Doppelklick auf ein Textobjekt öffnet einen über dem Objekt positionierten Texteditor.
+- Bei einem einzeln ausgewählten Textobjekt öffnet `Enter` denselben Editor.
+- Der Editor übernimmt Schriftfamilie, Schriftgröße, Farbe, Ausrichtung, Rotation sowie die sichtbare Objektgröße.
+- Während der Eingabe wird die Vorschau unmittelbar aktualisiert.
+- `Strg`/`Cmd` + `Enter` oder ein Fokusverlust übernimmt den Text.
+- `Esc` verwirft alle Änderungen dieser Inline-Bearbeitung und stellt den ursprünglichen Text wieder her.
+- Editorhilfen sind nur Teil der Bearbeitungsoberfläche und werden niemals mit dem PNG exportiert.
+
+Der PNG-Export bietet zwei gleichwertige Wege mit identischer Canvas-Renderpipeline:
+
+1. **PNG exportieren:** direkter Browserdownload mit aus dem Entwurfsnamen abgeleitetem Dateinamen.
+2. **PNG speichern unter:** nutzt in unterstützten Chromium-basierten Browsern die File System Access API und öffnet einen nativen Dialog zur Auswahl von Speicherort und Dateiname.
+
+Wenn die File System Access API nicht verfügbar ist, zeigt die Anwendung einen verständlichen Hinweis und der direkte PNG-Download bleibt vollständig nutzbar. Bricht der Nutzer den Speichern-unter-Dialog ab, bleibt der Entwurf unverändert und es wird keine Fehlerbenachrichtigung angezeigt.
+
+### 23.16 Ergänzte Akzeptanzkriterien für Text und Export
+
+29. Text kann mehrzeilig im Eigenschaftenpanel eingegeben werden, ohne dass das Textfeld nach einem Zeichen seinen Fokus verliert.
+30. Doppelklick und `Enter` aktivieren die direkte Textbearbeitung für ein einzelnes Textobjekt.
+31. `Esc` verwirft eine aktive direkte Textbearbeitung; `Strg`/`Cmd` + `Enter` übernimmt sie.
+32. Beide PNG-Exportwege erzeugen dieselbe Pixelauflösung und enthalten keine Auswahl- oder Texteingabehilfen.
+33. In Chromium/Edge kann der Nutzer über „PNG speichern unter“ Namen und Speicherort wählen; in nicht unterstützten Browsern bleibt der Standarddownload verfügbar.
 
 ---
 
