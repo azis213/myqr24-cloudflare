@@ -4,11 +4,15 @@ import {
   now,
   parseLabelTemplateExport,
   type GeneratedTag,
+  type LabelImageElement,
   type LabelTemplate,
   type PositionedElement,
+  type RichTextDocument,
+  type RichTextRun,
   type TagGeneratorConfiguration,
   validateTemplate,
 } from "./domain";
+import { richTextToRtf, rtfToRichText } from "./rich-text-rtf";
 
 export interface LabelDesignerContext {
   app: HTMLDivElement;
@@ -33,9 +37,11 @@ let escapeHtml: (value: string) => string;
 let download: (name: string, content: string | Blob) => void;
 let readFile: (input: HTMLInputElement) => Promise<string | undefined>;
 let editorZoom = 100;
+let richTextMode: "wysiwyg" | "rtf" = "wysiwyg";
+let rtfSource = "";
 let dragState:
   | {
-      element: "qr" | "text" | "tagIdText";
+      element: "qr" | "image" | "text" | "tagIdText";
       startX: number;
       startY: number;
       originX: number;
@@ -70,6 +76,10 @@ function parseLayoutNumber(input: string): number {
   return Number(input);
 }
 
+function imageStyle(image: LabelImageElement, scale: number): string {
+  const size = image.fitMode === "cover" ? "cover" : image.fitMode === "contain" ? "contain" : image.fitMode === "stretch" ? "100% 100%" : `${image.scale}% auto`;
+  return `left:${image.xMm * scale}px;top:${image.yMm * scale}px;width:${image.widthMm * scale}px;height:${image.heightMm * scale}px;opacity:${image.opacity};background-image:url('${image.dataUrl}');background-size:${size};background-position:${image.offsetXPercent}% ${image.offsetYPercent}%;background-repeat:no-repeat;overflow:hidden;`;
+}
 function renderTemplates(): void {
   const template = selectedTemplate();
   const layoutState = validateTemplate(template);
@@ -79,6 +89,7 @@ function renderTemplates(): void {
   const backgroundImageStyle = template.backgroundImage?.visible
     ? `left:${template.backgroundImage.xMm * labelScale}px;top:${template.backgroundImage.yMm * labelScale}px;width:${template.backgroundImage.widthMm * labelScale}px;height:${template.backgroundImage.heightMm * labelScale}px;opacity:${template.backgroundImage.opacity};background-image:url('${template.backgroundImage.dataUrl}');`
     : "";
+  const imageElementStyle = template.elements.image?.visible ? imageStyle(template.elements.image, labelScale) : "";
   renderTemplateShell(`
     <section class="grid template-layout">
       <article class="card"><div class="card-heading"><div><p class="eyebrow">VORLAGENEIGENSCHAFTEN</p><h2>DIN A4 Raster</h2></div><span class="status ${layoutState.ok ? "success" : "error"}">${layoutState.ok ? "druckbar" : "prüfen"}</span></div>
@@ -116,15 +127,17 @@ function renderTemplates(): void {
         <div class="label-stage-viewport">
           <div class="label-stage" id="label-stage" style="${labelStyle}">
             ${backgroundImageStyle ? `<div class="editor-background-image" style="${backgroundImageStyle}"></div>` : ""}
+            ${imageElementStyle ? `<div class="editable-element image-element" data-element="image" style="${imageElementStyle}"></div>` : ""}
             <div class="editable-element qr-element" data-element="qr" style="left:${template.elements.qr.xMm * labelScale}px;top:${template.elements.qr.yMm * labelScale}px;width:${template.elements.qr.widthMm * labelScale}px;height:${template.elements.qr.heightMm * labelScale}px;border-width:${template.elements.qr.borderWidthMm * labelScale}px;border-color:${template.elements.qr.borderColor};">QR</div>
-            ${template.elements.text.visible ? `<div class="editable-element text-element" data-element="text" style="${editorTextStyle(template.elements.text, labelScale)}">${escapeHtml(generatedTags[0]?.labelText || "Etikettentext")}</div>` : ""}
+            ${template.elements.text.visible ? `<div class="editable-element text-element rich-text-preview" data-element="text" style="${editorTextStyle(template.elements.text, labelScale)}">${renderRichText(template.elements.text.content, escapeHtml)}</div>` : ""}
             ${template.elements.tagIdText.visible ? `<div class="editable-element tag-id-element" data-element="tagIdText" style="${editorTextStyle(template.elements.tagIdText, labelScale)}">${escapeHtml(generatedTags[0]?.tagId || "TAG-ID")}</div>` : ""}
           </div>
         </div>
         <div class="element-fields">
           <section class="element-config"><h3>QR-Code</h3>${elementFields("qr", template.elements.qr)}${qrAppearanceFields(template)}</section>
           <section class="element-config"><h3>Hintergrundbild</h3>${backgroundImageFields(template)}</section>
-          <section class="element-config"><h3>Freies Textfeld</h3>${elementFields("text", template.elements.text)}${textAppearanceFields("text", template.elements.text)}</section>
+          <section class="element-config"><h3>Bildfeld</h3>${imageElementFields(template)}</section>
+          <section class="element-config"><h3>Freies Textfeld</h3>${elementFields("text", template.elements.text)}${richTextEditor(template.elements.text.content)}${textAppearanceFields("text", template.elements.text)}</section>
           <section class="element-config"><h3>Lesbare TAG-ID</h3>${elementFields("tagIdText", template.elements.tagIdText)}${textAppearanceFields("tagIdText", template.elements.tagIdText)}</section>
         </div>
         <p class="hint editor-hint">Größe und Position werden in Millimetern gespeichert. QR-Code bleibt quadratisch.</p>
@@ -183,8 +196,10 @@ function renderTemplates(): void {
   });
   bindColorControls(template);
   bindBackgroundImageFields(template);
+  bindImageElementFields(template);
   bindElementFields(template);
   bindTextAppearanceFields(template);
+  bindRichTextEditor(template);
   bindDrag(template, labelScale);
 }
 
@@ -210,7 +225,158 @@ function hexWithAlpha(hex: string, opacity: number): string {
   return `${hex}${alpha}`;
 }
 
-function elementFields(kind: "qr" | "text" | "tagIdText", element: { xMm: number; yMm: number; widthMm: number; heightMm: number }): string {
+export function renderRichText(document: RichTextDocument, escape: (value: string) => string): string {
+  return document.paragraphs.map((paragraph) => {
+    const runs = paragraph.runs.map((run) => {
+      const styles = [
+        run.color ? `color:${run.color}` : "",
+        run.backgroundColor ? `background-color:${run.backgroundColor}` : "",
+        run.underline ? "text-decoration:underline" : "",
+        run.fontFamily ? `font-family:${cssFontFamily(run.fontFamily)}` : "",
+        run.fontSizePt ? `font-size:${run.fontSizePt}pt` : "",
+      ].filter(Boolean).join(";");
+      let value = escape(run.text).replaceAll("\n", "<br>");
+      if (run.bold) value = `<strong>${value}</strong>`;
+      if (run.italic) value = `<em>${value}</em>`;
+      return `<span${styles ? ` style="${styles}"` : ""}>${value}</span>`;
+    }).join("");
+    return `<div class="rich-text-paragraph">${runs || "<br>"}</div>`;
+  }).join("");
+}
+
+function cssFontFamily(font: "helvetica" | "times-roman" | "courier"): string {
+  return font === "times-roman" ? "Times New Roman, serif" : font === "courier" ? "Courier New, monospace" : "Helvetica, Arial, sans-serif";
+}
+
+function richTextEditor(document: RichTextDocument): string {
+  if (!rtfSource) rtfSource = richTextToRtf(document, { fontFamily: "helvetica", fontSizePt: 9 });
+  return `<div class="rich-text-editor">
+    <div class="rich-text-heading"><p class="field-label">Formatierter Vorlagentext</p><div class="rich-text-mode" role="group" aria-label="Bearbeitungsmodus"><button class="${richTextMode === "wysiwyg" ? "primary" : "secondary"}" type="button" data-rich-mode="wysiwyg">WYSIWYG</button><button class="${richTextMode === "rtf" ? "primary" : "secondary"}" type="button" data-rich-mode="rtf">RTF</button></div></div>
+    <div class="rich-text-toolbar ${richTextMode === "rtf" ? "is-hidden" : ""}" role="toolbar" aria-label="Textformatierung">
+      <button class="secondary" type="button" data-rich-command="bold" title="Fett"><strong>F</strong></button>
+      <button class="secondary" type="button" data-rich-command="italic" title="Kursiv"><em>K</em></button>
+      <button class="secondary" type="button" data-rich-command="underline" title="Unterstreichen"><u>U</u></button>
+      <label>Schriftart<select data-rich-font-family><option value="helvetica">Helvetica</option><option value="times-roman">Times Roman</option><option value="courier">Courier</option></select></label>
+      <label>Größe<select data-rich-font-size>${[6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72].map((size) => `<option value="${size}">${size} pt</option>`).join("")}</select></label>
+      <label class="rich-color">Schriftfarbe<input type="color" value="#172033" data-rich-color="foreColor"></label>
+      <label class="rich-color">Markierung<input type="color" value="#fff3a3" data-rich-color="hiliteColor"></label>
+      <button class="secondary" type="button" data-rich-command="removeFormat">Format löschen</button>
+    </div>
+    <div id="rich-text-editor" class="rich-text-input ${richTextMode === "rtf" ? "is-hidden" : ""}" contenteditable="true" role="textbox" aria-multiline="true" spellcheck="true">${renderRichText(document, escapeHtml)}</div>
+    <textarea id="rich-text-rtf" class="rich-text-rtf ${richTextMode === "wysiwyg" ? "is-hidden" : ""}" spellcheck="false" aria-label="RTF-Quelltext">${escapeHtml(rtfSource)}</textarea>
+    <p class="hint">${richTextMode === "rtf" ? "Unterstützt werden Absätze, Zeilenumbrüche, Schriftfamilie, Größe, Fett, Kursiv, Unterstreichen, Schrift- und Markerfarben." : "Enter erstellt einen Absatz, Umschalt+Enter einen Zeilenumbruch. Markierten Text direkt über die Toolbar formatieren."}</p>
+  </div>`;
+}
+
+function normalizeColor(value: string | null): `#${string}` | undefined {
+  if (!value) return undefined;
+  const compact = value.trim().toLowerCase();
+  if (/^#[\da-f]{6}$/.test(compact)) return compact as `#${string}`;
+  const match = compact.match(/^rgb\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)$/);
+  if (!match) return undefined;
+  return `#${match.slice(1).map((entry) => Number(entry).toString(16).padStart(2, "0")).join("")}` as `#${string}`;
+}
+
+function richTextFromElement(editor: HTMLElement): RichTextDocument {
+  const paragraphs = Array.from(editor.childNodes).map((node) => {
+    const runs: RichTextRun[] = [];
+    const visit = (current: Node, format: Omit<RichTextRun, "text"> = {}): void => {
+      if (current.nodeType === Node.TEXT_NODE) {
+        if (current.textContent) runs.push({ text: current.textContent, ...format });
+        return;
+      }
+      if (!(current instanceof HTMLElement)) return;
+      if (current.tagName === "BR") {
+        runs.push({ text: "\n", ...format });
+        return;
+      }
+      const style = getComputedStyle(current);
+      const next = {
+        ...format,
+        ...(current.tagName === "STRONG" || current.tagName === "B" || Number(style.fontWeight) >= 600 ? { bold: true } : {}),
+        ...(current.tagName === "EM" || current.tagName === "I" || style.fontStyle === "italic" ? { italic: true } : {}),
+        ...(current.tagName === "U" || style.textDecorationLine.includes("underline") ? { underline: true } : {}),
+        ...(normalizeColor(style.color) ? { color: normalizeColor(style.color) } : {}),
+        ...(normalizeColor(style.backgroundColor) ? { backgroundColor: normalizeColor(style.backgroundColor) } : {}),
+        ...(style.fontFamily.includes("Times") ? { fontFamily: "times-roman" as const } : style.fontFamily.includes("Courier") ? { fontFamily: "courier" as const } : { fontFamily: "helvetica" as const }),
+        ...(Number.isFinite(Number.parseFloat(style.fontSize)) ? { fontSizePt: Math.max(4, Math.min(72, Math.round((Number.parseFloat(style.fontSize) * 72 / 96) * 2) / 2)) } : {}),
+      };
+      current.childNodes.forEach((child) => visit(child, next));
+    };
+    visit(node);
+    return { runs };
+  });
+  return { version: 1, paragraphs: paragraphs.length ? paragraphs : [{ runs: [] }] };
+}
+
+function bindRichTextEditor(template: LabelTemplate): void {
+  const editor = app.querySelector<HTMLElement>("#rich-text-editor");
+  const rtf = app.querySelector<HTMLTextAreaElement>("#rich-text-rtf");
+  const defaults = () => ({ fontFamily: template.elements.text.fontFamily, fontSizePt: template.elements.text.fontSizePt });
+
+  const sync = (): void => {
+    if (!editor) return;
+    template.elements.text.content = richTextFromElement(editor);
+    rtfSource = richTextToRtf(template.elements.text.content, defaults());
+    template.updatedAt = now();
+    const preview = app.querySelector<HTMLElement>(".rich-text-preview");
+    if (preview) preview.innerHTML = renderRichText(template.elements.text.content, escapeHtml);
+  };
+
+  editor?.addEventListener("input", sync);
+  app.querySelectorAll<HTMLButtonElement>("[data-rich-mode]").forEach((button) => button.addEventListener("click", () => {
+    const nextMode = button.dataset.richMode as "wysiwyg" | "rtf";
+    if (nextMode === "rtf") {
+      sync();
+      richTextMode = "rtf";
+      renderTemplates();
+      return;
+    }
+    const parsed = rtfToRichText(rtf?.value ?? rtfSource, defaults());
+    if (!parsed.ok) {
+      notice = parsed.errors.join(" ");
+      richTextMode = "rtf";
+      renderTemplates();
+      return;
+    }
+    template.elements.text.content = parsed.value;
+    rtfSource = richTextToRtf(parsed.value, defaults());
+    template.updatedAt = now();
+    richTextMode = "wysiwyg";
+    renderTemplates();
+  }));
+  app.querySelectorAll<HTMLButtonElement>("[data-rich-command]").forEach((button) => {
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("click", () => {
+      editor?.focus();
+      document.execCommand(button.dataset.richCommand!, false);
+      sync();
+    });
+  });
+  app.querySelectorAll<HTMLInputElement>("[data-rich-color]").forEach((input) => {
+    input.addEventListener("mousedown", (event) => event.stopPropagation());
+    input.addEventListener("input", () => {
+      editor?.focus();
+      document.execCommand(input.dataset.richColor!, false, input.value);
+      sync();
+    });
+  });
+  app.querySelector<HTMLSelectElement>("[data-rich-font-family]")?.addEventListener("change", (event) => {
+    editor?.focus();
+    document.execCommand("fontName", false, cssFontFamily((event.target as HTMLSelectElement).value as "helvetica" | "times-roman" | "courier"));
+    sync();
+  });
+  app.querySelector<HTMLSelectElement>("[data-rich-font-size]")?.addEventListener("change", (event) => {
+    editor?.focus();
+    document.execCommand("styleWithCSS", false, "true");
+    document.execCommand("fontSize", false, "7");
+    editor?.querySelectorAll<HTMLElement>("font[size='7'], span[style*='xxx-large']").forEach((node) => { node.style.fontSize = `${(event.target as HTMLSelectElement).value}pt`; });
+    sync();
+  });
+  rtf?.addEventListener("input", () => { rtfSource = rtf.value; });
+}
+
+function elementFields(kind: "qr" | "image" | "text" | "tagIdText", element: { xMm: number; yMm: number; widthMm: number; heightMm: number }): string {
   return `<div class="compact-form element-form">
     <label>X mm${numberControl(`position-${kind}-x`, element.xMm, { min: 0, step: 0.1, position: `${kind}:xMm` })}</label>
     <label>Y mm${numberControl(`position-${kind}-y`, element.yMm, { min: 0, step: 0.1, position: `${kind}:yMm` })}</label>
@@ -233,6 +399,19 @@ function backgroundImageFields(template: LabelTemplate): string {
   </div>`;
 }
 
+function imageElementFields(template: LabelTemplate): string {
+  const image = template.elements.image;
+  return `<div class="compact-form element-form">
+    <label class="checkbox-label"><input id="image-visible" type="checkbox" ${image?.visible ? "checked" : ""} ${image ? "" : "disabled"}> Bildfeld anzeigen</label>
+    <label>Lokales PNG/JPEG<input id="image-file" type="file" accept="image/png,image/jpeg"></label>
+    ${image ? `${elementFields("image", image)}
+    <label>Darstellung<select id="image-fit-mode"><option value="cover" ${image.fitMode === "cover" ? "selected" : ""}>Ausfüllen, proportional</option><option value="contain" ${image.fitMode === "contain" ? "selected" : ""}>Einpassen, proportional</option><option value="stretch" ${image.fitMode === "stretch" ? "selected" : ""}>Exakt einpassen</option><option value="manual" ${image.fitMode === "manual" ? "selected" : ""}>Manuell</option></select></label>
+    <label>Zoom %<input id="image-scale" type="number" min="10" max="400" step="1" value="${image.scale}"></label>
+    <label>Horizontal %<input id="image-offset-x" type="number" min="0" max="100" step="1" value="${image.offsetXPercent}"></label>
+    <label>Vertikal %<input id="image-offset-y" type="number" min="0" max="100" step="1" value="${image.offsetYPercent}"></label>` : `<p class="hint">Noch kein lokales Bild ausgewählt.</p>`}
+  </div>`;
+}
+
 function textAppearanceFields(
   kind: "text" | "tagIdText",
   element: LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"],
@@ -244,20 +423,21 @@ function textAppearanceFields(
     <label class="checkbox-label"><input type="checkbox" data-text-toggle="${kind}:background" ${element.background.enabled ? "checked" : ""}> Texthintergrund</label>
     <label>Hintergrundfarbe${colorControl(`text-${kind}-background-color`, element.background.color)}</label>
     <label>Transparenz %<input type="number" min="0" max="100" step="1" value="${Math.round(element.background.opacity * 100)}" data-text-opacity="${kind}"></label>
-    <label>Schriftart<select data-text-appearance="${kind}:fontFamily"><option value="helvetica" ${element.fontFamily === "helvetica" ? "selected" : ""}>Helvetica</option><option value="times-roman" ${element.fontFamily === "times-roman" ? "selected" : ""}>Times Roman</option><option value="courier" ${element.fontFamily === "courier" ? "selected" : ""}>Courier</option></select></label>
+    ${kind === "tagIdText" ? `<label>Schriftart<select data-text-appearance="${kind}:fontFamily"><option value="helvetica" ${element.fontFamily === "helvetica" ? "selected" : ""}>Helvetica</option><option value="times-roman" ${element.fontFamily === "times-roman" ? "selected" : ""}>Times Roman</option><option value="courier" ${element.fontFamily === "courier" ? "selected" : ""}>Courier</option></select></label>
     <label>Schriftgröße pt${numberControl(`text-${kind}-font-size`, element.fontSizePt, { min: 4, step: 0.5, position: `${kind}:fontSizePt` })}</label>
-    <label>Schrifttyp<select data-text-appearance="${kind}:fontStyle"><option value="normal" ${element.fontStyle === "normal" ? "selected" : ""}>Normal</option><option value="bold" ${element.fontStyle === "bold" ? "selected" : ""}>Fett</option><option value="italic" ${element.fontStyle === "italic" ? "selected" : ""}>Kursiv</option><option value="bold-italic" ${element.fontStyle === "bold-italic" ? "selected" : ""}>Fett kursiv</option></select></label>
+    <label>Schrifttyp<select data-text-appearance="${kind}:fontStyle"><option value="normal" ${element.fontStyle === "normal" ? "selected" : ""}>Normal</option><option value="bold" ${element.fontStyle === "bold" ? "selected" : ""}>Fett</option><option value="italic" ${element.fontStyle === "italic" ? "selected" : ""}>Kursiv</option><option value="bold-italic" ${element.fontStyle === "bold-italic" ? "selected" : ""}>Fett kursiv</option></select></label>` : ""}
   </div>`;
 }
 
 function bindElementFields(template: LabelTemplate): void {
   app.querySelectorAll<HTMLInputElement>("[data-position]").forEach((input) => input.addEventListener("change", () => {
     const [kind, property] = input.dataset.position!.split(":") as [
-      "qr" | "text" | "tagIdText",
+      "qr" | "image" | "text" | "tagIdText",
       keyof PositionedElement,
     ];
-    const element: PositionedElement =
-      kind === "qr" ? template.elements.qr : kind === "text" ? template.elements.text : template.elements.tagIdText;
+    const element: PositionedElement | undefined =
+      kind === "qr" ? template.elements.qr : kind === "image" ? template.elements.image : kind === "text" ? template.elements.text : template.elements.tagIdText;
+    if (!element) return;
     element[property] = parseLayoutNumber(input.value);
     if (kind === "qr" && (property === "widthMm" || property === "heightMm")) {
       template.elements.qr.widthMm = parseLayoutNumber(input.value);
@@ -300,6 +480,34 @@ function bindBackgroundImageFields(template: LabelTemplate): void {
   app.querySelector("#background-image-opacity")?.addEventListener("change", (event) => { if (template.backgroundImage) template.backgroundImage.opacity = parseLayoutNumber((event.target as HTMLInputElement).value) / 100; template.updatedAt = now(); renderTemplates(); });
 }
 
+function imageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onerror = () => reject(new Error("Die Bilddatei konnte nicht gelesen werden."));
+    image.src = dataUrl;
+  });
+}
+
+function bindImageElementFields(template: LabelTemplate): void {
+  app.querySelector<HTMLInputElement>("#image-visible")?.addEventListener("change", (event) => {
+    if (template.elements.image) template.elements.image.visible = (event.target as HTMLInputElement).checked;
+    template.updatedAt = now();
+    renderTemplates();
+  });
+  app.querySelector<HTMLInputElement>("#image-file")?.addEventListener("change", async (event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    if (!["image/png", "image/jpeg"].includes(file.type)) { notice = "Bitte ausschließlich PNG- oder JPEG-Bilder auswählen."; renderTemplates(); return; }
+    const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error("Die Bilddatei konnte nicht gelesen werden.")); reader.readAsDataURL(file); });
+    const dimensions = await imageDimensions(dataUrl);
+    template.elements.image = { visible: true, dataUrl, opacity: 1, sourceWidthPx: dimensions.width, sourceHeightPx: dimensions.height, fitMode: "cover", scale: 100, offsetXPercent: 50, offsetYPercent: 50, xMm: 2, yMm: 2, widthMm: Math.max(1, template.grid.labelWidthMm - 4), heightMm: Math.max(1, template.grid.labelHeightMm - 4) };
+    template.updatedAt = now(); notice = `Bildfeld „${file.name}“ übernommen.`; renderTemplates();
+  });
+  app.querySelector<HTMLSelectElement>("#image-fit-mode")?.addEventListener("change", (event) => { if (template.elements.image) template.elements.image.fitMode = (event.target as HTMLSelectElement).value as LabelImageElement["fitMode"]; template.updatedAt = now(); renderTemplates(); });
+  [["#image-scale", "scale"], ["#image-offset-x", "offsetXPercent"], ["#image-offset-y", "offsetYPercent"]].forEach(([selector, property]) => app.querySelector<HTMLInputElement>(selector)?.addEventListener("change", (event) => { if (template.elements.image) (template.elements.image as unknown as Record<string, number>)[property] = parseLayoutNumber((event.target as HTMLInputElement).value); template.updatedAt = now(); renderTemplates(); }));
+}
+
 function bindTextAppearanceFields(template: LabelTemplate): void {
   app.querySelectorAll<HTMLSelectElement>("[data-text-appearance]").forEach((input) => input.addEventListener("change", () => {
     const [kind, property] = input.dataset.textAppearance!.split(":") as [
@@ -331,14 +539,16 @@ function bindDrag(template: LabelTemplate, scale: number): void {
   if (!stage) return;
 
   app.querySelectorAll<HTMLElement>("[data-element]").forEach((element) => element.addEventListener("pointerdown", (event) => {
-    const kind = element.dataset.element as "qr" | "text" | "tagIdText";
-    const target = template.elements[kind];
+    const kind = element.dataset.element as "qr" | "image" | "text" | "tagIdText";
+    const target = kind === "image" ? template.elements.image : template.elements[kind];
+    if (!target) return;
     dragState = { element: kind, startX: event.clientX, startY: event.clientY, originX: target.xMm, originY: target.yMm };
     element.setPointerCapture(event.pointerId);
   }));
   stage.addEventListener("pointermove", (event) => {
     if (!dragState) return;
-    const target = template.elements[dragState.element];
+    const target = dragState.element === "image" ? template.elements.image : template.elements[dragState.element];
+    if (!target) return;
     const maxX = template.grid.labelWidthMm - target.widthMm;
     const maxY = template.grid.labelHeightMm - target.heightMm;
     target.xMm = Math.max(0, Math.min(maxX, Math.round((dragState.originX + (event.clientX - dragState.startX) / scale) * 10) / 10));

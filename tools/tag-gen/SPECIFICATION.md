@@ -873,6 +873,40 @@ Diese Spezifikation ist die Grundlage für die nachfolgende Implementierung; Än
 
 ### 21.1 Vorlagenmodell und Kompatibilität
 
+### 21.1a Formatierter Vorlagentext
+
+Der Inhalt des freien Textfelds gehört ausschließlich zur Etikettenvorlage und nicht mehr zu einzelnen TAG-Bereichen. `LabelTemplate.elements.text.content` verwendet ein eingeschränktes, portables Rich-Text-Dokument:
+
+```ts
+{
+  version: 1,
+  paragraphs: [{
+    runs: [{
+      text: "Beispiel",
+      bold: true,
+      italic: false,
+      underline: false,
+      color: "#1769aa",
+      backgroundColor: "#fff3a3",
+      fontFamily: "times-roman",
+      fontSizePt: 12
+    }]
+  }]
+}
+```
+
+- Unterstützte Laufattribute sind **Fett**, *Kursiv*, Unterstreichen, Schriftfarbe, Textmarkierung, Schriftfamilie (`helvetica`, `times-roman`, `courier`) und Schriftgröße (`4`–`72 pt`).
+- Absätze werden als `paragraphs` gespeichert. Ein manueller Zeilenumbruch innerhalb eines Absatzes wird im Lauftext als `\n` gespeichert.
+- Der Vorlageneditor bietet diese Funktionen über eine WYSIWYG-Toolbar direkt am freien Textfeld. Schriftfamilie, Punktgröße, Schriftfarbe und Markerfarbe gelten jeweils für die aktuelle Auswahl.
+- Zusätzlich kann zwischen WYSIWYG und einer RTF-Quellansicht umgeschaltet werden. Beim Wechsel zurück nach WYSIWYG wird der Quelltext validiert; bei Fehlern bleibt die RTF-Ansicht sichtbar und zeigt die Ursache an.
+- Der RTF-Codec (`src/rich-text-rtf.ts`) akzeptiert und erzeugt ausschließlich eine begrenzte Teilmenge: Absätze (`\par`), Zeilenumbrüche (`\line`), Tabulatoren, Unicode-Escapes, die drei erlaubten Schriftfamilien, Punktgrößen, Fett, Kursiv, Unterstreichen, Schriftfarbe und Textmarkierung. Objekt-, Bild-, Feld-, HTML- und Stylesheet-Destinationen werden abgewiesen; Eingabe-, Text-, Absatz- und Laufanzahl sind begrenzt.
+- Rohes HTML, fremde Attribute, Skripte und externe Inhalte sind kein Persistenzformat. Beim Editorabgleich wird nur das eingeschränkte Dokumentmodell übernommen.
+- Der Rich-Text wird bei lokalem Speichern sowie bei Konfigurations- und Vorlagenexport/-import als Teil der Vorlage mitgeführt.
+- Beim Import älterer Vorlagen ohne `content` ergänzt die Migration den gültigen Standardinhalt „Etikettentext“.
+- Bereichsdaten dürfen aus Kompatibilitätsgründen weiterhin ein altes `labelText` enthalten. Dieses Feld wird weder im Editor noch in der Browser- oder PDF-Druckausgabe verwendet.
+- Browser-Druckvorschau und PDF verwenden denselben Vorlagentext. Die PDF-Ausgabe übernimmt Absatz- und manuelle Zeilenumbrüche, Schriftfamilie, Punktgröße, Farben, Textmarkierung, Fett, Kursiv und Unterstreichen je Textlauf; die separate lesbare TAG-ID bleibt dynamisch.
+
+
 Jede Etikettenvorlage enthält zusätzlich folgende Designwerte:
 
 ```ts
@@ -919,7 +953,8 @@ Der Vorlagenbereich bietet zusätzlich:
 - Eingaben für Randbreite und Randfarbe des QR-Codes,
 - Zoomauswahl von `75 %` bis `400 %` für den Einzeletikett-Canvas. Der Zoom beeinflusst ausschließlich die Editordarstellung, niemals gespeicherte Millimeterwerte oder PDF-Ausgabe.
 - Die Einzeletikett-Designvorschau wird oberhalb der Konfigurationsbereiche angezeigt. Bei hohen Zoomstufen bleibt sie innerhalb eines eigenen Scrollbereichs vollständig bedienbar.
-- Die Konfigurationsbereiche für QR-Code, Hintergrundbild, freien Text und lesbare TAG-ID verwenden ein responsives Grid: Bei ausreichend breiter Ansicht stehen sie nebeneinander, bei reduzierter Breite ordnen sie sich untereinander an.
+- Die Konfigurationsbereiche für QR-Code, Hintergrundbild, freien Text und lesbare TAG-ID verwenden ein responsives Grid mit höchstens zwei gleich breiten Spalten. Bei reduzierter Breite ordnen sie sich untereinander an.
+- Der Hauptbereich nutzt die verfügbare Breite neben der Navigation ohne künstliche Maximalbreite aus. Die oberen Vorlagenkarten für DIN-A4-Raster und A4-Vorschau wechseln bei reduzierter Breite ebenfalls von zwei Spalten in eine vertikale Anordnung.
 
 ### 21.3 Renderreihenfolge und PDF-Gleichheit
 
@@ -952,6 +987,7 @@ Die Vorlagenansicht ist als flaches Modul in `src/label-designer.ts` abgegrenzt.
 | `src/main.ts` | Application Host: globaler Konfigurations- und TAG-Zustand, Navigation, Shell, Persistenz-/Datei-Adapter, TAG-Generierung und Druckauftrag |
 | `src/label-designer.ts` | A4-Raster, Vorlageneigenschaften, Einzeletikett-Editor, Zoom, Drag-Interaktion, Designfelder sowie Vorlagenimport/-export |
 | `src/domain.ts` | Vorlagenmodell, Migration, Validierung und portable Import-/Exportformate ohne UI-Abhängigkeit |
+| `src/rich-text-rtf.ts` | Begrenzter, sicherer RTF-Import/-Export zwischen Quellansicht und portablem Rich-Text-Modell |
 | `src/pdf-generation.ts` | Maßhaltige PDF-Ausgabe auf Grundlage einer validierten Vorlage und TAG-Liste |
 
 Der Host übergibt dem Etiketten-Designer einen expliziten `LabelDesignerContext`. Dieser enthält nur die für die Ansicht notwendigen Datenzugriffe sowie Shell-, Download- und Datei-Adapter. Das Feature führt keine globale Navigation und speichert keine Geheimnisse.

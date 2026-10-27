@@ -13,6 +13,30 @@ export interface ElementBackground {
   opacity: number;
 }
 
+export interface RichTextRun {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  color?: HexColor;
+  backgroundColor?: HexColor;
+  fontFamily?: LabelFontFamily;
+  fontSizePt?: number;
+}
+
+export interface RichTextParagraph {
+  runs: RichTextRun[];
+}
+
+export interface RichTextDocument {
+  version: 1;
+  paragraphs: RichTextParagraph[];
+}
+
+export function defaultRichText(content = "Etikettentext"): RichTextDocument {
+  return { version: 1, paragraphs: [{ runs: [{ text: content }] }] };
+}
+
 export interface QrProfile {
   version: QrVersion;
   errorCorrectionLevel: QrErrorCorrectionLevel;
@@ -63,6 +87,19 @@ export interface BackgroundImage extends PositionedElement {
   opacity: number;
 }
 
+export type ImageFitMode = "cover" | "contain" | "stretch" | "manual";
+
+export interface LabelImageElement extends PositionedElement {
+  visible: boolean;
+  dataUrl: string;
+  opacity: number;
+  sourceWidthPx: number;
+  sourceHeightPx: number;
+  fitMode: ImageFitMode;
+  scale: number;
+  offsetXPercent: number;
+  offsetYPercent: number;
+}
 export interface PageTextArea {
   text: string;
   leftMm: number;
@@ -99,7 +136,9 @@ export interface LabelTemplate {
       borderWidthMm: number;
       borderColor: HexColor;
     };
+    image?: LabelImageElement;
     text: PositionedElement & {
+      content: RichTextDocument;
       visible: boolean;
       background: ElementBackground;
       fontFamily: LabelFontFamily;
@@ -396,6 +435,25 @@ export function validateTemplate(template: LabelTemplate): ValidationResult<Labe
   const footerTopMm = 297 - footer.bottomOffsetMm - footer.heightMm;
   const isHexColor = (value: unknown): value is HexColor => typeof value === "string" && /^#[\da-f]{6}$/i.test(value);
   const validOpacity = (value: unknown): boolean => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+  const richTextLength = template.elements.text.content?.paragraphs?.reduce(
+    (total, paragraph) => total + paragraph.runs.reduce((runTotal, run) => runTotal + run.text.length, 0),
+    0,
+  ) ?? 0;
+  const richTextIsValid =
+    template.elements.text.content?.version === 1 &&
+    Array.isArray(template.elements.text.content.paragraphs) &&
+    template.elements.text.content.paragraphs.length <= 40 &&
+    template.elements.text.content.paragraphs.every((paragraph) =>
+      Array.isArray(paragraph.runs) &&
+      paragraph.runs.length <= 100 &&
+      paragraph.runs.every((run) =>
+        typeof run.text === "string" &&
+        (!run.color || isHexColor(run.color)) &&
+        (!run.backgroundColor || isHexColor(run.backgroundColor)) &&
+        (!run.fontFamily || ["helvetica", "times-roman", "courier"].includes(run.fontFamily)) &&
+        (!run.fontSizePt || (Number.isFinite(run.fontSizePt) && run.fontSizePt >= 4 && run.fontSizePt <= 72)),
+      ),
+    );
 
   if (!template.name.trim()) errors.push("Ein Vorlagenname ist erforderlich.");
   if (!Number.isInteger(grid.columns) || grid.columns < 1) errors.push("Mindestens eine Spalte ist erforderlich.");
@@ -444,7 +502,33 @@ export function validateTemplate(template: LabelTemplate): ValidationResult<Labe
   };
 
   validateElement(elements.qr, "QR-Code");
+  if (elements.image) {
+    validateElement(elements.image, "Bildfeld");
+    if (
+      !validOpacity(elements.image.opacity) ||
+      !/^data:image\/(?:png|jpeg);base64,/i.test(elements.image.dataUrl) ||
+      !Number.isInteger(elements.image.sourceWidthPx) ||
+      elements.image.sourceWidthPx < 1 ||
+      !Number.isInteger(elements.image.sourceHeightPx) ||
+      elements.image.sourceHeightPx < 1 ||
+      !["cover", "contain", "stretch", "manual"].includes(elements.image.fitMode) ||
+      !Number.isFinite(elements.image.scale) ||
+      elements.image.scale < 10 ||
+      elements.image.scale > 400 ||
+      !Number.isFinite(elements.image.offsetXPercent) ||
+      !Number.isFinite(elements.image.offsetYPercent) ||
+      elements.image.offsetXPercent < 0 ||
+      elements.image.offsetXPercent > 100 ||
+      elements.image.offsetYPercent < 0 ||
+      elements.image.offsetYPercent > 100
+    ) {
+      errors.push("Bildfeld: Datei, Darstellung, Transparenz, Skalierung oder Bildposition ist ungültig.");
+    }
+  }
   validateElement(elements.text, "Freies Textfeld");
+  if (!richTextIsValid || richTextLength > 5_000) {
+    errors.push("Der formatierte Etikettentext ist ungültig oder zu lang.");
+  }
   validateElement(elements.tagIdText, "TAG-ID-Feld");
   if (!isHexColor(template.backgroundColor)) errors.push("Die Etiketten-Hintergrundfarbe muss ein Hex-Farbwert sein.");
   if (!isHexColor(elements.qr.borderColor) || !Number.isFinite(elements.qr.borderWidthMm) || elements.qr.borderWidthMm < 0) errors.push("QR-Randfarbe und -breite sind ungültig.");
@@ -498,6 +582,7 @@ export function defaultTemplate(): LabelTemplate {
     elements: {
     qr: { xMm: 2, yMm: 2, widthMm: 22, heightMm: 22, quietZoneModules: 4, errorCorrectionLevel: "M", borderWidthMm: 0, borderColor: "#101828" },
       text: {
+        content: defaultRichText(),
         xMm: 26,
         yMm: 3,
         widthMm: 34,
@@ -622,6 +707,40 @@ function migrateTemplate(template: LabelTemplate): LabelTemplate {
     widthMm: template.elements.text.widthMm,
   };
 
+  const migrateRichText = (content: unknown): RichTextDocument => {
+    if (
+      content &&
+      typeof content === "object" &&
+      (content as RichTextDocument).version === 1 &&
+      Array.isArray((content as RichTextDocument).paragraphs)
+    ) {
+      return {
+        version: 1,
+        paragraphs: (content as RichTextDocument).paragraphs.slice(0, 40).map((paragraph) => ({
+          runs: Array.isArray(paragraph.runs)
+            ? paragraph.runs.slice(0, 100).flatMap((run) => typeof run?.text === "string"
+              ? [{
+                  text: run.text.slice(0, 5_000),
+                  ...(run.bold === true ? { bold: true } : {}),
+                  ...(run.italic === true ? { italic: true } : {}),
+                  ...(run.underline === true ? { underline: true } : {}),
+                  ...(run.fontFamily === "helvetica" || run.fontFamily === "times-roman" || run.fontFamily === "courier"
+                    ? { fontFamily: run.fontFamily }
+                    : {}),
+                  ...(typeof run.fontSizePt === "number" && Number.isFinite(run.fontSizePt) && run.fontSizePt >= 4 && run.fontSizePt <= 72
+                    ? { fontSizePt: run.fontSizePt }
+                    : {}),
+                  ...(/^#[\da-f]{6}$/i.test(run.color ?? "") ? { color: (run.color ?? "").toLowerCase() as HexColor } : {}),
+                  ...(/^#[\da-f]{6}$/i.test(run.backgroundColor ?? "") ? { backgroundColor: (run.backgroundColor ?? "").toLowerCase() as HexColor } : {}),
+                }]
+              : [])
+            : [],
+        })),
+      };
+    }
+    return defaultRichText();
+  };
+
   const migrateTextElement = <T extends LabelTemplate["elements"]["text"] | LabelTemplate["elements"]["tagIdText"]>(element: T): T => ({
     ...element,
     visible: element.visible !== false,
@@ -646,12 +765,28 @@ function migrateTemplate(template: LabelTemplate): LabelTemplate {
       : undefined,
     elements: {
       ...template.elements,
+      image: template.elements.image && /^data:image\/(?:png|jpeg);base64,/i.test(template.elements.image.dataUrl)
+        ? {
+            ...template.elements.image,
+            visible: template.elements.image.visible !== false,
+            opacity: typeof template.elements.image.opacity === "number" && template.elements.image.opacity >= 0 && template.elements.image.opacity <= 1 ? template.elements.image.opacity : 1,
+            sourceWidthPx: Number.isInteger(template.elements.image.sourceWidthPx) && template.elements.image.sourceWidthPx > 0 ? template.elements.image.sourceWidthPx : 1,
+            sourceHeightPx: Number.isInteger(template.elements.image.sourceHeightPx) && template.elements.image.sourceHeightPx > 0 ? template.elements.image.sourceHeightPx : 1,
+            fitMode: ["cover", "contain", "stretch", "manual"].includes(template.elements.image.fitMode) ? template.elements.image.fitMode : "cover",
+            scale: typeof template.elements.image.scale === "number" && template.elements.image.scale >= 10 && template.elements.image.scale <= 400 ? template.elements.image.scale : 100,
+            offsetXPercent: typeof template.elements.image.offsetXPercent === "number" && template.elements.image.offsetXPercent >= 0 && template.elements.image.offsetXPercent <= 100 ? template.elements.image.offsetXPercent : 50,
+            offsetYPercent: typeof template.elements.image.offsetYPercent === "number" && template.elements.image.offsetYPercent >= 0 && template.elements.image.offsetYPercent <= 100 ? template.elements.image.offsetYPercent : 50,
+          }
+        : undefined,
       qr: {
         ...template.elements.qr,
         borderWidthMm: Number.isFinite(template.elements.qr.borderWidthMm) && template.elements.qr.borderWidthMm >= 0 ? template.elements.qr.borderWidthMm : 0,
         borderColor: /^#[\da-f]{6}$/i.test(template.elements.qr.borderColor) ? template.elements.qr.borderColor : "#101828",
       },
-      text: migrateTextElement(template.elements.text),
+      text: {
+        ...migrateTextElement(template.elements.text),
+        content: migrateRichText((template.elements.text as Partial<LabelTemplate["elements"]["text"]>).content),
+      },
       tagIdText: migrateTextElement(tagIdText),
     },
   };

@@ -7,6 +7,9 @@ node_modules/
 # Local Tag Lab registry (may contain non-public test tag IDs)
 .tag-lab/
 
+# Bilder aus tag-gen/tag-images/ werden nicht versioniert, da sie automatisch generiert werden und nicht in das Repository gehören.
+tools/tag-gen/tag-images/
+
 # Build artifacts
 dist/
 coverage/

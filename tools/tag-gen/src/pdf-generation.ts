@@ -3,9 +3,11 @@ import {
   type GeneratedTag,
   type LabelFontFamily,
   type LabelFontStyle,
+  type LabelImageElement,
   type LabelTemplate,
   type PageCell,
   type PositionedElement,
+  type RichTextDocument,
   defaultQrProfile,
   paginateTags,
   validateTemplate,
@@ -15,6 +17,11 @@ import {
   PDFFont,
   PDFPage,
   StandardFonts,
+  clip,
+  endPath,
+  popGraphicsState,
+  pushGraphicsState,
+  rectangle,
   rgb,
 } from "pdf-lib";
 
@@ -158,6 +165,10 @@ async function drawLabel(
     });
   }
 
+  if (template.elements.image?.visible) {
+    await drawLabelImage(document, page, origin, template.elements.image);
+  }
+
   drawElementBackground(page, origin, template.elements.text);
   drawElementBackground(page, origin, template.elements.tagIdText);
 
@@ -188,8 +199,46 @@ async function drawLabel(
     height: mm(qr.heightMm),
   });
 
-  drawElementText(page, tag.labelText, origin, template.elements.text, textFonts);
+  drawRichTextElement(page, template.elements.text.content, origin, template.elements.text, textFonts);
   drawElementText(page, tag.tagId, origin, template.elements.tagIdText, textFonts);
+}
+
+async function drawLabelImage(
+  document: PDFDocument,
+  page: PDFPage,
+  origin: { xMm: number; yMm: number },
+  element: LabelImageElement,
+): Promise<void> {
+  const image = element.dataUrl.startsWith("data:image/png")
+    ? await document.embedPng(element.dataUrl)
+    : await document.embedJpg(element.dataUrl);
+  const boxWidth = mm(element.widthMm);
+  const boxHeight = mm(element.heightMm);
+  const sourceRatio = element.sourceWidthPx / element.sourceHeightPx;
+  const boxRatio = boxWidth / boxHeight;
+  let width = boxWidth;
+  let height = boxHeight;
+
+  if (element.fitMode !== "stretch") {
+    const useWidth = element.fitMode === "contain" ? sourceRatio > boxRatio : sourceRatio < boxRatio;
+    width = useWidth ? boxWidth : boxHeight * sourceRatio;
+    height = useWidth ? boxWidth / sourceRatio : boxHeight;
+    if (element.fitMode === "manual") {
+      width *= element.scale / 100;
+      height *= element.scale / 100;
+    }
+  }
+
+  const x = mm(origin.xMm + element.xMm) + (boxWidth - width) * (element.offsetXPercent / 100);
+  const y = pdfY(origin.yMm + element.yMm, element.heightMm) + (boxHeight - height) * (1 - element.offsetYPercent / 100);
+  page.pushOperators(
+    pushGraphicsState(),
+    rectangle(mm(origin.xMm + element.xMm), pdfY(origin.yMm + element.yMm, element.heightMm), boxWidth, boxHeight),
+    clip(),
+    endPath(),
+  );
+  page.drawImage(image, { x, y, width, height, opacity: element.opacity });
+  page.pushOperators(popGraphicsState());
 }
 
 function hexToRgb(color: string): ReturnType<typeof rgb> {
@@ -234,6 +283,89 @@ function drawPageText(
     lineHeight: 1.2,
     overflow: "clip",
   });
+}
+
+interface RichTextLine {
+  runs: RichTextDocument["paragraphs"][number]["runs"];
+  height: number;
+}
+
+function richTextLines(content: RichTextDocument, element: LabelTemplate["elements"]["text"]): RichTextLine[] {
+  const lines: RichTextLine[] = [];
+  const paragraphs = content.paragraphs.length ? content.paragraphs : [{ runs: [] }];
+  for (const paragraph of paragraphs) {
+    let current: RichTextDocument["paragraphs"][number]["runs"] = [];
+    const finish = (): void => {
+      const height = Math.max(
+        element.fontSizePt,
+        ...current.map((run) => run.fontSizePt ?? element.fontSizePt),
+      ) * element.lineHeight;
+      lines.push({ runs: current, height });
+      current = [];
+    };
+    if (!paragraph.runs.length) {
+      finish();
+      continue;
+    }
+    for (const run of paragraph.runs) {
+      const pieces = run.text.replaceAll("\r\n", "\n").split("\n");
+      pieces.forEach((piece, index) => {
+        if (piece) current.push({ ...run, text: piece });
+        if (index < pieces.length - 1) finish();
+      });
+    }
+    finish();
+  }
+  return lines;
+}
+
+function drawRichTextElement(
+  page: PDFPage,
+  content: RichTextDocument,
+  origin: { xMm: number; yMm: number },
+  element: LabelTemplate["elements"]["text"],
+  textFonts: EmbeddedTextFonts,
+): void {
+  if (!element.visible || element.widthMm <= 0 || element.heightMm <= 0) return;
+  const heightPt = mm(element.heightMm);
+  const lines = richTextLines(content, element);
+  const visibleLines: RichTextLine[] = [];
+  let usedHeight = 0;
+  for (const line of lines) {
+    if (usedHeight + line.height > heightPt + 0.001) break;
+    visibleLines.push(line);
+    usedHeight += line.height;
+  }
+  const topOffset = element.verticalAlign === "middle" ? (heightPt - usedHeight) / 2 : element.verticalAlign === "bottom" ? heightPt - usedHeight : 0;
+  const xStart = mm(origin.xMm + element.xMm);
+  const widthPt = mm(element.widthMm);
+  let cursorFromTop = topOffset;
+
+  for (const line of visibleLines) {
+    const metrics = line.runs.map((run) => {
+      const family = run.fontFamily ?? element.fontFamily;
+      const size = run.fontSizePt ?? element.fontSizePt;
+      const style = run.bold && run.italic ? "bold-italic" : run.bold ? "bold" : run.italic ? "italic" : element.fontStyle;
+      const font = textFonts[family][style];
+      return { run, font, size, width: font.widthOfTextAtSize(run.text, size) };
+    });
+    const lineWidth = metrics.reduce((total, metric) => total + metric.width, 0);
+    let x = xStart + (element.horizontalAlign === "center" ? (widthPt - lineWidth) / 2 : element.horizontalAlign === "right" ? widthPt - lineWidth : 0);
+    const maximumSize = Math.max(element.fontSizePt, ...metrics.map((metric) => metric.size));
+    const baseline = pdfY(origin.yMm + element.yMm, element.heightMm) + heightPt - cursorFromTop - line.height + (line.height - maximumSize) / 2;
+
+    for (const { run, font, size, width } of metrics) {
+      if (run.backgroundColor && run.text) {
+        page.drawRectangle({ x, y: baseline - 1, width, height: size + 2, color: hexToRgb(run.backgroundColor) });
+      }
+      if (run.text) page.drawText(run.text, { x, y: baseline, size, font, color: hexToRgb(run.color ?? "#121f33") });
+      if (run.underline && run.text) {
+        page.drawLine({ start: { x, y: baseline - 1 }, end: { x: x + width, y: baseline - 1 }, thickness: Math.max(0.4, size / 16), color: hexToRgb(run.color ?? "#121f33") });
+      }
+      x += width;
+    }
+    cursorFromTop += line.height;
+  }
 }
 
 function drawElementText(

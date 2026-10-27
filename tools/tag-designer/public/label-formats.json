@@ -1,0 +1,29 @@
+{
+  "default": {
+    "formatId": "lost-found",
+    "dpi": 300,
+    "physicalUnit": "mm",
+    "numberFormat": "de-DE",
+    "cornerRadiusPx": 42
+  },
+  "formats": [
+    {
+      "id": "lost-found",
+      "name": "Lost & Found Standard",
+      "widthMm": 154.8,
+      "heightMm": 71.8
+    },
+    {
+      "id": "L4778-8",
+      "name": "L4778-8",
+      "widthMm": 45.7,
+      "heightMm": 21.2
+    },
+    {
+      "id": "L4773-8",
+      "name": "L4773-8",
+      "widthMm": 63.5,
+      "heightMm": 33.9
+    }
+  ]
+}

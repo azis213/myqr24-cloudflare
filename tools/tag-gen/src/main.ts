@@ -29,7 +29,7 @@ import {
   parseTagListJson,
 } from "./tag-generation";
 import { createTagPdf } from "./pdf-generation";
-import { editorTextStyle, renderLabelDesigner } from "./label-designer";
+import { editorTextStyle, renderLabelDesigner, renderRichText } from "./label-designer";
 
 declare const __TAG_GEN_DEFAULT_SECRETS__: {
   feistelSecret: string;
@@ -240,7 +240,7 @@ function renderRanges(): void {
   const endLabel = rangeInputMode === "offset" ? "Bis-Offset" : "Bis";
   const rows = configuration.ranges
     .map((range) => `<tr>
-      <td><strong>${escapeHtml(range.name)}</strong><small>${escapeHtml(range.labelText || "Kein Etikettentext")}</small></td>
+      <td><strong>${escapeHtml(range.name)}</strong></td>
       <td><span class="pill">${range.tagLength} Zeichen</span></td>
       <td>${formatInteger(range.start)}</td><td>${formatInteger(range.end)}</td>
       <td>${formatInteger(countRange(range))}</td>
@@ -284,7 +284,7 @@ function renderRanges(): void {
         <label>Fehlertoleranz<select id="range-qr-ecc">${["L", "M", "Q", "H"].map((level) => `<option value="${level}" ${draftRange.qrProfile.errorCorrectionLevel === level ? "selected" : ""}>${level}</option>`).join("")}</select></label>
         <label>Quiet Zone (Module)<input id="range-qr-margin" type="number" min="0" max="20" step="1" value="${draftRange.qrProfile.quietZoneModules}"></label>
         ${offsetPreview?.ok ? `<div class="wide resolved-range">Berechnete absolute Werte: <strong>${formatInteger(offsetPreview.value.start)}</strong> bis <strong>${formatInteger(offsetPreview.value.end)}</strong></div>` : ""}
-        <label class="wide">Etikettentext<textarea id="range-text" rows="2" placeholder="Text, der auf jedem Etikett dieses Bereichs erscheint">${escapeHtml(draftRange.labelText)}</textarea></label>
+        <p class="wide hint">Der Etikettentext wird in der Etikettenvorlage als formatierbares Textfeld gepflegt.</p>
       </div>
       <div class="toolbar"><button class="primary" id="add-range">${rangeVersionSourceName ? "Neue Bereichsversion hinzufügen" : "Bereich hinzufügen"}</button><span class="hint">${rangeVersionSourceName ? `Fortführung von „${escapeHtml(rangeVersionSourceName)}“: Die bestehende Range bleibt unverändert.` : rangeInputMode === "offset" ? "Gespeichert und exportiert werden immer die berechneten absoluten Werte." : "8-stellige Bereiche benötigen bei Von und Bis durch 16 teilbare Basiswerte."}</span></div>
     </section>
@@ -304,7 +304,7 @@ function renderRanges(): void {
       start: inputValue("range-start"),
       end: inputValue("range-end"),
       tagLength: Number(inputValue("range-length")) as 6 | 8,
-      labelText: app.querySelector<HTMLTextAreaElement>("#range-text")?.value ?? "",
+      labelText: "",
       qrProfile: {
         version: inputValue("range-qr-version") === "auto" ? "auto" as const : Number(inputValue("range-qr-version")),
         errorCorrectionLevel: inputValue("range-qr-ecc") as "L" | "M" | "Q" | "H",
@@ -427,7 +427,7 @@ function renderRanges(): void {
 async function renderTags(): Promise<void> {
   const preview = generatedTags[selectedTagIndex] ?? generatedTags[0];
   const svg = preview ? await qrSvg(preview.url, preview.qrProfile) : "";
-  const rows = generatedTags.slice(0, 100).map((tag, index) => `<tr class="selectable-row ${tag === preview ? "is-selected" : ""}" data-tag-index="${index}"><td>${escapeHtml(tag.rangeName)}</td><td><code>${tag.tagId}</code></td><td class="url">${escapeHtml(tag.url)}</td><td>${escapeHtml(tag.labelText || "—")}</td></tr>`).join("");
+  const rows = generatedTags.slice(0, 100).map((tag, index) => `<tr class="selectable-row ${tag === preview ? "is-selected" : ""}" data-tag-index="${index}"><td>${escapeHtml(tag.rangeName)}</td><td><code>${tag.tagId}</code></td><td class="url">${escapeHtml(tag.url)}</td></tr>`).join("");
   renderShell(`
     <section class="grid tags-summary">
       <article class="card metric"><p class="eyebrow">AKTUELLE LISTE</p><strong>${generatedTags.length.toLocaleString("de-DE")}</strong><span>generierte / importierte TAGs</span></article>
@@ -435,10 +435,10 @@ async function renderTags(): Promise<void> {
       <article class="card action-card"><p class="eyebrow">DATENEXPORT</p><button class="primary" id="export-tags" ${generatedTags.length ? "" : "disabled"}>TAG-Liste als JSON exportieren</button></article>
     </section>
     <section class="grid preview-grid">
-      <article class="card"><div class="card-heading"><div><p class="eyebrow">QR-EINZELVORSCHAU</p><h2>${preview ? preview.tagId : "Keine TAGs"}</h2></div></div>${preview ? `<div class="qr-preview">${svg}</div><p class="url">${escapeHtml(preview.url)}</p><p>${escapeHtml(preview.labelText || "Kein Etikettentext")}</p>` : `<p class="empty">Generieren oder importieren Sie zunächst eine TAG-Liste.</p>`}</article>
+      <article class="card"><div class="card-heading"><div><p class="eyebrow">QR-EINZELVORSCHAU</p><h2>${preview ? preview.tagId : "Keine TAGs"}</h2></div></div>${preview ? `<div class="qr-preview">${svg}</div><p class="url">${escapeHtml(preview.url)}</p>` : `<p class="empty">Generieren oder importieren Sie zunächst eine TAG-Liste.</p>`}</article>
       <article class="card"><p class="eyebrow">KOMPATIBILITÄT</p><h2>Codec identisch zum Edge Router</h2><p>Die öffentlichen IDs werden direkt mit <code>encodeTagId()</code> aus der Edge-Router-Implementierung erzeugt. Große Zahlen bleiben als BigInt präzise.</p></article>
     </section>
-    <section class="card"><div class="card-heading"><div><p class="eyebrow">ERGEBNISSE</p><h2>TAG-Liste ${generatedTags.length > 100 ? "(erste 100)" : ""}</h2></div></div><div class="table-wrap"><table><thead><tr><th>Bereich</th><th>TAG-ID</th><th>Ziel-URL</th><th>Etikettentext</th></tr></thead><tbody>${rows || `<tr><td colspan="4" class="empty">Keine TAG-Liste vorhanden.</td></tr>`}</tbody></table></div></section>
+    <section class="card"><div class="card-heading"><div><p class="eyebrow">ERGEBNISSE</p><h2>TAG-Liste ${generatedTags.length > 100 ? "(erste 100)" : ""}</h2></div></div><div class="table-wrap"><table><thead><tr><th>Bereich</th><th>TAG-ID</th><th>Ziel-URL</th></tr></thead><tbody>${rows || `<tr><td colspan="3" class="empty">Keine TAG-Liste vorhanden.</td></tr>`}</tbody></table></div></section>
   `);
   app.querySelector("#export-tags")?.addEventListener("click", () => {
     download(`myqr24-tag-list-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.json`, createTagListJson(configuration.baseUrl, configuration.qrIdCase, configuration.ranges, generatedTags));
@@ -550,16 +550,19 @@ async function renderPagePreview(cells: ReturnType<typeof paginateTags>[number],
     const backgroundImage = template.backgroundImage?.visible
       ? `<div class="print-background-image" style="${positionStyle(template.backgroundImage)}opacity:${template.backgroundImage.opacity};background-image:url('${template.backgroundImage.dataUrl}');"></div>`
       : "";
+    const imageElement = template.elements.image?.visible
+      ? `<div class="print-image-element" style="${positionStyle(template.elements.image)}opacity:${template.elements.image.opacity};background-image:url('${template.elements.image.dataUrl}');background-size:${template.elements.image.fitMode === "cover" ? "cover" : template.elements.image.fitMode === "contain" ? "contain" : template.elements.image.fitMode === "stretch" ? "100% 100%" : `${template.elements.image.scale}% auto`};background-position:${template.elements.image.offsetXPercent}% ${template.elements.image.offsetYPercent}%;background-repeat:no-repeat;"></div>`
+      : "";
     const qrBorder = template.elements.qr.borderWidthMm > 0
       ? `border:${template.elements.qr.borderWidthMm}mm solid ${template.elements.qr.borderColor};box-sizing:border-box;`
       : "";
     const text = template.elements.text.visible
-      ? `<div class="mini-text positioned-print-element" style="${printTextStyle(template.elements.text)}">${escapeHtml(cell.tag.labelText)}</div>`
+      ? `<div class="mini-text positioned-print-element" style="${printTextStyle(template.elements.text)}">${renderRichText(template.elements.text.content, escapeHtml)}</div>`
       : "";
     const tagId = template.elements.tagIdText.visible
       ? `<div class="mini-tag-id positioned-print-element" style="${printTextStyle(template.elements.tagIdText)}">${escapeHtml(cell.tag.tagId)}</div>`
       : "";
-    return `<div class="print-label" style="background-color:${template.backgroundColor}">${backgroundImage}<div class="mini-qr positioned-print-element" style="${positionStyle(template.elements.qr)}${qrBorder}">${svg}</div>${text}${tagId}</div>`;
+    return `<div class="print-label" style="background-color:${template.backgroundColor}">${backgroundImage}${imageElement}<div class="mini-qr positioned-print-element" style="${positionStyle(template.elements.qr)}${qrBorder}">${svg}</div>${text}${tagId}</div>`;
   }));
 
   return `<div class="print-page-with-chrome"><div class="page-text page-header" style="${pageTextStyle(header.leftMm, header.topOffsetMm, header.widthMm, header.heightMm)}">${escapeHtml(header.text)}</div><div class="print-page" style="${gridStyle}">${cellsHtml.join("")}</div><div class="page-text page-footer" style="${pageTextStyle(footer.leftMm, footerTopMm, footer.widthMm, footer.heightMm)}">${escapeHtml(footer.text)}</div></div>`;

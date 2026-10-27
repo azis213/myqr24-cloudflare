@@ -103,8 +103,9 @@ Ich möchte nun eine TAG-APP im Ordner tools\tag-gen erstellen, die als Tool fü
 7. Farbeingaben bestehen jeweils aus einem klickbaren nativen Farbfeld und einem editierbaren Hex-Farbwert. Bei ungültigem Hex-Wert wird der zuletzt gültige Wert beibehalten und ein verständlicher Hinweis angezeigt.
 8. Der Einzeletikett-Editor besitzt eine Zoom-Funktion von 75 % bis 400 %, damit QR-Code, Textfelder und Hintergrundbild für die Positionierung vergrößert oder verkleinert dargestellt werden können. Zoom verändert niemals die gespeicherten Millimeterwerte oder die PDF-Maße.
 9. Die Designvorschau steht im Einzeletikett-Editor oberhalb der Konfigurationsfelder. Bei hohen Zoomstufen bleibt sie in einem eigenen Scrollbereich vollständig erreichbar.
-10. Die Konfigurationsblöcke für QR-Code, Hintergrundbild, freies Textfeld und lesbare TAG-ID stehen bei ausreichend breitem Fenster nebeneinander. Bei abnehmender Breite ordnen sie sich responsiv untereinander an.
-11. Alle neuen Designwerte werden mit der Etikettenvorlage gespeichert, beim Vorlagenexport mitgegeben und in der Browser-Druckvorschau, PDF-Vorschau sowie heruntergeladenen PDF gleich umgesetzt.
+10. Die Konfigurationsblöcke für QR-Code, Hintergrundbild, freies Textfeld und lesbare TAG-ID stehen bei ausreichend breitem Fenster in höchstens zwei gleich breiten Spalten nebeneinander. Bei abnehmender Breite ordnen sie sich responsiv untereinander an.
+11. Die Oberfläche nutzt die verfügbare Breite neben der Seitennavigation vollständig aus; es gibt keine künstliche Maximalbreite des Hauptbereichs. Die oberen zwei Vorlagenkarten (DIN-A4-Raster und A4-Vorschau) ordnen sich bei schmaler werdendem Fenster ebenfalls untereinander an.
+12. Alle neuen Designwerte werden mit der Etikettenvorlage gespeichert, beim Vorlagenexport mitgegeben und in der Browser-Druckvorschau, PDF-Vorschau sowie heruntergeladenen PDF gleich umgesetzt.
 
 ## Zusatz – Technische Modulgrenze Etiketten-Designer
 
