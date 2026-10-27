@@ -51,9 +51,9 @@
 | `publication_outbox` | zuverlässiger Publish-Job | idempotenter `deduplication_key` | Eventtyp, Payload-Referenz/Hash, Ziel, Status, Versuche, nächster Versuch, Korrelation |
 | `publication_attempts` | technische Nachweise | n:1 zu Outbox | Ergebniscode, redigierte Fehlerklasse, Zeitpunkt, externe Request-Korrelation |
 
-**`decoded_value`-Speicherung:** Weil der 8-stellige Raum über die bequeme Reichweite mancher SQL-Integer- und PHP-Plattformpfade hinausgehen kann und die Domänenregel ohnehin eine verlustfreie Behandlung verlangt, wird der kanonische Wert als streng validierter dezimaler String gespeichert. Jeder Vergabe-/Vergleichspfad verwendet BigInt-/arbitrary-precision-fähige Applikationslogik. Datenbank-Constraints sichern mindestens die eindeutige Zeichenrepräsentation je Länge.
+**`decoded_value`-Speicherung:** Weil insbesondere der 10-stellige kanonische Raum die Reichweite herkömmlicher SQL-Integer- und PHP-Plattformpfade übersteigen kann und die Domänenregel ohnehin verlustfreie Behandlung verlangt, wird der Wert als streng validierter dezimaler String gespeichert. Jeder Vergabe-/Vergleichspfad verwendet BigInt-/arbitrary-precision-fähige Applikationslogik. Datenbank-Constraints sichern mindestens die eindeutige kanonische Zeichenrepräsentation je Länge.
 
-**Range-Integrität:** MySQL besitzt keinen nativen allgemeinen Exclusion Constraint. Nichtüberlappung und 8-stellige 16er-Slot-Grenzen werden daher in einem serialisierten Verwaltungscommand geprüft; zusätzlich schützt ein Range-Index/Lock gegen parallele Änderungen. Der Publisher validiert die gesamte Range-Menge vor jeder KV-Projektion nochmals fail-closed.
+**Range-Integrität:** MySQL besitzt keinen nativen allgemeinen Exclusion Constraint. Nichtüberlappung, kanonische Grenzen und gleiche Länge werden daher in einem serialisierten Verwaltungscommand geprüft; zusätzlich schützt ein Range-Index/Lock gegen parallele Änderungen. Eine Range umfasst lineare aufeinanderfolgende Integer ohne Slot-Ausrichtung. Der Publisher validiert die gesamte Range-Menge vor jeder KV-Projektion nochmals fail-closed.
 
 ### 2.3 Produkt, Pools, Claim und Ownership
 
@@ -170,10 +170,10 @@ Die Keyteile werden ausschließlich durch TCP generiert und gegen das dokumentie
 | --- | --- |
 | `version` | positive Schema-/Projektionsversion |
 | `start`, `end` | kanonische, nichtnegative Dezimalstrings; niemals JSON Number |
-| `length` | `6` oder `8` |
-| Reihenfolge | global streng aufsteigend nach `start`; keine Überlappung |
-| 8-stellige Grenzen | `start % 16 = 0`, `end % 16 = 15` |
-| Leselogik | Worker parst zu `BigInt` und verwirft ungültigen gesamten Index fail-closed |
+| `length` | `6`, `8` oder `10` |
+| Reihenfolge | je Länge streng aufsteigend nach `start`; keine Überlappung |
+| Grenzen | `start` und `end` liegen im kanonischen Raum der angegebenen Länge; `start <= end`; keine Slot-Ausrichtung |
+| Leselogik | Worker parst zu `BigInt` und verwirft einen ungültigen gesamten Index fail-closed |
 
 #### Regel- und Feature-Dokumente
 
@@ -438,7 +438,7 @@ Ein Restore der Control Plane löst keine automatische unkontrollierte Data-Plan
 Vor Implementierung oder Schemaänderung sind mindestens zu prüfen:
 
 1. Unique Constraints für `tag_id` und `(length, decoded_value)`.
-2. Range-Überlappungs- und 8-Stellen-Slotprüfung im transaktionalen Command und vor KV-Publish.
+2. Range-Überlappungs-, Längen- und kanonische Grenzprüfung im transaktionalen Command und vor KV-Publish.
 3. Fremdschlüssel/Scopes für Vault-, Block-, Item-, Asset- und Sessionbeziehungen.
 4. Schema-Validierung für Feature- und Content-JSON, einschließlich einer Denylist für HTML, Script, iFrame und freie Objektkeys.
 5. Leak-Tests: keine privaten Daten, Hashes, Tokens oder R2-private Keys in KV, Runtime-R2, PublicTagView, TCC-Standardlisten, Logs oder Fixtures.

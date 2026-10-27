@@ -53,16 +53,16 @@ describe("TAG-Generator-Domäne", () => {
     });
   });
 
-  it("löst achtstellige Offsets als 16-ausgerichtete Basiswert-Slots auf", () => {
+  it("löst achtstellige Offsets als lineare kanonische Werte auf", () => {
     const result = resolveRangeValues(8, "offset", "0", "2");
     expect(result).toEqual({
       ok: true,
-      value: { start: "78364164096", end: "78364164128" },
+      value: { start: "78364164096", end: "78364164098" },
     });
     expect(resolveRangeValues(8, "offset", "0", (maximumOffset(8) + 1n).toString()).ok).toBe(false);
   });
 
-  it("weist Überlappungen und nicht ausgerichtete achtstellige Bereiche zurück", () => {
+  it("weist Überlappungen zurück und akzeptiert lineare acht- und zehnstellige Bereiche", () => {
     const current = validateRange({
       id: "current",
       name: "Bestehend",
@@ -84,15 +84,25 @@ describe("TAG-Generator-Domäne", () => {
     }, [current.value]);
     expect(overlap.ok).toBe(false);
 
-    const unaligned = validateRange({
+    const eight = validateRange({
       id: "eight",
       name: "Acht",
-      start: "2176782337",
-      end: "2176782368",
+      start: "78364164097",
+      end: "78364164098",
       tagLength: 8,
       labelText: "",
     });
-    expect(unaligned.ok).toBe(false);
+    const ten = validateRange({
+      id: "ten",
+      name: "Zehn",
+      start: "101559956668416",
+      end: "101559956668418",
+      tagLength: 10,
+      labelText: "",
+    });
+
+    expect(eight.ok).toBe(true);
+    expect(ten.ok).toBe(true);
   });
 
   it("verteilt TAGs ab der gewählten Startposition über Druckseiten", () => {

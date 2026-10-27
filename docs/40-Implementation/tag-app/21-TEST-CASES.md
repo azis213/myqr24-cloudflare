@@ -27,7 +27,7 @@
 
 | ID | Story | Ebene | Testfall | Erwartetes Ergebnis | Status |
 | --- | --- | --- | --- | --- | --- |
-| APP-TC-INTEGRATION-001 | APP-US-006 | Staging E2E | HMAC-validen, gesäten Staging-Scan unter `/t/{tagId}` ausführen | `302` auf `/tag/stagv001`; TAG-App rendert die öffentliche Fixture | blocked |
+| APP-TC-INTEGRATION-001 | APP-US-006 | Staging E2E | kanonische, gesäte Staging-Scans mit 6, 8 und 10 Stellen unter `/t/{tagId}` ausführen | jeder Scan führt per `302` auf die zugehörige `/tag/{tagId}`-Route; TAG-App rendert ausschließlich die öffentliche Fixture | blocked |
 | APP-TC-INTEGRATION-002 | APP-US-006 | Staging E2E | route-lose, ungültige und nicht erlaubte Routenpfade am Scan-Host aufrufen | Router liefert `404`; keine App-Ansicht | blocked |
 | APP-TC-INTEGRATION-003 | APP-US-006 | Configuration | aktiven Worker und KV-Namespace vor Redirect-Wechsel abgleichen | Änderung betrifft ausschließlich identifizierte Staging-Ressource | blocked |
 

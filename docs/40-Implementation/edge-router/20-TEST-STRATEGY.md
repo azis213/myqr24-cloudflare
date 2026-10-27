@@ -18,15 +18,14 @@ npm run build
 Unit-Tests prüfen reine oder gezielt isolierte Funktionen:
 
 - öffentliche URL-Extraktion und Base36-Parsing;
-- kanonische Grenzen `I(6)` und `I(8)`;
-- Feistel-/Cycle-Walk-Verhalten;
-- HMAC-Nibble über der maskierten Basis;
+- kanonische Grenzen `I(6)`, `I(8)` und `I(10)`;
+- Feistel-/Cycle-Walk-Verhalten für alle unterstützten Längen;
 - globale Range-Index-Validierung und binäre Range-Suche;
 - Validierung von Feature-Zuweisungen und Feature-Dokumenten;
 - Template-Placeholder-Prüfung und Rendering;
 - Prüfung des finalen Redirect-Ziels;
-- gemeinsame Feistel-/HMAC-Codec-Funktionen für Scan- und Codec-Worker;
-- private Codec-API für 6- und 8-stellige Encode-/Decode-Roundtrips.
+- gemeinsame Feistel-Codec-Funktionen für Scan- und Codec-Worker;
+- private Codec-API für 6-, 8- und 10-stellige Encode-/Decode-Roundtrips.
 
 ### 2. Worker-Integrationstests
 
@@ -36,7 +35,6 @@ Integrationstests rufen `handleRequest` mit einem In-Memory-`KVNamespace` auf un
 Request
 → URL-Extraktion
 → Decodierung
-→ HMAC-Prüfung
 → Range-Index
 → Tag-/Range-/Gruppen-Zuweisung
 → Feature-Lookup
@@ -44,8 +42,6 @@ Request
 ```
 
 Der private Codec-Worker wird unabhängig mit direkten `handleCodecRequest`-Aufrufen geprüft. Er besitzt weder KV- noch Redirect-Signing-Bindings und akzeptiert ausschließlich authentisierte `POST`-Anfragen an die festgelegten Codec-Pfade.
-
-Das KV-Testdouble protokolliert Keys. Dadurch lässt sich nachweisen, dass ungültige 8-stellige HMACs keinen KV-Lookup auslösen.
 
 ### 3. Cloudflare-Staging-End-to-End-Tests
 
@@ -62,7 +58,8 @@ Nach jedem Deployment oder Secret-Wechsel werden mindestens geprüft:
 - nicht autorisierter `POST` auf `encode` mit neutralem `401`, `Cache-Control: no-store` und ohne CORS-Freigabe;
 - `GET` auf `encode` mit `405` und `Allow: POST`;
 - autorisierter 6-stelliger Encode-/Decode-Roundtrip gegen den ursprünglichen kanonischen Eingabewert;
-- autorisierter 8-stelliger HMAC-geschützter Encode-/Decode-Roundtrip gegen den ursprünglichen kanonischen Eingabewert.
+- autorisierter 8-stelliger Encode-/Decode-Roundtrip gegen den ursprünglichen kanonischen Eingabewert;
+- autorisierter 10-stelliger Encode-/Decode-Roundtrip gegen den ursprünglichen kanonischen Eingabewert.
 
 Die Ausführung wird ohne sensitive Daten in [`../evidence/README.md`](../evidence/README.md) dokumentiert.
 
@@ -73,7 +70,6 @@ Für jede fail-closed Grenze existiert mindestens ein Negativtest:
 - ungültiger Host, Pfad oder Base36-Wert;
 - nicht erlaubte HTTP-Methode;
 - Feistel-/Cycle-Walk-Fehler;
-- ungültiges 8-stelliges HMAC-Nibble;
 - ungültiger, überlappender oder längenfalscher Range-Index;
 - fehlende/inaktive Range;
 - fehlende oder fehlerhafte Zuweisung;
@@ -81,7 +77,7 @@ Für jede fail-closed Grenze existiert mindestens ein Negativtest:
 - unbekannter oder nicht verfügbarer Template-Platzhalter;
 - relatives, `javascript:`- oder `data:`-Redirect-Ziel;
 - fehlender API-Key, unbekannter Codec-Pfad oder falsche HTTP-Methode;
-- ungültiger JSON-Body, nichtkanonischer Wert und nicht ausgerichtete achtstellige Basis;
+- ungültiger JSON-Body, nichtkanonischer Wert oder nicht unterstützte ID-Länge;
 - browserseitige CORS-Freigabe am privaten Codec-Endpunkt.
 
 ### 5. Deterministische Testvektoren
@@ -90,7 +86,7 @@ Alle kryptografischen und vollständigen Request-Tests verwenden feste, nicht ge
 
 - kanonische vollständige Integer;
 - erzeugte öffentliche Test-Tag-IDs;
-- den 8-stelligen HMAC-Slot samt korrektem Nibble;
+- vollständige lineare kanonische Werte für 6, 8 und 10 Stellen;
 - erwartete gerenderte Redirect-Ziele.
 
 Testvektoren werden erst nach erfolgreicher Testausführung als stabil betrachtet. Produktive Secrets oder reale Tags sind verboten.
@@ -117,10 +113,7 @@ Jeder Fehlerfund führt zu:
 3. einer Verknüpfung in `30-TRACEABILITY.md`;
 4. einer Aktualisierung von `STATUS.md`.
 
-Tests prüfen Verhalten, nicht interne Implementierungsdetails, mit zwei bewussten Ausnahmen:
-
-- Der HMAC-Negativtest prüft, dass **kein** KV-Key gelesen wird.
-- Tests für komplette Integer prüfen explizit, dass bei 8-stelligen Tags der HMAC-Nibble Teil des Range-Keys bleibt.
+Tests prüfen Verhalten, nicht interne Implementierungsdetails. Sie vergleichen jedoch für alle drei Längen explizit den vollständigen linearen kanonischen Integer vor und nach dem Codec-Roundtrip.
 
 ## Ausführungsreihenfolge
 

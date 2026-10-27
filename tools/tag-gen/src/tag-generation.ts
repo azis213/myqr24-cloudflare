@@ -12,7 +12,6 @@ import {
 
 export interface GenerationSecrets {
   feistelSecret: string;
-  hmacSecret: string;
 }
 
 export interface GenerationProgress {
@@ -34,18 +33,17 @@ function qrPayload(baseUrl: string, tagId: string, qrIdCase: QrIdCase): string {
 function generateValues(range: TagRangeDefinition): bigint[] {
   const start = BigInt(range.start);
   const end = BigInt(range.end);
-  const step = range.tagLength === 8 ? 16n : 1n;
   const values: bigint[] = [];
 
-  for (let value = start; value <= end; value += step) values.push(value);
+  for (let value = start; value <= end; value += 1n) values.push(value);
   return values;
 }
 
 export function countSelectedTags(ranges: readonly TagRangeDefinition[]): bigint {
-  return ranges.reduce((total, range) => {
-    const step = range.tagLength === 8 ? 16n : 1n;
-    return total + (BigInt(range.end) - BigInt(range.start)) / step + 1n;
-  }, 0n);
+  return ranges.reduce(
+    (total, range) => total + BigInt(range.end) - BigInt(range.start) + 1n,
+    0n,
+  );
 }
 
 export async function generateTags(
@@ -57,10 +55,6 @@ export async function generateTags(
   const baseUrl = validateBaseUrl(baseUrlInput);
   if (!baseUrl.ok) throw new Error(baseUrl.errors.join(" "));
   if (!secrets.feistelSecret) throw new Error("Das FEISTEL Secret ist erforderlich.");
-  if (ranges.some((range) => range.tagLength === 8) && !secrets.hmacSecret) {
-    throw new Error("Das HMAC Secret ist für achtstellige TAGs erforderlich.");
-  }
-
   const totalAsBigInt = countSelectedTags(ranges);
   if (totalAsBigInt > BigInt(MAX_TAGS_PER_RUN)) {
     throw new Error(`Es dürfen maximal ${MAX_TAGS_PER_RUN.toLocaleString("de-DE")} TAGs je Lauf generiert werden.`);
@@ -79,7 +73,6 @@ export async function generateTags(
       const requestedValue = values[ordinal];
       const encoded = await encodeTagId(requestedValue, range.tagLength as TagLength, {
         FEISTEL_SECRET_S01: secrets.feistelSecret,
-        TAG_HMAC_SECRET_S01: secrets.hmacSecret,
       });
 
       if (!encoded) {
@@ -155,7 +148,7 @@ export function parseTagListJson(input: string): TagListExport {
   const qrIdCase: QrIdCase = parsed.source.qrIdCase === "upper" ? "upper" : "lower";
   const seen = new Set<string>();
   for (const tag of parsed.tags) {
-    if (!/^[0-9a-z]{6}$|^[0-9a-z]{8}$/.test(tag.tagId) || seen.has(tag.tagId)) {
+    if (!/^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/.test(tag.tagId) || seen.has(tag.tagId)) {
       throw new Error("Die TAG-Liste enthält ungültige oder doppelte TAG-IDs.");
     }
     if (tag.url !== qrPayload(url.value, tag.tagId, qrIdCase)) {

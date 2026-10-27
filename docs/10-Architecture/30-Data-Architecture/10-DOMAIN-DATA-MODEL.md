@@ -80,7 +80,7 @@ Die Darstellung abstrahiert optionale Features wie Lost & Found, Chat, Guestbook
 | Objekt                       | Fachliche Aufgabe                                                  | Primärschlüssel / stabile Identität                                                   | Wesentliche Attribute                                                                                | Autorität                      |
 | ---------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------- |
 | **TAG**                | verwaltetes physisches oder selbstgedrucktes TAG als Kernaggregate | interne`tagId`-Referenz; fachlich eindeutig durch öffentliche ID und kanonischen Wert | Lifecycle-Status, Ausgabedatum, Range-/Gruppenkontext, Aktivierungs- und Ablaufzeit                  | TCP                             |
-| **TAG Identity**       | kryptografisch und öffentlich relevante TAG-Identität            | `tagId` plus `(length, decodedValue)`                                                | kanonische Base36-`tagId`, `length`, vollständiger `decodedValue`, ggf. 8-stelliger Basisslot | TCP; Edge prüft nur abgeleitet |
+| **TAG Identity**       | kryptografisch und öffentlich relevante TAG-Identität            | `tagId` plus `(length, decodedValue)`                                                | kanonische Base36-`tagId`, `length`, vollständiger linearer `decodedValue` | TCP; Edge prüft nur abgeleitet |
 | **TAG Range**          | reservierter, lückenfreier numerischer TAG-Bereich                | stabile`rangeId`                                                                       | `start`, `end`, `length`, `active`, `groupId`                                              | TCP                             |
 | **TAG Group**          | logische Standardgruppierung mehrerer Ranges                       | `groupId`                                                                              | Bezeichnung, Standard-Feature-Zuweisung, Status                                                      | TCP                             |
 | **Feature Definition** | wiederverwendbare, schema-validierte Routing-/App-Funktion         | `featureId`                                                                            | Typ, aktiv, sichere URL-/App-Vorlage, typspezifische Attribute                                       | TCP                             |
@@ -89,13 +89,13 @@ Die Darstellung abstrahiert optionale Features wie Lost & Found, Chat, Guestbook
 
 #### Identitätsinvarianten
 
-1. `tagId` ist eine kanonische, kleingeschriebene Base36-ID mit exakt 6 oder 8 Stellen.
+1. `tagId` ist eine kanonische, kleingeschriebene Base36-ID mit exakt 6, 8 oder 10 Stellen.
 2. `(length, decodedValue)` und `tagId` sind jeweils global eindeutig.
-3. `decodedValue` ist immer der vollständige Feistel-decodierte kanonische Integer; bei 8 Stellen inklusive HMAC-Nibble.
-4. Eine TAG-Range ist global sortiert, nicht überlappend und für 8 Stellen an 16er-Slotgrenzen ausgerichtet.
+3. `decodedValue` ist immer der vollständige lineare Feistel-decodierte kanonische Integer im Raum `I(length) = [36^(length-1), 36^length)`.
+4. Eine TAG-Range ist je Länge global sortiert und nicht überlappend; ihre Grenzen sind beliebige aufeinanderfolgende kanonische Integer, ohne Slot-Ausrichtung.
 5. Ein TAG gehört durch seinen vollständigen kanonischen Wert höchstens zu einer aktiven Range und damit genau einem Gruppen-Kontext.
 6. Edge-Regelpriorität lautet: direkte TAG-Zuweisung vor Range-Zuweisung vor Gruppen-Zuweisung.
-7. Secrets, Feistel-Schlüssel und HMAC-Schlüssel sind keine Domänendaten und werden niemals an TAG-, Range-, Feature- oder Projektionsobjekte angehängt.
+7. Feistel-Schlüssel, Codec-API-Schlüssel und Redirect-Signing-Schlüssel sind keine Domänendaten und werden niemals an TAG-, Range-, Feature- oder Projektionsobjekte angehängt.
 
 ### 3.2 Produkt, Lifecycle, Besitz und Mandant
 

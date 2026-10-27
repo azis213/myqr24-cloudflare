@@ -15,7 +15,7 @@ Die zulässigen Scan-Hosts werden durch `SCAN_ENVIRONMENT` als deployment-spezif
 | Staging | `s.qr4.uk/t/{TAG-ID}` | `s.myqr24.com/t/{TAG-ID}` |
 | Produktion | `p.qr4.uk/t/{TAG-ID}` | `p.myqr24.com/t/{TAG-ID}` |
 
-Der Vergleich der Hosts erfolgt case-insensitiv. Andere Hosts, Cross-Environment-Hosts oder abweichende Pfadformen werden mit `404 Not Found` abgelehnt. Eine Tag-ID darf ausschließlich aus 6 oder 8 Base36-Zeichen (`0-9`, `a-z`, unabhängig von Groß-/Kleinschreibung) bestehen.
+Der Vergleich der Hosts erfolgt case-insensitiv. Andere Hosts, Cross-Environment-Hosts oder abweichende Pfadformen werden mit `404 Not Found` abgelehnt. Eine Tag-ID darf ausschließlich aus 6, 8 oder 10 Base36-Zeichen (`0-9`, `a-z`, unabhängig von Groß-/Kleinschreibung) bestehen.
 
 Die gewählte Scan-Domain ist eine Ausgabe- bzw. Präsentationsentscheidung für den QR-/NFC-Tag. Beide Domains einer Umgebung lösen dieselbe Tag-ID mit demselben Range-, Gruppen- und Featurebestand auf. Sie erzeugen keine separaten Tags oder Feature-Zuweisungen.
 
@@ -25,13 +25,13 @@ Die gewählte Scan-Domain ist eine Ausgabe- bzw. Präsentationsentscheidung für
 2. **Base36-Parsing:** Die ID wird verlustfrei in einen `BigInt` umgewandelt. JavaScript-`number` wird für Tag-Identitäten nicht verwendet.
 3. **Feistel-Decodierung und kanonische Längenräume:**
    - sechs Base36-Stellen werden auf einem 32-Bit-Block decodiert;
-   - acht Base36-Stellen werden auf dem geforderten 42-Bit-Block decodiert;
-   - beide Varianten verwenden getrennte Domänenbezeichner und dadurch getrennte Feistel-Round-Funktionen;
+   - acht Base36-Stellen werden auf einem 42-Bit-Block decodiert;
+   - zehn Base36-Stellen werden auf einem 52-Bit-Block decodiert;
+   - alle Varianten verwenden getrennte Domänenbezeichner und dadurch getrennte Feistel-Round-Funktionen;
    - ein Cycle-Walk beschränkt die entschlüsselte Ausgabe auf den **kanonischen Zahlenraum der jeweiligen Länge**. Für eine Länge `L` gilt exakt `36^(L-1) ≤ n < 36^L`;
-   - dadurch ist die minimale gültige sechsstellige Zahl `36^5`, die minimale gültige achtstellige Zahl `36^7`, und kein numerischer Tag-Wert kann zu mehr als einer Base36-Länge gehören.
-4. **Integritätsprüfung und 16er-Slots für achtstellige IDs:** Die vier niederwertigen Bits werden für den HMAC reserviert. Der Worker bildet ohne Shift `base = decodedValue & ~0x0f` und `suppliedHmacNibble = decodedValue & 0x0f`; das HMAC wird über `base` berechnet. Bei einer Abweichung wird der Request unmittelbar mit `404` beendet. Der nächste logische Tag-Slot entsteht durch `(lastDecodedValue & ~0x0f) + 0x10`. Ein um eins erhöhter logischer Zähler belegt daher den nächsten 16er-Slot, nicht den unmittelbar folgenden Integer. Das Prüfnibble ist ausschließlich der kryptographische Bestandteil innerhalb dieses Slots. Der vollständige decodierte Wert einschließlich Prüfnibble bleibt der kanonische Range-Key.
-5. **Range- und Regelauflösung:** Erst nach erfolgreicher Feistel- und HMAC-Prüfung wird der vollständige, kanonische Feistel-Wert gegen den globalen Range-Index geprüft. Ohne passende aktive Range endet die Auflösung mit `404`. Innerhalb der bestätigten Range prüft der Worker anschließend eine direkte Tag-Regel, danach eine optionale Range-Regel und schließlich die referenzierte Gruppe mit ihrer Gruppen-Regel bzw. ihren Features.
-6. **Feature-Ausführung:** Eine aufgelöste Redirect-Regel erzeugt einen HTTP-Redirect; andere oder mehrere Features werden als JSON-Aktionsdokument ausgeliefert. Redirect-Templates können ausschließlich serverseitig bereitgestellte Platzhalter verwenden.
+   - dadurch ist kein numerischer Tag-Wert mehr als einer Base36-Länge zugeordnet.
+4. **Range- und Regelauflösung:** Der vollständige kanonische Feistel-Wert wird gegen den globalen Range-Index geprüft. Ohne passende aktive Range endet die Auflösung mit `404`. Innerhalb der bestätigten Range prüft der Worker anschließend eine direkte Tag-Regel, danach eine optionale Range-Regel und schließlich die referenzierte Gruppe mit ihrer Gruppen-Regel bzw. ihren Features.
+5. **Feature-Ausführung:** Eine aufgelöste Redirect-Regel erzeugt einen HTTP-Redirect; andere oder mehrere Features werden als JSON-Aktionsdokument ausgeliefert. Redirect-Templates können ausschließlich serverseitig bereitgestellte Platzhalter verwenden.
 
 Fehlerhafte oder nicht existente IDs werden grundsätzlich als `404` behandelt, damit keine Informationen über interne Daten oder kryptographische Prüfungen offengelegt werden.
 
@@ -39,20 +39,15 @@ Fehlerhafte oder nicht existente IDs werden grundsätzlich als `404` behandelt, 
 
 Die Parameter sind im Code fest definiert und dürfen nicht pro Request oder über untrusted Input geändert werden.
 
-| Parameter                               | Wert                                                                                         |
-| --------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Feistel-Runden                          | 10                                                                                           |
-| Feistel-Block für 6 Zeichen            | 32 Bit, zwei 16-Bit-Hälften                                                                 |
-| Feistel-Block für 8 Zeichen            | 42 Bit, zwei 21-Bit-Hälften                                                                 |
-| Domain-Restriktion                      | Cycle-Walking auf den kanonischen Intervallraum`[36^(L-1), 36^L)`, maximal 128 Iterationen |
-| Feistel-Secret                          | Cloudflare Secret`FEISTEL_SECRET`                                                          |
-| HMAC-Secret                             | Cloudflare Secret`TAG_HMAC_SECRET`                                                         |
-| HMAC-Algorithmus                        | HMAC-SHA-256                                                                                 |
-| HMAC-Eingabe                            | `myqr24/tag/v1/8:{base}`, wobei `base = decodedValue & ~0x0f`                            |
-| HMAC-Prüfwert                          | untere 4 Bit des ersten HMAC-Bytes                                                           |
-| 8-stellige Slot-Formel                  | `decodedValue = base \| hmacNibble`                                                         |
-| Nächste 8-stellige Basis               | `(lastDecodedValue & ~0x0f) + 0x10`                                                        |
-| Schrittweite logischer 8-stelliger Tags | `nextBase - base = 16`                                                                     |
+| Parameter | Wert |
+| --- | --- |
+| Feistel-Runden | 10 |
+| Feistel-Block für 6 Zeichen | 32 Bit, zwei 16-Bit-Hälften |
+| Feistel-Block für 8 Zeichen | 42 Bit, zwei 21-Bit-Hälften |
+| Feistel-Block für 10 Zeichen | 52 Bit, zwei 26-Bit-Hälften |
+| Domain-Restriktion | Cycle-Walking auf den kanonischen Intervallraum `[36^(L-1), 36^L)`, maximal 128 Iterationen |
+| Feistel-Secret | Cloudflare Secret `FEISTEL_SECRET` |
+| Vergabe | vollständige lineare, aufeinanderfolgende Integer je Range |
 
 Die Feistel-Round-Funktion leitet pro Variante und Runde per SHA-256 aus Secret, Variantendomain, Rundennummer und rechter Hälfte einen Halbblock ab. Die Entschlüsselung verarbeitet die Runden in umgekehrter Reihenfolge.
 
@@ -70,15 +65,13 @@ Konkret:
 
 | Länge | Untergrenze inklusive | Obergrenze exklusiv |
 | ------ | --------------------- | ------------------- |
-| 6      | `36^5`              | `36^6`            |
-| 7      | `36^6`              | `36^7`            |
-| 8      | `36^7`              | `36^8`            |
+| 6 | `36^5` | `36^6` |
+| 8 | `36^7` | `36^8` |
+| 10 | `36^9` | `36^10` |
 
 Damit beginnt eine achtstellige Tag-ID zwingend bei `36^7`, also exakt am ersten Wert, der sieben Base36-Stellen nicht mehr genügt. Ein nach Feistel-Decodierung außerhalb von `I(L)` liegender Wert wird per Cycle-Walking erneut decodiert, bis er in `I(L)` liegt; andernfalls wird der Tag fail-closed abgelehnt.
 
 > **Implementierungsfolgeregel:** Die Cycle-Walk-Grenzen müssen in `src/index.ts` auf `[36^(L-1), 36^L)` umgesetzt werden. Die vorherige Begrenzung auf `[0, 36^L)` ist für diese Anforderung nicht ausreichend und darf nicht als finales Produktionsformat betrachtet werden.
-
-> Ein 4-Bit-MAC erkennt nur zufällige bzw. nicht gezielt erzeugte fehlerhafte IDs mit begrenzter Wahrscheinlichkeit. Er ist hier als vorgegebene Integritätsprüfung umgesetzt, aber kein Ersatz für ein ausreichend langes Authentifizierungsmerkmal.
 
 ## Cloudflare Bindings
 
@@ -88,15 +81,13 @@ Secrets werden nicht in `wrangler.toml` gespeichert und müssen für jede Umgebu
 
 ```sh
 npx wrangler secret put FEISTEL_SECRET --env staging
-npx wrangler secret put TAG_HMAC_SECRET --env staging
 npx wrangler secret put REDIRECT_SIGNING_SECRET --env staging
 
 npx wrangler secret put FEISTEL_SECRET --env production
-npx wrangler secret put TAG_HMAC_SECRET --env production
 npx wrangler secret put REDIRECT_SIGNING_SECRET --env production
 ```
 
-Staging und Produktion dürfen weder Feistel-, HMAC- noch Redirect-Signing-Secrets teilen.
+Staging und Produktion dürfen weder Feistel- noch Redirect-Signing-Secrets teilen.
 
 ### KV Namespaces und Worker-Routen
 
@@ -145,17 +136,7 @@ Der Key `tag-range-index` enthält ein JSON-Dokument mit **global nicht überlap
 }
 ```
 
-Der Lookup-Key ist stets der vollständige Feistel-decodierte, kanonische Wert. Für achtstellige IDs gilt:
-
-```text
-base              = decodedValue & ~0x0f
-hmacNibble        = decodedValue & 0x0f
-decodedValue      = base | hmacNibble
-```
-
-Der logische Tag-Zähler verwendet somit 16er-Slots. Die nächste Basis ergibt sich ohne Shift direkt als `(lastDecodedValue & ~0x0f) + 0x10`; das HMAC-Nibble ist kein eigener fortlaufender Wert. Die vier HMAC-Bits gehören dennoch zum konkreten, validierten Range-Key und werden nicht vor der Range-Suche entfernt. Dies verhindert Kollisionen mit den Räumen kürzerer ID-Längen.
-
-Ranges für achtstellige Tags sollen ganze Slots abdecken (`start % 16 = 0`, `end % 16 = 15`). Die 15 nicht mit dem korrekten HMAC belegten Werte jedes Slots erreichen diesen Lookup niemals, weil die HMAC-Prüfung davor fail-closed durchgeführt wird.
+Der Lookup-Key ist stets der vollständige Feistel-decodierte, kanonische Wert. Ranges werden pro Länge als lineare, aufeinanderfolgende Integer-Intervalle modelliert; `start` und `end` liegen jeweils im kanonischen Raum der angegebenen Länge. Für 6-, 8- und 10-stellige IDs existieren keine Prüfnibbles, Slotgrenzen oder nicht belegbaren Zwischenwerte.
 
 Da Cloudflare KV keine numerische Range-Abfrage bereitstellt, lädt der Worker diesen kompakten Index und durchsucht ihn binär. Bei sehr großen oder häufig veränderten Indizes muss das Modell später auf geshardete Präfix-Indizes, D1 oder Durable Objects erweitert werden.
 
@@ -165,20 +146,13 @@ Die spätere Verwaltungsdatenbank ist die autoritative Quelle für bereits ausge
 
 | Feld             | Repräsentation          | Zweck                                                             |
 | ---------------- | ------------------------ | ----------------------------------------------------------------- |
-| `decodedValue` | Dezimaler Integer-String | Vollständiger Feistel-decodierter und HMAC-validierter Range-Key |
-| `tagId`        | Base36-String            | Öffentliche 6- oder 8-stellige NFC-/QR-Tag-ID                    |
+| `decodedValue` | Dezimaler Integer-String | Vollständiger Feistel-decodierter kanonischer Range-Key |
+| `tagId` | Base36-String | Öffentliche 6-, 8- oder 10-stellige NFC-/QR-Tag-ID |
 | `length`       | Integer                  | Länge der öffentlichen Tag-ID                                   |
 | `groupId`      | String                   | Zuordnungs- bzw. Ausgabekontext                                   |
 | `createdAt`    | Zeitstempel              | Auditierbarkeit                                                   |
 
-Bei achtstelligen IDs wird ausschließlich der vollständige HMAC-validierte Integer gespeichert. Für die nächste Vergabe wird die Basis des zuletzt ausgegebenen Werts bestimmt und um genau einen Slot erhöht:
-
-```text
-nextBase = (lastDecodedValue & ~0x0f) + 0x10
-nextDecodedValue = nextBase | HMAC4(nextBase)
-```
-
-`lastDecodedValue + 1` ist ausdrücklich keine gültige Vergaberegel. Eindeutige Constraints für `(length, decodedValue)` und `tagId` verhindern neben der festen Slot-Formel auch bei parallelen Vergabevorgängen doppelte Ausgaben.
+Für jede unterstützte Länge wird der vollständige Feistel-decodierte Wert gespeichert. Die nächste Vergabe innerhalb einer Range verwendet den nächsten noch freien linearen Integer. Eindeutige Constraints für `(length, decodedValue)` und `tagId` verhindern bei parallelen Vergabevorgängen doppelte Ausgaben.
 
 ### Zukünftige Verwaltungs- und Allocation-API
 
@@ -188,17 +162,17 @@ Die API verwaltet mehrere Ranges für unterschiedliche Zwecke. Jede Range besitz
 
 Typische Vergabeflüsse:
 
-1. Ein Client fordert für einen bestimmten Zweck eine neue ID mit Länge 6, 7 oder 8 an.
+1. Ein Client fordert für einen bestimmten Zweck eine neue ID mit Länge 6, 8 oder 10 an.
 2. Das Backend wählt eine aktive, passende Range dieses Zwecks.
-3. Es reserviert atomar den nächsten freien Slot innerhalb dieser Range.
-4. Es erzeugt daraus den vollständigen kanonischen Integer, berechnet bei achtstelligen IDs den HMAC-Nibble und codiert die öffentliche Base36-Tag-ID.
+3. Es reserviert atomar den nächsten freien linearen Integer innerhalb dieser Range.
+4. Es kodiert den vollständigen kanonischen Integer über den privaten Codec in die öffentliche Base36-Tag-ID.
 5. Es speichert Integer und Tag-ID dauerhaft und liefert beide Werte an den Client zurück.
 
-Bereits physisch gedruckte Tags können ebenfalls registriert werden. Dabei muss das Backend die gedruckte Base36-ID vollständig decodieren, HMAC und kanonischen Längenraum prüfen und verifizieren, dass der resultierende vollständige Integer exakt in einer für den Zweck zulässigen Range liegt. Erst danach darf die ID als vergeben gespeichert oder einer Gruppe zugeordnet werden.
+Bereits physisch gedruckte Tags können ebenfalls registriert werden. Dabei muss das Backend die gedruckte Base36-ID vollständig decodieren, den kanonischen Längenraum prüfen und verifizieren, dass der resultierende vollständige Integer exakt in einer für den Zweck zulässigen Range liegt. Erst danach darf die ID als vergeben gespeichert oder einer Gruppe zugeordnet werden.
 
 Für parallele Vergaben sind Datenbanktransaktionen, Zeilen-/Range-Locks oder ein atomarer Counter nötig. Ein reines „letzten Wert lesen, hochzählen, schreiben“ ohne Nebenläufigkeitsschutz ist nicht ausreichend.
 
-> **Unterstützte Längen:** Der Edge-Worker implementiert aktuell 6 und 8 Base36-Stellen. Die Verwaltungs-API darf 7-stellige IDs erst ausgeben, wenn der Worker um eine separat definierte 7-stellige Feistel-Domäne, Cycle-Walking und Testvektoren erweitert wurde. Der kanonische Raum dafür ist bereits eindeutig: `I(7) = [36^6, 36^7)`.
+> **Unterstützte Längen:** Der Edge-Worker implementiert aktuell 6, 8 und 10 Base36-Stellen. Die Verwaltungs-API darf ausschließlich diese drei Längen ausgeben, solange weitere Feistel-Domänen nicht ausdrücklich spezifiziert, implementiert und getestet sind.
 
 ### Regelauflösung und Überschreibungsreihenfolge
 
@@ -213,7 +187,7 @@ Eine direkte Tag-Regel darf nur dann ausgeführt werden, wenn der Tag-Wert in ei
 
 ### Direkte Tag-Regel
 
-Der KV-Key `tag:{decodedValue}` verwendet den vollständigen dezimalen kanonischen Integer, einschließlich HMAC-Nibble bei achtstelligen Tags:
+Der KV-Key `tag:{decodedValue}` verwendet den vollständigen dezimalen kanonischen Integer:
 
 ```json
 {
@@ -400,7 +374,7 @@ Ohne auflösbares Redirect-Feature liefert der Worker die aufgelösten Features 
 - `BigInt` wird für alle Tag-Identitäten, Grenzen und Decodierungswerte verwendet.
 - Alle kanonischen ID-Räume folgen der Invariante `[36^(L-1), 36^L)` und sind dadurch längendisjunkt.
 - Der Range-Index ist global sortiert und nicht überlappend; daher kann ein Tag höchstens einer Gruppe zugeordnet werden.
-- Bei achtstelligen IDs wird die maskierte Basis (`decodedValue & ~0x0f`) per HMAC geprüft; der vollständige HMAC-validierte decodierte Wert bleibt der Range-Key.
+- Der vollständige Feistel-decodierte Wert bleibt unabhängig von der Länge der Range-Key; jede Range ist linear und enthält keine Slotlücken.
 - Signierte Redirects verwenden `REDIRECT_SIGNING_SECRET` und eine auf 10 bis 300 Sekunden begrenzte TTL; der Empfänger muss HMAC und Ablauf serverseitig prüfen.
 - Ablauf und HMAC ersetzen keinen atomaren Einmal-Token-Verbrauch beim Zielsystem.
-- Invalidität, HMAC-Fehler, fehlende Range und fehlende Gruppe führen ohne Detailinformationen zu `404`.
+- Invalidität, fehlende Range und fehlende Gruppe führen ohne Detailinformationen zu `404`.

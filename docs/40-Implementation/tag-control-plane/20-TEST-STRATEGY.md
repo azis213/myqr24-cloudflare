@@ -20,7 +20,7 @@
 
 | Ebene | Zweck | Beispiele | Ausführung |
 | --- | --- | --- | --- |
-| Unit | deterministische Fachlogik | Range-Invarianten, Statusautomaten, Slotberechnung, JSON-Snapshot-Prüfsumme | bei jedem Commit |
+| Unit | deterministische Fachlogik | Range-Invarianten, Statusautomaten, lineare Vergabe, JSON-Snapshot-Prüfsumme | bei jedem Commit |
 | Service | Domänenservices und Policies | Allocator, JSON-Exportauftrag, PIN-Schutz, QA-Gate, Projektionsgenerator | bei jedem Commit |
 | Integration | MySQL, Transaktionen, Locks, Outbox und Adapter | Parallelreservierung, Migrationslauf, Retry, Publish-Markierung | CI mit isolierter DB |
 | Contract | Grenzen zu Edge Router, Control Center und TAG-App | KV-Schema, interne Commands, `PublicTagView` | CI vor Staging |
@@ -50,8 +50,8 @@ Die gemeinsame [lokale PHP-/MySQL-Testtopologie](../../../tools/local-php-mysql/
 
 ### 3.2 CP-I02 – Pools, Ranges, Vergabe und Lebenszyklus
 
-- Randwerte der kanonischen 6-/8-stelligen Räume.
-- Nichtüberlappung, Sortierung und vollständige 16er-Slots für achtstellige Ranges.
+- Randwerte der kanonischen 6-/8-/10-stelligen Räume.
+- Nichtüberlappung, Sortierung und lineare Integer-Intervalle ohne Slotgrenzen.
 - Poolbindung, Kundensegment-/Organisationsgrenzen, Kapazitätswarnungen und Erschöpfung.
 - Gleichzeitige Reservierungen in mehreren DB-Verbindungen.
 - Idempotente Wiederholung nach Client- oder Prozessabbruch.
@@ -115,7 +115,7 @@ Jede sicherheitsrelevante Funktion erhält mindestens einen Test für:
 | Gate | Voraussetzung | Mindestnachweis |
 | --- | --- | --- |
 | CP-G1 – Fundament | CP-I01-Tests erfolgreich | Migration, Rollback, AuthZ-/Audit-/Secret-Prüfung |
-| CP-G2 – Vergabe | CP-G1 erfüllt | Parallelitäts-, Slot-, Retry- und Lifecycle-Tests |
+| CP-G2 – Vergabe | CP-G1 erfüllt | Parallelitäts-, lineare Vergabe-, Retry- und Lifecycle-Tests |
 | CP-G3 – Claim und JSON-Export | CP-G2 erfüllt | atomare Exportauftragsanlage, Prüfhash-/PIN-Verschlüsselung, Parallelclaim, Lockout, unveränderlicher JSON-Snapshot mit Wiederdownload, QA-/Ausschuss-/Nachdruckreferenzen |
 | CP-G4 – Publishing | CP-G3 erfüllt, Staging-KV bestätigt | Projektion, Retry, Publish und Unpublish im isolierten Namespace |
 | CP-G5 – Public API | CP-G4 erfüllt | Contract-, Leak-, CORS-, Cache- und Rate-Limit-Tests |

@@ -33,7 +33,6 @@ import { editorTextStyle, renderLabelDesigner, renderRichText } from "./label-de
 
 declare const __TAG_GEN_DEFAULT_SECRETS__: {
   feistelSecret: string;
-  hmacSecret: string;
 };
 
 type View = "ranges" | "tags" | "templates" | "print" | "transfer";
@@ -63,7 +62,6 @@ let rangeErrors: string[] = [];
 let generationProgress = "";
 let secrets = { ...__TAG_GEN_DEFAULT_SECRETS__ };
 let showFeistelSecret = false;
-let showHmacSecret = false;
 let selectedTagIndex = 0;
 let draftRange = createRangeDraft();
 let rangeInputMode: RangeInputMode = "absolute";
@@ -223,12 +221,12 @@ function bindShell(): void {
   app.querySelector("#load-local")?.addEventListener("click", loadLocal);
 }
 
-function rangeSpaceDescription(length: 6 | 8): string {
+function rangeSpaceDescription(length: 6 | 8 | 10): string {
   const lower = lowerBound(length);
   const maxOffset = maximumOffset(length);
-  const highestValue = length === 8 ? lower + maxOffset * 16n : lower + maxOffset;
+  const highestValue = lower + maxOffset;
 
-  return `Untergrenze: ${formatInteger(lower)} · höchste ${length === 8 ? "Basis" : ""}zahl: ${formatInteger(highestValue)} · Zahlenraum: ${formatInteger(maxOffset + 1n)} ${length === 8 ? "Slots" : "Werte"}`;
+  return `Untergrenze: ${formatInteger(lower)} · höchste Zahl: ${formatInteger(highestValue)} · Zahlenraum: ${formatInteger(maxOffset + 1n)} Werte`;
 }
 
 function renderRanges(): void {
@@ -265,7 +263,6 @@ function renderRanges(): void {
       <article class="card secret-card">
         <div class="card-heading"><div><p class="eyebrow">NUR LAUFZEIT</p><h2>Codec-Geheimnisse</h2></div><span class="status neutral">nicht gespeichert</span></div>
         <label>FEISTEL Secret<div class="secret-input"><input id="feistel-secret" type="${showFeistelSecret ? "text" : "password"}" autocomplete="off" value="${escapeHtml(secrets.feistelSecret)}"><button type="button" class="icon-button" id="toggle-feistel-secret" aria-label="FEISTEL Secret ${showFeistelSecret ? "ausblenden" : "anzeigen"}" title="Secret ${showFeistelSecret ? "ausblenden" : "anzeigen"}">${showFeistelSecret ? "◉" : "◌"}</button></div></label>
-        <label>HMAC Secret <small>(für 8-stellige TAGs)</small><div class="secret-input"><input id="hmac-secret" type="${showHmacSecret ? "text" : "password"}" autocomplete="off" value="${escapeHtml(secrets.hmacSecret)}"><button type="button" class="icon-button" id="toggle-hmac-secret" aria-label="HMAC Secret ${showHmacSecret ? "ausblenden" : "anzeigen"}" title="Secret ${showHmacSecret ? "ausblenden" : "anzeigen"}">${showHmacSecret ? "◉" : "◌"}</button></div></label>
         <p class="hint">Aus <code>tools/.env.local</code> lokal vorbelegt; weder gespeichert noch exportiert.</p>
       </article>
     </section>
@@ -275,9 +272,9 @@ function renderRanges(): void {
       ${rangeErrors.length ? `<div class="form-errors">${rangeErrors.map((item) => `<div>${escapeHtml(item)}</div>`).join("")}</div>` : ""}
       <div class="range-form">
         <label>Name<input id="range-name" value="${escapeHtml(draftRange.name)}" placeholder="z. B. Veranstaltung Nord"></label>
-        <label>TAG-Länge<select id="range-length"><option value="6" ${draftRange.tagLength === 6 ? "selected" : ""}>6 Zeichen</option><option value="8" ${draftRange.tagLength === 8 ? "selected" : ""}>8 Zeichen</option></select></label>
+        <label>TAG-Länge<select id="range-length"><option value="6" ${draftRange.tagLength === 6 ? "selected" : ""}>6 Zeichen</option><option value="8" ${draftRange.tagLength === 8 ? "selected" : ""}>8 Zeichen</option><option value="10" ${draftRange.tagLength === 10 ? "selected" : ""}>10 Zeichen</option></select></label>
         <label>Eingabeart<select id="range-input-mode"><option value="absolute" ${rangeInputMode === "absolute" ? "selected" : ""}>Absolute Werte</option><option value="offset" ${rangeInputMode === "offset" ? "selected" : ""}>Offsets ab Untergrenze</option></select></label>
-        <div class="wide range-space"><strong>${rangeSpaceDescription(draftRange.tagLength)}</strong><small>${draftRange.tagLength === 8 ? "Ein Offset entspricht einem 16-ausgerichteten Basiswert." : "Offsets werden direkt zur Untergrenze addiert."}</small></div>
+        <div class="wide range-space"><strong>${rangeSpaceDescription(draftRange.tagLength)}</strong><small>Offsets werden direkt zur Untergrenze addiert.</small></div>
         <label>${startLabel}<input id="range-start" inputmode="numeric" value="${escapeHtml(draftRange.start)}" placeholder="${rangeInputMode === "offset" ? "z. B. 0" : "z. B. 60.466.176"}"></label>
         <label>${endLabel}<input id="range-end" inputmode="numeric" value="${escapeHtml(draftRange.end)}" placeholder="${rangeInputMode === "offset" ? "z. B. 24" : "z. B. 60.466.200"}"></label>
         <label>QR-Version<select id="range-qr-version"><option value="auto" ${draftRange.qrProfile.version === "auto" ? "selected" : ""}>Automatisch</option>${Array.from({ length: 40 }, (_, index) => `<option value="${index + 1}" ${draftRange.qrProfile.version === index + 1 ? "selected" : ""}>Version ${index + 1}</option>`).join("")}</select></label>
@@ -286,7 +283,7 @@ function renderRanges(): void {
         ${offsetPreview?.ok ? `<div class="wide resolved-range">Berechnete absolute Werte: <strong>${formatInteger(offsetPreview.value.start)}</strong> bis <strong>${formatInteger(offsetPreview.value.end)}</strong></div>` : ""}
         <p class="wide hint">Der Etikettentext wird in der Etikettenvorlage als formatierbares Textfeld gepflegt.</p>
       </div>
-      <div class="toolbar"><button class="primary" id="add-range">${rangeVersionSourceName ? "Neue Bereichsversion hinzufügen" : "Bereich hinzufügen"}</button><span class="hint">${rangeVersionSourceName ? `Fortführung von „${escapeHtml(rangeVersionSourceName)}“: Die bestehende Range bleibt unverändert.` : rangeInputMode === "offset" ? "Gespeichert und exportiert werden immer die berechneten absoluten Werte." : "8-stellige Bereiche benötigen bei Von und Bis durch 16 teilbare Basiswerte."}</span></div>
+      <div class="toolbar"><button class="primary" id="add-range">${rangeVersionSourceName ? "Neue Bereichsversion hinzufügen" : "Bereich hinzufügen"}</button><span class="hint">${rangeVersionSourceName ? `Fortführung von „${escapeHtml(rangeVersionSourceName)}“: Die bestehende Range bleibt unverändert.` : "Gespeichert und exportiert werden immer die berechneten absoluten Werte."}</span></div>
     </section>
 
     <section class="card">
@@ -303,7 +300,7 @@ function renderRanges(): void {
       name: inputValue("range-name"),
       start: inputValue("range-start"),
       end: inputValue("range-end"),
-      tagLength: Number(inputValue("range-length")) as 6 | 8,
+      tagLength: Number(inputValue("range-length")) as 6 | 8 | 10,
       labelText: "",
       qrProfile: {
         version: inputValue("range-qr-version") === "auto" ? "auto" as const : Number(inputValue("range-qr-version")),
@@ -340,9 +337,7 @@ function renderRanges(): void {
     renderRanges();
   }));
   app.querySelector("#feistel-secret")?.addEventListener("input", (event) => { secrets.feistelSecret = (event.target as HTMLInputElement).value; });
-  app.querySelector("#hmac-secret")?.addEventListener("input", (event) => { secrets.hmacSecret = (event.target as HTMLInputElement).value; });
   app.querySelector("#toggle-feistel-secret")?.addEventListener("click", () => { showFeistelSecret = !showFeistelSecret; renderRanges(); });
-  app.querySelector("#toggle-hmac-secret")?.addEventListener("click", () => { showHmacSecret = !showHmacSecret; renderRanges(); });
   ["range-name", "range-start", "range-end", "range-text"].forEach((id) => app.querySelector(`#${id}`)?.addEventListener("input", refreshDraft));
   app.querySelector("#range-length")?.addEventListener("change", () => {
     refreshDraft();
@@ -574,7 +569,7 @@ function renderTransfer(): void {
       <article class="card"><p class="eyebrow">KONFIGURATION</p><h2>Exportieren & importieren</h2><p>Bereiche, Basis-URL, Vorlagen und Druckeinstellungen. Geheimnisse und TAG-Listen sind nicht enthalten.</p><div class="toolbar"><button class="primary" id="export-config">Konfiguration exportieren</button><label class="file-button">Konfiguration importieren<input id="import-config" type="file" accept="application/json"></label></div></article>
       <article class="card"><p class="eyebrow">TAG-LISTE</p><h2>Liste importieren</h2><p>Importierte TAG-Listen werden nicht kryptografisch verifiziert, bis Secrets erneut eingegeben wurden.</p><label class="file-button">TAG-Liste importieren<input id="import-tags" type="file" accept="application/json"></label></article>
     </section>
-    <section class="card"><p class="eyebrow">DATENSCHUTZ</p><h2>Was wird gespeichert?</h2><ul><li>Lokal speicherbar: Basis-URL, Bereiche, Etikettenvorlagen, Druckstartposition.</li><li>Nur Laufzeit: Feistel- und HMAC-Secret.</li><li>Explizit exportierbar: Konfigurationen und TAG-Listen ohne Geheimnisse.</li></ul></section>
+    <section class="card"><p class="eyebrow">DATENSCHUTZ</p><h2>Was wird gespeichert?</h2><ul><li>Lokal speicherbar: Basis-URL, Bereiche, Etikettenvorlagen, Druckstartposition.</li><li>Nur Laufzeit: Feistel-Secret.</li><li>Explizit exportierbar: Konfigurationen und TAG-Listen ohne Geheimnisse.</li></ul></section>
   `);
   app.querySelector("#export-config")?.addEventListener("click", () => download(`myqr24-tag-config-${new Date().toISOString().slice(0, 10)}.json`, createConfigExport(configuration)));
   app.querySelector<HTMLInputElement>("#import-config")?.addEventListener("change", async (event) => {

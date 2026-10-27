@@ -8,13 +8,13 @@
 
 ## 1. Zweck und fachliche Grenze
 
-Dieser interne Vertrag stellt der serverseitigen TAG Control Plane eine kleine, authentisierte API für die Feistel-/HMAC-Codec-Operationen bereit. Er erzeugt öffentliche kanonische TAG-IDs aus bereits autoritativ reservierten Werten und prüft bereits ausgegebene TAG-IDs.
+Dieser interne Vertrag stellt der serverseitigen TAG Control Plane eine kleine, authentisierte API für Feistel-Codec-Operationen bereit. Er erzeugt öffentliche kanonische TAG-IDs aus bereits autoritativ reservierten Werten und prüft bereits ausgegebene TAG-IDs.
 
-Die Feistel- und HMAC-Implementierung liegen gemeinsam in `apps/edge-router/src/codec/index.ts`. Sowohl der öffentliche Scan-Worker als auch der private Codec-Worker importieren diesen Kern. Damit verwenden beide Worker dieselben Algorithmen und Staging-Secrets, ohne dass der Scan-Pfad den Codec-Worker über das Netzwerk aufruft.
+Die Feistel-Implementierung liegt in `apps/edge-router/src/codec/index.ts`. Sowohl der öffentliche Scan-Worker als auch der private Codec-Worker importieren diesen Kern. Damit verwenden beide Worker denselben Algorithmus und dasselbe Staging-Secret, ohne dass der Scan-Pfad den Codec-Worker über das Netzwerk aufruft.
 
 Die TAG Control Plane bleibt fachlich autoritativ für:
 
-- Range-, Pool- und Slot-Validierung;
+- Range- und Pool-Validierung;
 - atomare Reservierung im kanonischen `decodedValue`-Raum;
 - Idempotenz, Lifecycle, Audit und Produktionsfreigaben;
 - Speicherung der zurückgelieferten öffentlichen `tagId`;
@@ -30,7 +30,7 @@ Der implementierte Slice umfasst einzelne Encode- und Decode-Operationen. Er bie
 - keine Range-Reservierung, Datenbankmutation oder KV-Projektion;
 - keine KV-Bindung und kein `REDIRECT_SIGNING_SECRET_S01`;
 - keine CORS-Freigabe;
-- keine Ausgabe von Feistel-, HMAC-, Redirect- oder Publisher-Secrets;
+- keine Ausgabe von Feistel-, Redirect- oder Publisher-Secrets;
 - kein Batch-Encoding, keine `Idempotency-Key`-Verarbeitung und keine Worker-seitige Idempotenzspeicherung;
 - kein im Worker implementiertes Rate Limit, IP-Allowlisting oder Cloudflare Access.
 
@@ -43,7 +43,6 @@ Diese aufgeschobenen Betriebs- und Batch-Funktionen bleiben Teil von `CP-BLK-005
 | Secret | Speicherort | Verwendung |
 | --- | --- | --- |
 | `FEISTEL_SECRET_S01` | Cloudflare Staging Worker Secret: Scan-Worker und Codec-Worker | feste 10-Runden-Feistel-Codierung bzw. -Decodierung |
-| `TAG_HMAC_SECRET_S01` | Cloudflare Staging Worker Secret: Scan-Worker und Codec-Worker | 4-Bit-Integritätsnibble für achtstellige TAGs |
 | `TAG_CODEC_API_KEY_S01` | Cloudflare Staging Codec-Worker Secret und serverseitiger Dogado-Secret-Speicher der Staging Control Plane | Authentisierung Control Plane → Codec-Worker |
 | `REDIRECT_SIGNING_SECRET_S01` | Cloudflare Staging Scan-Worker Secret | nicht an den Codec-Worker gebunden |
 
@@ -95,14 +94,14 @@ POST /api/v1/tag-codec/encode
 
 | Feld | Typ | Regeln |
 | --- | --- | --- |
-| `length` | Integer | Ausschließlich `6` oder `8`. |
+| `length` | Integer | Ausschließlich `6`, `8` oder `10`. |
 | `value` | Dezimalstring | Keine Vorzeichen, keine führenden Nullen außer `0`; kanonisch im Base36-Raum der Länge. |
 
 Zusätzliche Regeln:
 
-1. Für Länge `6` ist `value` der vollständige kanonische Decoded-Integer.
-2. Für Länge `8` ist `value` eine durch 16 teilbare kanonische Basis. Der Codec ergänzt das HMAC-Nibble und gibt den vollständigen Wert zurück.
-3. Die Control Plane validiert vor dem Request weiterhin Range, Pool, Slotgrenzen und atomare Reservierung.
+1. Für jede Länge ist `value` der vollständige lineare kanonische Decoded-Integer.
+2. Der Codec verändert den Wert nicht; er kodiert ihn ausschließlich als öffentliche Base36-ID.
+3. Die Control Plane validiert vor dem Request weiterhin Range, Poolgrenzen und atomare Reservierung.
 
 Erfolgsantwort:
 
@@ -116,7 +115,7 @@ Erfolgsantwort:
 }
 ```
 
-`tag.id` ist lowercase Base36 und exakt `length` Zeichen lang. Bei Länge `8` enthält `tag.value` den vollständigen HMAC-validierten Integer.
+`tag.id` ist lowercase Base36 und exakt `length` Zeichen lang. `tag.value` entspricht für jede Länge unverändert dem vollständigen kanonischen Eingabewert.
 
 ### 5.2 Decode
 
@@ -132,7 +131,7 @@ POST /api/v1/tag-codec/decode
 
 | Feld | Typ | Regeln |
 | --- | --- | --- |
-| `tagId` | String | Lowercase oder uppercase Base36, exakt 6 oder 8 Zeichen; der Worker normalisiert nach lowercase. |
+| `tagId` | String | Lowercase oder uppercase Base36, exakt 6, 8 oder 10 Zeichen; der Worker normalisiert nach lowercase. |
 
 Erfolgsantwort:
 
@@ -146,13 +145,13 @@ Erfolgsantwort:
 }
 ```
 
-Bei achtstelligen IDs wird die HMAC-Prüfung vor der Erfolgsantwort ausgeführt.
+Der zurückgegebene Wert ist für jede Länge der vollständige lineare kanonische Range-Key.
 
 ## 6. Fehlernormalisierung
 
 | HTTP | Fehlercode | Wann |
 | --- | --- | --- |
-| `400` | `invalid_request` | ungültiges JSON, falscher Content-Type, Schema, Länge, nichtkanonischer Wert, nicht ausgerichtete Achtstellen-Basis oder ungültige TAG-ID einschließlich HMAC-Fehler |
+| `400` | `invalid_request` | ungültiges JSON, falscher Content-Type, Schema, nicht unterstützte Länge, nichtkanonischer Wert oder ungültige TAG-ID |
 | `401` | `unauthorized` | fehlender oder ungültiger API-Key |
 | `404` | `not_found` | anderer Codec-Pfad |
 | `405` | Plain text `Method Not Allowed` | andere HTTP-Methode; Header `Allow: POST` |
@@ -168,11 +167,11 @@ JSON-Fehlerantworten sind normiert:
 }
 ```
 
-Die Antwort enthält keine Geheimnisse, Key-IDs, Feistel-/HMAC-Zwischenwerte oder interne Validierungsdetails.
+Die Antwort enthält keine Geheimnisse, Key-IDs, Feistel-Zwischenwerte oder interne Validierungsdetails.
 
 ## 7. Rotation, Logging und Betriebsgrenzen
 
-Der API-Key wird getrennt von Feistel-/HMAC-Secrets rotiert:
+Der API-Key wird getrennt vom Feistel-Secret rotiert:
 
 1. neuen Key im Cloudflare-Secret und im serverseitigen Dogado-Secret-Speicher hinterlegen;
 2. Control Plane auf den neuen Key umstellen und einen authentisierten Staging-Smoketest ausführen;
@@ -186,10 +185,10 @@ Worker-Logs dürfen weder `Authorization` noch Request-Bodies, `value`-Listen, T
 | Test-ID | Nachweis |
 | --- | --- |
 | `TC-CODEC-001` | Ein kanonischer sechsstelliger Wert wird mit dem gemeinsamen Codec-Kern encodiert und wieder decodiert. |
-| `TC-CODEC-002` | Eine ausgerichtete achtstellige Basis erzeugt eine HMAC-geschützte ID und wird vollständig wieder decodiert. |
+| `TC-CODEC-002` | Kanonische acht- und zehnstellige Werte erzeugen öffentliche IDs und werden jeweils vollständig wieder decodiert. |
 | `TC-CODEC-003` | Unbekannter Pfad, falsche Methode und fehlende Credentials werden fail-closed behandelt; es existiert keine CORS-Freigabe. |
-| `TC-CODEC-004` | Ungültiges JSON-Schema, nichtkanonische Werte, nicht ausgerichtete Achtstellen-Basen und ungültige IDs liefern neutrale `400`-Antworten. |
-| `TC-CRYPTO-001` bis `TC-HMAC-004` | Der Scan-Worker verwendet dieselben Feistel-/HMAC-Primitive und kompatible Testsecrets. |
+| `TC-CODEC-004` | Ungültiges JSON-Schema, nichtkanonische Werte und ungültige IDs liefern neutrale `400`-Antworten. |
+| `TC-CRYPTO-001` bis `TC-CRYPTO-006` | Scan- und Codec-Worker verwenden dieselben Feistel-Primitive, Parameter und kompatible Testsecrets für 6, 8 und 10 Stellen. |
 
 Nicht implementierte Nachweise für Batch-Idempotenz, Rate Limits, Access/IP-Restriktionen, Key-Rotation und deployed Staging-Smoke-Tests bleiben vor einer produktiven Freigabe offen.
 
@@ -197,7 +196,7 @@ Nicht implementierte Nachweise für Batch-Idempotenz, Rate Limits, Access/IP-Res
 
 | Story / Blocker | Vertragsbezug |
 | --- | --- |
-| `CP-US-011` | Öffentliche `tagId` aus reservierten canonical values erzeugen, ohne Feistel-/HMAC-Secrets in der Plane |
+| `CP-US-011` | Öffentliche `tagId` aus reservierten canonical values erzeugen, ohne Feistel-Secrets in der Plane |
 | `CP-US-013` | Poolgrenzen verbleiben im `decodedValue`-Raum |
 | `CP-US-020` / `CP-US-021` | deterministische TAG-ID für Druck-/Snapshotdaten |
 | `CP-BLK-003` | getrennte Cloudflare-Staging-Testsecrets und kompatible Testvektoren |

@@ -6,7 +6,7 @@
  * this exact source code but receive only their respective least-privilege
  * secrets.
  */
-export type TagLength = 6 | 8;
+export type TagLength = 6 | 8 | 10;
 
 export interface PublicTagId {
   id: string;
@@ -16,7 +16,8 @@ export interface PublicTagId {
 interface FeistelParameters {
   blockBits: number;
   halfBits: number;
-  domain: "myqr24/tag/6" | "myqr24/tag/8";
+  domain: "myqr24/tag/6" | "myqr24/tag/8" | "myqr24/tag/10";
+  roundInputBytes: number;
 }
 
 const FEISTEL_ROUNDS = 10;
@@ -28,16 +29,24 @@ const FEISTEL_PARAMETERS: Record<TagLength, FeistelParameters> = {
     blockBits: 32,
     halfBits: 16,
     domain: "myqr24/tag/6",
+    roundInputBytes: 3,
   },
   8: {
     blockBits: 42,
     halfBits: 21,
     domain: "myqr24/tag/8",
+    roundInputBytes: 3,
+  },
+  10: {
+    blockBits: 52,
+    halfBits: 26,
+    domain: "myqr24/tag/10",
+    roundInputBytes: 4,
   },
 };
 
 export function isTagLength(value: unknown): value is TagLength {
-  return value === 6 || value === 8;
+  return value === 6 || value === 8 || value === 10;
 }
 
 export function base36UpperBound(length: TagLength): bigint {
@@ -120,18 +129,22 @@ async function feistelRound(
   rightHalf: bigint,
 ): Promise<bigint> {
   const prefix = encoder.encode(`${secret}|${parameters.domain}|${round}|`);
-  const material = new Uint8Array(prefix.length + 3);
+  const material = new Uint8Array(prefix.length + parameters.roundInputBytes);
   material.set(prefix);
-  material.set(toFixedWidthBytes(rightHalf, 3), prefix.length);
+  material.set(
+    toFixedWidthBytes(rightHalf, parameters.roundInputBytes),
+    prefix.length,
+  );
 
   const digest = await sha256(material);
   const mask = (1n << BigInt(parameters.halfBits)) - 1n;
-  const firstThreeBytes =
-    (BigInt(digest[0]) << 16n) |
-    (BigInt(digest[1]) << 8n) |
-    BigInt(digest[2]);
+  let roundValue = 0n;
 
-  return firstThreeBytes & mask;
+  for (let index = 0; index < parameters.roundInputBytes; index += 1) {
+    roundValue = (roundValue << 8n) | BigInt(digest[index]);
+  }
+
+  return roundValue & mask;
 }
 
 async function decodeFeistelBlock(
@@ -230,35 +243,12 @@ export async function encodeFeistel(
   return null;
 }
 
-export async function calculateHmacNibble(
-  base: bigint,
-  secret: string,
-): Promise<number | null> {
-  if (!secret || base < 0n || base >= 1n << 42n || base % 16n !== 0n) {
-    return null;
-  }
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    toArrayBuffer(encoder.encode(secret)),
-    { hash: "SHA-256", name: "HMAC" },
-    false,
-    ["sign"],
-  );
-  const message = encoder.encode(`myqr24/tag/v1/8:${base.toString()}`);
-  const signature = new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, toArrayBuffer(message)),
-  );
-
-  return signature[0] & 0x0f;
-}
-
+/**
+ * Decodes a public tag ID into its complete canonical integer value.
+ */
 export async function decodeTagId(
   tag: PublicTagId,
-  secrets: Pick<
-    { FEISTEL_SECRET_S01: string; TAG_HMAC_SECRET_S01: string },
-    "FEISTEL_SECRET_S01" | "TAG_HMAC_SECRET_S01"
-  >,
+  secrets: Pick<{ FEISTEL_SECRET_S01: string }, "FEISTEL_SECRET_S01">,
 ): Promise<bigint | null> {
   const encryptedValue = parseBase36(tag.id);
 
@@ -266,64 +256,21 @@ export async function decodeTagId(
     return null;
   }
 
-  const decodedValue = await decodeFeistel(
+  return decodeFeistel(
     encryptedValue,
     tag.length,
     secrets.FEISTEL_SECRET_S01,
   );
-
-  if (decodedValue === null) {
-    return null;
-  }
-
-  if (tag.length === 6) {
-    return decodedValue;
-  }
-
-  const base = decodedValue & ~0x0fn;
-  const suppliedNibble = Number(decodedValue & 0x0fn);
-  const expectedNibble = await calculateHmacNibble(
-    base,
-    secrets.TAG_HMAC_SECRET_S01,
-  );
-
-  return expectedNibble !== null && suppliedNibble === expectedNibble
-    ? decodedValue
-    : null;
 }
 
 /**
- * Converts an authoritative canonical value into a public tag ID. For
- * eight-character tags the caller supplies a 16-aligned base; this function
- * calculates and returns the complete HMAC-protected decoded value.
+ * Converts an authoritative complete canonical value into a public tag ID.
  */
 export async function encodeTagId(
-  requestedValue: bigint,
+  decodedValue: bigint,
   length: TagLength,
-  secrets: Pick<
-    { FEISTEL_SECRET_S01: string; TAG_HMAC_SECRET_S01: string },
-    "FEISTEL_SECRET_S01" | "TAG_HMAC_SECRET_S01"
-  >,
+  secrets: Pick<{ FEISTEL_SECRET_S01: string }, "FEISTEL_SECRET_S01">,
 ): Promise<{ tagId: string; decodedValue: bigint } | null> {
-  let decodedValue = requestedValue;
-
-  if (length === 8) {
-    if (!isCanonicalValue(requestedValue, length) || requestedValue % 16n !== 0n) {
-      return null;
-    }
-
-    const nibble = await calculateHmacNibble(
-      requestedValue,
-      secrets.TAG_HMAC_SECRET_S01,
-    );
-
-    if (nibble === null) {
-      return null;
-    }
-
-    decodedValue = requestedValue | BigInt(nibble);
-  }
-
   const encryptedValue = await encodeFeistel(
     decodedValue,
     length,

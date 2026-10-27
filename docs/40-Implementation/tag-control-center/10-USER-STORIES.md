@@ -82,7 +82,7 @@
 4. Statuswechsel folgen ausschließlich der erlaubten Zustandsfolge und benötigen die erforderliche Rolle.
 5. Änderungen erzeugen Audit-Ereignisse.
 
-### CC-US-011 – Eindeutige sechs- und achtstellige TAGs vergeben
+### CC-US-011 – Eindeutige sechs-, acht- und zehnstellige TAGs vergeben
 
 **Als** TAG-Manager  
 **möchte ich** eine gültige, eindeutige TAG-ID aus einer zugelassenen Range reservieren,  
@@ -92,11 +92,11 @@
 
 1. Die UI stößt ausschließlich einen autorisierten Control-Plane-Befehl an; die atomare Vergabe läuft serverseitig in einer Datenbanktransaktion.
 2. Es bestehen eindeutige Constraints auf öffentlicher `tagId` sowie auf `(length, decodedValue)`.
-3. Für sechsstellige IDs wird ausschließlich der kanonische Raum `I(6)` verwendet.
-4. Für achtstellige IDs wird der nächste Basisslot mit `(lastDecodedValue & ~0x0f) + 0x10` bestimmt; der HMAC-Nibble wird danach serverseitig berechnet.
-5. Der vollständige HMAC-validierte `decodedValue` wird unverändert gespeichert und dient als Range-Key.
+3. Die zulässigen Längen sind ausschließlich 6, 8 und 10; jede ID stammt aus dem kanonischen Raum `I(6)`, `I(8)` oder `I(10)`.
+4. Die Control Plane reserviert innerhalb einer aktiven Range den nächsten freien linearen `decodedValue` und lässt ihn vom privaten Codec in die öffentliche `tagId` überführen.
+5. Der vollständige kanonische `decodedValue` wird unverändert gespeichert und dient als Range-Key.
 6. Die Vergabe kann weder durch Parallelaufrufe noch durch Wiederholung eines fehlgeschlagenen Requests eine doppelte ID erzeugen.
-7. Feistel- und HMAC-Secrets erscheinen nie in Antwortdaten, Logs, Testfixtures oder Datenbanktabellen.
+7. Feistel-Secrets erscheinen nie in Antwortdaten, Logs, Testfixtures oder Datenbanktabellen.
 
 ### CC-US-012 – Ranges, Gruppen und Feature-Zuweisungen verwalten
 
@@ -108,7 +108,7 @@
 
 1. Ranges sind global nach Startwert sortiert, nicht überlappend und einer gültigen Länge zugeordnet.
 2. Start und Ende liegen im kanonischen Raum der jeweiligen Länge.
-3. Achtstellige Ranges beginnen auf einer 16er-Slotgrenze und enden auf einem vollständigen Slot (`start % 16 = 0`, `end % 16 = 15`).
+3. Ranges sind je Länge lineare, aufeinanderfolgende Integer-Intervalle ohne Slotgrenzen oder Prüfnibbles.
 4. Range-ID, Gruppen-ID und Feature-ID erfüllen die dokumentierten Identifier-Regeln.
 5. Direkte TAG-, Range- und Gruppen-Zuweisungen werden in der Priorität TAG vor Range vor Gruppe dargestellt.
 6. Ungültige oder unvollständige Konfiguration kann nicht publiziert werden.

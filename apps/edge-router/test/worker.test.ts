@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fixtures from "./fixtures/edge-routing.json";
 import {
-  calculateHmacNibble,
   calculateRedirectSignature,
   decodeTagId,
   encodeFeistel,
@@ -54,13 +53,10 @@ function range(
   groupId = "group-default",
   active = true,
 ): TagRange {
-  const start = length === 8 ? value & ~0x0fn : value;
-  const end = length === 8 ? start + 15n : value;
-
   return {
     id,
-    start: start.toString(),
-    end: end.toString(),
+    start: value.toString(),
+    end: value.toString(),
     groupId,
     length,
     active,
@@ -101,20 +97,12 @@ async function sixTag(): Promise<{ id: string; value: bigint }> {
   return publicTag(36n ** 5n + 12345n, 6);
 }
 
-async function eightTag(): Promise<{
-  id: string;
-  value: bigint;
-  base: bigint;
-}> {
-  const lower = 36n ** 7n;
-  const base = (lower + 64n) & ~0x0fn;
-  const nibble = await calculateHmacNibble(base, secrets.TAG_HMAC_SECRET_S01);
-  expect(nibble).not.toBeNull();
+async function eightTag(): Promise<{ id: string; value: bigint }> {
+  return publicTag(36n ** 7n + 65n, 8);
+}
 
-  const value = base | BigInt(nibble!);
-  const tag = await publicTag(value, 8);
-
-  return { ...tag, base };
+async function tenTag(): Promise<{ id: string; value: bigint }> {
+  return publicTag(36n ** 9n + 1_000_000_000_000_000n, 10);
 }
 
 function requestFor(
@@ -170,6 +158,11 @@ describe("URL extraction", () => {
       "https://s.myqr24.com/T1/ab12cd34",
       "staging",
       { id: "ab12cd34", length: 8 },
+    ],
+    [
+      "https://s.myqr24.com/T1/Ab12Cd34Ef",
+      "staging",
+      { id: "ab12cd34ef", length: 10 },
     ],
   ])(
     "TC-URL-001/002 extracts an eight-character tag from a case-insensitive route",
@@ -302,7 +295,7 @@ describe("platform home redirect", () => {
   );
 });
 
-describe("canonical ID and HMAC primitives", () => {
+describe("canonical ID primitives", () => {
   it("TC-CRYPTO-004 parses Base36 into BigInt without precision loss", () => {
     expect(parseBase36("zzzzzzzz")).toBe(2_821_109_907_455n);
     expect(parseBase36("ABC123")).toBe(parseBase36("abc123"));
@@ -318,23 +311,23 @@ describe("canonical ID and HMAC primitives", () => {
     expect(tag.value).toBeLessThan(36n ** 6n);
   });
 
-  it("TC-CRYPTO-002 and TC-HMAC-001 retain the complete valid 8-character integer", async () => {
+  it("TC-CRYPTO-002 decodes a non-16-aligned eight-character integer", async () => {
     const tag = await eightTag();
     const request = extractTagRequest(new URL(`https://p.qr4.uk/t/${tag.id}`));
 
     await expect(decodeTagId(request!, secrets)).resolves.toBe(tag.value);
+    expect(tag.value % 16n).not.toBe(0n);
     expect(tag.value).toBeGreaterThanOrEqual(36n ** 7n);
     expect(tag.value).toBeLessThan(36n ** 8n);
-    expect(tag.value & ~0x0fn).toBe(tag.base);
   });
 
-  it("TC-HMAC-002 rejects a public tag carrying the wrong HMAC nibble", async () => {
-    const tag = await eightTag();
-    const wrongValue = tag.base | ((tag.value + 1n) & 0x0fn);
-    const wrongTag = await publicTag(wrongValue, 8);
-    const request = extractTagRequest(new URL(`https://p.qr4.uk/t/${wrongTag.id}`));
+  it("TC-CRYPTO-003 round-trips a high canonical ten-character integer", async () => {
+    const tag = await tenTag();
+    const request = extractTagRequest(new URL(`https://p.qr4.uk/t/${tag.id}`));
 
-    await expect(decodeTagId(request!, secrets)).resolves.toBeNull();
+    await expect(decodeTagId(request!, secrets)).resolves.toBe(tag.value);
+    expect(tag.value).toBeGreaterThan(36n ** 9n);
+    expect(tag.value).toBeLessThan(36n ** 10n);
   });
 });
 
@@ -378,21 +371,21 @@ describe("range validation", () => {
     ).toBe(false);
   });
 
-  it("TC-RANGE-005 rejects 8-character ranges that do not cover complete slots", async () => {
+  it("TC-RANGE-005 accepts non-aligned eight-character range boundaries", async () => {
     const tag = await eightTag();
 
     expect(
       isValidRangeIndex([
         {
-          id: "bad-eight",
-          start: (tag.base + 1n).toString(),
-          end: (tag.base + 15n).toString(),
+          id: "linear-eight",
+          start: tag.value.toString(),
+          end: (tag.value + 7n).toString(),
           groupId: "group-default",
           length: 8,
           active: true,
         },
       ]),
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 
@@ -720,28 +713,15 @@ describe("features, templates and worker responses", () => {
   });
 });
 
-describe("8-character edge integration", () => {
-  it("TC-HMAC-003 rejects invalid HMAC before any KV read", async () => {
+describe("eight- and ten-character edge integration", () => {
+  it("TC-EDGE-008 resolves a non-aligned eight-character value in a linear range", async () => {
     const tag = await eightTag();
-    const wrongTag = await publicTag(tag.base | ((tag.value + 1n) & 0x0fn), 8);
-    const reads: string[] = [];
-
-    const response = await workerResponse(requestFor(wrongTag.id), {}, reads);
-
-    expect(response.status).toBe(404);
-    expect(reads).toEqual([]);
-  });
-
-  it("TC-HMAC-004 uses the complete HMAC-valid integer for an 8-character range", async () => {
-    const tag = await eightTag();
-    const start = tag.base;
-    const end = tag.base + 15n;
     const response = await workerResponse(requestFor(tag.id), {
       ...rangeIndex([
         {
           id: "range-eight",
-          start: start.toString(),
-          end: end.toString(),
+          start: tag.value.toString(),
+          end: (tag.value + 7n).toString(),
           groupId: "group-default",
           length: 8,
           active: true,
@@ -757,5 +737,19 @@ describe("8-character edge integration", () => {
       range: { id: "range-eight" },
     });
   });
-});
 
+  it("TC-EDGE-010 resolves a ten-character value with exact BigInt range lookup", async () => {
+    const tag = await tenTag();
+    const response = await workerResponse(requestFor(tag.id), {
+      ...rangeIndex([range("range-ten", tag.value, 10)]),
+      "group:group-default": fixtures.groups["group-default"],
+      "feature:json-default": activeFeature("json-default"),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      tag: { id: tag.id, value: tag.value.toString(), length: 10 },
+      range: { id: "range-ten" },
+    });
+  });
+});

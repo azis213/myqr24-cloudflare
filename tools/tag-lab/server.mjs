@@ -27,7 +27,7 @@ const CONTENT_TEST_FIXTURES = [
   { id: "gipfel99", label: "Sonnspitze", description: "POI- und Sicherheitshinweise" },
 ];
 
-const TAG_LENGTHS = new Set([6, 8]);
+const TAG_LENGTHS = new Set([6, 8, 10]);
 const FEISTEL_ROUNDS = 10;
 const MAX_CYCLE_WALK_ITERATIONS = 128;
 const encoder = new TextEncoder();
@@ -35,6 +35,7 @@ const encoder = new TextEncoder();
 const parametersByLength = {
   6: { blockBits: 32, halfBits: 16, domain: "myqr24/tag/6" },
   8: { blockBits: 42, halfBits: 21, domain: "myqr24/tag/8" },
+  10: { blockBits: 52, halfBits: 26, domain: "myqr24/tag/10" },
 };
 
 function parseEnvironmentFile(path) {
@@ -58,8 +59,6 @@ function parseEnvironmentFile(path) {
 
 const localEnvironment = parseEnvironmentFile(SECRET_FILE);
 const feistelSecret = localEnvironment.FEISTEL_SECRET_S01;
-const tagHmacSecret = localEnvironment.TAG_HMAC_SECRET_S01;
-
 if (!feistelSecret) {
   throw new Error(
     "FEISTEL_SECRET_S01 is missing. Add it to the local, Git-ignored .env.staging.local file.",
@@ -147,26 +146,6 @@ async function encodeFeistel(decodedValue, length, secret) {
   return null;
 }
 
-async function calculateHmacNibble(base, secret) {
-  if (!secret || base < 0n || base >= 1n << 42n || base % 16n !== 0n) {
-    return null;
-  }
-
-  const key = await webcrypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { hash: "SHA-256", name: "HMAC" },
-    false,
-    ["sign"],
-  );
-  const message = encoder.encode(`myqr24/tag/v1/8:${base.toString()}`);
-  const signature = new Uint8Array(
-    await webcrypto.subtle.sign("HMAC", key, message),
-  );
-
-  return signature[0] & 0x0f;
-}
-
 function randomBigIntBelow(limit) {
   const byteLength = Math.ceil(limit.toString(2).length / 8);
   const highestByteMask = (1 << ((limit.toString(2).length - 1) % 8 + 1)) - 1;
@@ -207,7 +186,7 @@ function readStore() {
       parsed.tags.every(
         (tag) =>
           typeof tag?.id === "string" &&
-          (tag.length === 6 || tag.length === 8) &&
+          (tag.length === 6 || tag.length === 8 || tag.length === 10) &&
           typeof tag.url === "string",
       )
     ) {
@@ -263,7 +242,7 @@ function addConfiguredTags(store) {
   const configuredIds = (localEnvironment.TEST_TAGS ?? "")
     .split(",")
     .map((id) => id.trim().toLowerCase())
-    .filter((id) => /^(?:[0-9a-z]{6}|[0-9a-z]{8})$/.test(id));
+    .filter((id) => /^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/.test(id));
 
   for (const id of configuredIds) {
     if (!store.tags.some((tag) => tag.id === id)) {
@@ -295,23 +274,11 @@ async function createTag(length) {
   addConfiguredTags(store);
 
   if (!TAG_LENGTHS.has(length)) {
-    throw new Error("Only 6- and 8-character tags are supported.");
-  }
-
-  if (length === 8 && !tagHmacSecret) {
-    throw new Error(
-      "TAG_HMAC_SECRET_S01 is missing locally. Add it to .env.staging.local before generating 8-character tags.",
-    );
+    throw new Error("Only 6-, 8-, and 10-character tags are supported.");
   }
 
   for (let attempt = 0; attempt < 128; attempt += 1) {
-    let decodedValue = randomCanonicalValue(length);
-
-    if (length === 8) {
-      const base = decodedValue & ~0x0fn;
-      const nibble = await calculateHmacNibble(base, tagHmacSecret);
-      decodedValue = base | BigInt(nibble);
-    }
+    const decodedValue = randomCanonicalValue(length);
 
     const encodedValue = await encodeFeistel(
       decodedValue,
@@ -379,7 +346,7 @@ async function handler(request, response) {
     writeStore(store);
     return sendJson(response, 200, {
       tags: store.tags.map(publicTag),
-      capabilities: { generate6: true, generate8: Boolean(tagHmacSecret) },
+      capabilities: { generate6: true, generate8: true, generate10: true },
     });
   }
 
@@ -390,7 +357,7 @@ async function handler(request, response) {
     });
   }
 
-  const contentQrMatch = /^\/api\/content-tags\/([0-9a-z]{6}|[0-9a-z]{8})\/qr$/i.exec(
+  const contentQrMatch = /^\/api\/content-tags\/([0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})\/qr$/i.exec(
     url.pathname,
   );
 
@@ -423,7 +390,7 @@ async function handler(request, response) {
     }
   }
 
-  const qrMatch = /^\/api\/tags\/([0-9a-z]{6}|[0-9a-z]{8})\/qr$/i.exec(
+  const qrMatch = /^\/api\/tags\/([0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})\/qr$/i.exec(
     url.pathname,
   );
 

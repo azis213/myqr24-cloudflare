@@ -45,7 +45,7 @@ Diese Aufteilung vermeidet, dass eine komplexe Backoffice-Oberfläche zu früh v
 | Feature-Konfiguration | PHP / MySQL | Feature auswählen, konfigurieren, validieren und freigeben |
 | QR-Code-/Druckvorbereitung | PHP | öffentliche Scan-URL erzeugen und QR-Code bereitstellen |
 | Routing-Projektion | PHP → Cloudflare KV | minimale öffentliche Feature-, Gruppen- und Range-Konfiguration veröffentlichen |
-| Scan-URL-Auflösung | Cloudflare Worker | Host, Pfad, Tag-ID, Feistel/HMAC, Range, Regelpriorität und Feature-Dokument validieren |
+| Scan-URL-Auflösung | Cloudflare Worker | Host, Pfad, kanonische Tag-ID, Feistel-Dekodierung, Range, Regelpriorität und Feature-Dokument validieren |
 | Öffentliche Staging-Ansicht | Cloudflare Pages / PWA | nach erfolgreicher Auflösung eine sichtbare, vertrauenswürdige Zielseite darstellen |
 | Öffentliche Vault-Ansicht | später Cloudflare PWA/API | nur veröffentlichte öffentliche Inhalte ausliefern |
 | Medienablage | später Cloudflare R2 | Bilder, Audio und Dokumente kontrolliert speichern und ausliefern |
@@ -137,7 +137,7 @@ type ManagedTagStatus =
 | Öffentliche Vault-Inhalte | Titel, Beschreibung, veröffentlichte Bildreferenzen | zunächst PHP-Read-API, später Cloudflare Vault API |
 | Mediendateien | Bilder, Audio, Dokumente | später R2; niemals direkt im Routing-KV |
 
-Die fachlich autoritative PHP-Datenbank speichert bei achtstelligen TAGs den vollständigen, HMAC-validierten `decodedValue`. Die bestehenden Regeln aus `DOMAIN_RULES.md` für ID-Räume, HMAC, Range-Grenzen und Eindeutigkeit gelten unverändert.
+Die fachlich autoritative PHP-Datenbank speichert für jede unterstützte Länge den vollständigen linearen Feistel-dekodierten `decodedValue`. Unterstützt werden kanonische Base36-IDs mit 6, 8 oder 10 Stellen; Ranges enthalten je Länge aufeinanderfolgende freie Integer ohne Slot-Ausrichtung. Die verbindlichen Regeln für ID-Räume, Eindeutigkeit und Range-Grenzen stehen in `DOMAIN_RULES.md`.
 
 ---
 
@@ -402,7 +402,7 @@ Browser oder Scan
   → typisiertes Rendering von Content, Galerie oder erlaubtem Redirect
 ```
 
-Die App implementiert keine Feistel-, HMAC-, Range- oder Routing-Entscheidung. Der Edge Router validiert Scan-URLs; die öffentliche View-API entscheidet anhand der veröffentlichten Projektion nur über die zulässige öffentliche Darstellung.
+Die App implementiert keine Feistel-, Range- oder Routing-Entscheidung. Der Edge Router validiert Scan-URLs; die öffentliche View-API entscheidet anhand der veröffentlichten Projektion nur über die zulässige öffentliche Darstellung.
 
 Eine fehlende, geschlossene, gesperrte oder nicht veröffentlichte Projektion erzeugt öffentlich eine neutrale Nichtverfügbar-Ansicht. Sie offenbart weder Owner-, Claim- noch Entwurfsdetails.
 

@@ -8,7 +8,7 @@
 
 ### Akzeptanzkriterien
 
-- `https://p.qr4.uk/t/{TAG-ID}` akzeptiert genau ein Base36-Pfadsegment mit 6 oder 8 Zeichen.
+- `https://p.qr4.uk/t/{TAG-ID}` akzeptiert genau ein Base36-Pfadsegment mit 6, 8 oder 10 Zeichen.
 - `https://p.myqr24.com/t/{TAG-ID}` akzeptiert genau die dokumentierte Kompatibilitätsform.
 - Groß- und Kleinschreibung der Tag-ID führt zum selben normalisierten Wert.
 - Andere Hosts, Pfade, zusätzliche Segmente und andere ID-Längen führen zu `404`.
@@ -21,7 +21,7 @@
 
 ### Akzeptanzkriterien
 
-- Ungültige URL, Base36-Parsing-Fehler, Feistel-/Cycle-Walk-Fehler, HMAC-Fehler, fehlende Range, fehlende Zuweisung, fehlendes Feature und fehlerhafte Feature-Konfiguration liefern `404`.
+- Ungültige URL, Base36-Parsing-Fehler, Feistel-/Cycle-Walk-Fehler, fehlende Range, fehlende Zuweisung, fehlendes Feature und fehlerhafte Feature-Konfiguration liefern `404`.
 - Nur `GET` und `HEAD` sind zulässig; alle anderen Methoden liefern `405` mit `Allow: GET, HEAD`.
 - Ein `HEAD`-Request gibt keinen Response-Body zurück.
 
@@ -36,22 +36,22 @@
 - Die Feistel-Decodierung cycle-walkt in den exakten Raum `I(L) = [36^(L-1), 36^L)`.
 - Sechsstellige Tags verwenden ausschließlich `I(6)`.
 - Achtstellige Tags verwenden ausschließlich `I(8)`.
+- Zehnstellige Tags verwenden ausschließlich `I(10)`.
 - Range-Lookups arbeiten mit dem vollständigen Feistel-decodierten kanonischen Integer.
 - JavaScript-`number` wird nicht für IDs oder Range-Grenzen verwendet.
 
-## US-004 — HMAC-Integrität für achtstellige Tags
+## US-004 — HMAC-freie lineare ID-Auflösung
 
 **Als** Sicherheitsverantwortlicher  
-**möchte ich** die Integrität jedes achtstelligen Tags vor einem Konfigurations-Lookup prüfen,  
-**damit** nur der korrekte Wert eines 16er-Slots aufgelöst werden kann.
+**möchte ich** alle kanonischen 6-, 8- und 10-stelligen Feistel-Werte ohne zusätzliche Prüfnibbles auflösen,  
+**damit** der vollständige Integer unverändert als eindeutiger Range- und Regel-Key dient.
 
 ### Akzeptanzkriterien
 
-- Für eine 8-stellige ID wird `base = decodedValue & ~0x0fn` gebildet.
-- Das gelieferte HMAC-Nibble ist `decodedValue & 0x0fn`.
-- Das erwartete Nibble ist der niederwertige Halbbyte-Wert von `HMAC-SHA-256("myqr24/tag/v1/8:{base}")`.
-- Ungültige Nibbles führen zu `404`, bevor `TAG_CONFIG.get` aufgerufen wird.
-- Ein gültiger 8-stelliger Tag verwendet den vollständigen `decodedValue` einschließlich HMAC-Nibble als Range-Key.
+- Die Feistel-Transformation einschließlich Cycle-Walk ist die einzige ID-bezogene kryptografische Prüfung.
+- Es gibt keine HMAC-Prüfung, Bitmaskierung, Slot-Ausrichtung oder Prüfnibbles.
+- Jeder erfolgreich decodierte kanonische Wert wird vollständig und unverändert für Range- und direkte Tag-Regel-Lookups verwendet.
+- Eine fehlgeschlagene Feistel-/Cycle-Walk-Validierung führt vor `TAG_CONFIG.get` zu `404`.
 
 ## US-005 — Aktive und valide Range ermitteln
 

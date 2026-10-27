@@ -6,21 +6,19 @@ Alle Testdaten sind künstlich und nicht geheim. Die Test-Secrets dürfen aussch
 
 ```text
 FEISTEL_SECRET_S01=test-feistel-secret
-TAG_HMAC_SECRET_S01=test-hmac-secret
 ```
 
 Sie sind keine Produktionswerte und werden niemals als Cloudflare Secret gesetzt.
 
 ## Staging-Live-Testdaten
 
-Die Codec-Staging-End-to-End-Tests verwenden ausschließlich künstliche kanonische Eingabewerte und die separat verwalteten Staging-Secrets `FEISTEL_SECRET_S01`, `TAG_HMAC_SECRET_S01` und `TAG_CODEC_API_KEY_S01`. Diese Secrets werden als nicht auslesbare Cloudflare-Secrets gesetzt und können lokal beispielsweise aus einer ignorierten Umgebungsdatei in den Arbeitsspeicher geladen werden.
+Die Codec-Staging-End-to-End-Tests verwenden ausschließlich künstliche kanonische Eingabewerte und die separat verwalteten Staging-Secrets `FEISTEL_SECRET_S01` und `TAG_CODEC_API_KEY_S01`. Diese Secrets werden als nicht auslesbare Cloudflare-Secrets gesetzt und können lokal beispielsweise aus einer ignorierten Umgebungsdatei in den Arbeitsspeicher geladen werden.
 
 Für die Tests gelten folgende Regeln:
 
-- 6-stellige Eingabewerte liegen in `I(6)` und werden vollständig gegen den Decode-Wert verglichen;
-- 8-stellige Eingabewerte liegen in `I(8)`, sind durch 16 teilbar und werden vollständig gegen den HMAC-validierten Decode-Wert verglichen;
-- Bearer-Key, Feistel- und HMAC-Secrets, konkrete Eingabewerte sowie erzeugte öffentliche TAG-IDs dürfen weder in Testausgaben noch in versionierter Dokumentation erscheinen;
-- die Ausführung wird unter den Cases `TC-CODEC-STAGING-001` bis `TC-CODEC-STAGING-003` ohne sensitive Daten in `../evidence/README.md` nachgewiesen.
+- 6-, 8- und 10-stellige Eingabewerte liegen jeweils vollständig in `I(6)`, `I(8)` beziehungsweise `I(10)` und werden vollständig gegen den Decode-Wert verglichen;
+- Bearer-Key, Feistel-Secret, konkrete Eingabewerte sowie erzeugte öffentliche TAG-IDs dürfen weder in Testausgaben noch in versionierter Dokumentation erscheinen;
+- die Ausführung wird unter den Cases `TC-CODEC-STAGING-001` bis `TC-CODEC-STAGING-004` ohne sensitive Daten in `../evidence/README.md` nachgewiesen.
 
 ## Ablage
 
@@ -43,10 +41,9 @@ Die Datei enthält nicht geheime Test-Secrets sowie wiederverwendbare KV-Feature
 | Kennung | Bedeutung | Regel |
 | --- | --- | --- |
 | `canonicalValue6` | Vollständiger Feistel-decodierter 6-stelliger Range-Key | Muss in `I(6) = [36^5, 36^6)` liegen |
-| `canonicalBase8` | Maskierte Basis eines 8-stelligen Testslots | Muss in `I(8)` liegen und durch 16 teilbar sein |
-| `canonicalValue8` | Vollständiger 8-stelliger Range-Key | `canonicalBase8 \| hmacNibble` |
-| `publicTagId` | Öffentliche 6- oder 8-stellige Base36-ID | Wird durch den testbaren Feistel-Encoder aus dem kanonischen Wert erzeugt |
-| `wrongHmacValue8` | Wert desselben 8-stelligen Slots mit falschem Nibble | Muss vor KV-Lookups abgelehnt werden |
+| `canonicalValue8` | Vollständiger Feistel-decodierter 8-stelliger Range-Key | Muss in `I(8) = [36^7, 36^8)` liegen |
+| `canonicalValue10` | Vollständiger Feistel-decodierter 10-stelliger Range-Key | Muss in `I(10) = [36^9, 36^10)` liegen |
+| `publicTagId` | Öffentliche 6-, 8- oder 10-stellige Base36-ID | Wird durch den testbaren Feistel-Encoder aus dem kanonischen Wert erzeugt |
 
 Die konkreten Werte werden von Tests berechnet, damit Fixtures keine unkontrolliert manuell berechneten kryptografischen Ableitungen enthalten.
 
@@ -127,7 +124,7 @@ Tests erzeugen oder laden außerdem folgende absichtlich ungültigen Varianten:
 | Kennung | Fehlerbild | Erwartung |
 | --- | --- | --- |
 | `invalid-overlap-index` | Überlappende Ranges | Gesamter Index wird abgelehnt |
-| `invalid-eight-slot-index` | 8-stellige Range nicht auf `% 16 = 0/15` ausgerichtet | Gesamter Index wird abgelehnt |
+| `out-of-space-range` | 8- oder 10-stellige Range außerhalb ihres kanonischen Raums | Gesamter Index wird abgelehnt |
 | `inactive-range` | `active: false` | Keine Auflösung |
 | `wrong-length-range` | Range-Länge stimmt nicht mit Tag-Länge überein | Kein Treffer |
 | `missing-feature` | Referenz ohne `feature:{id}` | `404` |

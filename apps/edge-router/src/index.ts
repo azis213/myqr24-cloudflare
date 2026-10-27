@@ -3,7 +3,6 @@
  *
  * Runtime secrets:
  * - FEISTEL_SECRET_S01: Staging key material for the fixed 10-round Feistel permutation
- * - TAG_HMAC_SECRET_S01: Staging key material for the 4-bit integrity check of 8-character tags
  * - REDIRECT_SIGNING_SECRET_S01: Staging key material for short-lived signed redirect URLs
  *
  * Runtime bindings:
@@ -20,7 +19,6 @@ import {
 export {
   base36LowerBound,
   base36UpperBound,
-  calculateHmacNibble,
   decodeFeistel,
   decodeTagId,
   encodeFeistel,
@@ -39,7 +37,6 @@ export interface Env {
   TAG_CONFIG: KVNamespace;
   SCAN_ENVIRONMENT: ScanEnvironment;
   FEISTEL_SECRET_S01: string;
-  TAG_HMAC_SECRET_S01: string;
   REDIRECT_SIGNING_SECRET_S01: string;
 }
 
@@ -148,7 +145,7 @@ const PLATFORM_HOME_HTML = `<!doctype html>
     </main>
   </body>
 </html>`;
-const TAG_ID_PATTERN = /^(?:[0-9a-z]{6}|[0-9a-z]{8})$/i;
+const TAG_ID_PATTERN = /^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/i;
 const ROUTE_SEGMENTS = new Set(["t", "t1"]);
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const REDIRECT_STATUSES = new Set<RedirectStatus>([301, 302, 303, 307, 308]);
@@ -275,7 +272,7 @@ function isValidRange(range: unknown, previousEnd: bigint): range is TagRange {
     return false;
   }
 
-  return candidate.length !== 8 || (start % 16n === 0n && end % 16n === 15n);
+  return true;
 }
 
 /**
@@ -439,9 +436,9 @@ async function resolveFeatures(
 }
 
 /**
- * Resolves a complete tag only after the caller has completed decoding and
- * HMAC validation. A valid active range is mandatory before reading direct
- * tag assignments or features.
+ * Resolves a complete tag only after the caller has completed Feistel decoding.
+ * A valid active range is mandatory before reading direct tag assignments or
+ * features.
  */
 export async function resolveTag(
   tagValue: bigint,

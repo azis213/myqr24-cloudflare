@@ -7,7 +7,7 @@
 
 1. Fixtures sind synthetisch, deterministisch, umgebungsmarkiert und frei von Produktivdaten.
 2. Echte Personen, Kontakte, Betreiber, Standorte, Genehmigungen, Bestellungen, Zahlungsinformationen und Produktionsdaten sind verboten.
-3. Feistel-/HMAC-Secrets, Cloudflare-Tokens, Datenbankzugänge, MFA-Secrets und Cookie-/Sessionwerte werden niemals versioniert.
+3. Feistel-Secrets, Cloudflare-Tokens, Datenbankzugänge, MFA-Secrets und Cookie-/Sessionwerte werden niemals versioniert.
 4. Kryptografische Tests verwenden einen isolierten lokalen/CI-Secret-Provider oder freigegebene nichtproduktive Testvektoren außerhalb allgemeiner Fixtures.
 5. Staging und Produktion verwenden getrennte Datenbanken, Namespace-IDs, Tokens, JSON-Exportversionen, Hosts und Secret Stores.
 6. Nicht geheime Fixture-Daten dürfen keine Datenfelder enthalten, die später durch KV oder öffentliche API ausgeschlossen sein müssen, außer in ausdrücklich markierten Negativfixtures.
@@ -40,8 +40,9 @@ Für Beispielhosts sind `.invalid`-Domains zu verwenden. Ein bestätigter öffen
 | --- | --- | --- |
 | gültige 6-stellige Test-Range | positiver Range-Fall | kanonisch, aktiv, nicht überlappend |
 | überlappende Test-Range | Negativfall | Speicherung/Projektion abgelehnt |
-| gültige 8-stellige 16er-Slot-Range | HMAC-Slotregel | akzeptiert |
-| 8-stellige Range mit fehlerhafter Start-/Endgrenze | HMAC-Slotregel | abgelehnt |
+| gültige lineare 8-stellige Test-Range | positiver Range-Fall | kanonisch, aktiv, nicht überlappend und ohne Slotgrenzen zulässig |
+| gültige lineare 10-stellige Test-Range | positiver Range-Fall | kanonisch, aktiv, nicht überlappend und ohne Slotgrenzen zulässig |
+| 8- oder 10-stellige Range außerhalb ihres kanonischen Raums | Negativfall | Speicherung/Projektion abgelehnt |
 | parallele Reservierungen | DB-Parallelität | einzigartige TAGs ohne Doppelvergabe |
 | Wiederholung mit gleicher Korrelation | Idempotenz | keine zweite Reservierung |
 

@@ -124,7 +124,7 @@ Workers führen serverseitigen JavaScript-/TypeScript-Code nahe am Nutzer aus. F
 
 | Anwendungsfall | Worker-Aufgabe |
 | --- | --- |
-| QR-/NFC-Scan | Host, URL, Tag-ID, HMAC, Range und Feature prüfen |
+| QR-/NFC-Scan | Host, URL, kanonische Tag-ID, Range und Feature prüfen |
 | öffentlicher Vault | Tag-ID erneut validieren; öffentliche Inhalte kontrolliert ausliefern |
 | Owner-Dashboard | Session prüfen; Inhalte, Sichtbarkeiten und Uploads verwalten |
 | Lost & Found | Status und Chat-Berechtigungen erzwingen |
@@ -438,7 +438,7 @@ Secrets werden pro Worker und pro Umgebung sicher hinterlegt, ohne in Git oder B
 ### Erforderliche Regeln
 
 - getrennte Secrets für Staging und Production;
-- keine Wiederverwendung von Feistel-, HMAC- oder Redirect-Signing-Secrets;
+- keine Wiederverwendung von Feistel- oder Redirect-Signing-Secrets;
 - Minimalrechte für Cloudflare-API-Tokens;
 - getrennte Deployment-Tokens je Projekt und Umgebung;
 - regelmäßige Überprüfung von Teamzugängen;
@@ -446,7 +446,7 @@ Secrets werden pro Worker und pro Umgebung sicher hinterlegt, ohne in Git oder B
 
 ### Besonderheit für Tag-Secrets
 
-Änderungen an `FEISTEL_SECRET` oder `TAG_HMAC_SECRET` können bestehende Tag-IDs ungültig machen. Diese Secrets dürfen nicht routinemäßig oder ungeplant rotiert werden. Ihre Rotation benötigt einen expliziten Migrations- und Tag-Lebenszyklusplan.
+Änderungen an `FEISTEL_SECRET_S01` können bestehende Tag-IDs ungültig machen. Dieser Schlüssel darf nicht routinemäßig oder ungeplant rotiert werden; seine Rotation benötigt einen expliziten Migrations- und Tag-Lebenszyklusplan. `REDIRECT_SIGNING_SECRET_S01` ist davon getrennt: Seine Rotation betrifft ausschließlich die Gültigkeit kurzlebiger Redirect-Signaturen, nicht die Kodierung oder Dekodierung von Tag-IDs.
 
 ---
 

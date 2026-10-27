@@ -4,7 +4,7 @@
 
 | Bereich | Nachweisstrang | Aktueller Stand |
 | --- | --- | --- |
-| Edge Router | [`../edge-router/`](../edge-router/) | Worker-Tests, Build und erster öffentlicher Staging-Scan verifiziert |
+| Edge Router | [`../edge-router/`](../edge-router/) | Lokale Worker-Tests und Builds für den linearen 6/8/10-Vertrag verifiziert; frühere öffentliche Staging-Scans gehören zum abgelösten HMAC-Vertrag |
 | TAG-App | [`../tag-app/`](../tag-app/) | Pages-Deploy und öffentlicher Vault-Staging-MVP vorhanden; zusätzliche Browser-/PWA-Nachweise offen |
 | Router→TAG-App | [`../tag-app/20-TEST-STRATEGY.md`](../tag-app/20-TEST-STRATEGY.md#6-integrationsstrategie-edge-router--tag-app) | blockiert, bis aktiver Worker und gebundener KV-Namespace eindeutig identifiziert sind |
 
@@ -17,20 +17,22 @@ Die verbindliche technische Evidenz wird lokal oder in CI durch folgende Befehle
 ```sh
 npm test
 npm run build
+npm run build:codec
 ```
 
 Die Befehle müssen im jeweiligen Anwendungspaket oder über ein äquivalentes Root-Skript ausgeführt werden. Für den getrennten Edge-Codec-Worker gelten zusätzlich:
 
 ```sh
-npm --prefix apps/edge-router test
-npm --prefix apps/edge-router run build
-npm --prefix apps/edge-router run build:codec
+npm run test:router
+npm run build:router
+npm run build:codec
 ```
 
 | Nachweis | Bedeutung |
 | --- | --- |
 | `npm test` erfolgreich | Alle automatisierten Unit- und Worker-Integrationstests sind erfolgreich |
-| `npm run build` erfolgreich | Der TypeScript-Worker und die Pages-PWA können mit der aktuellen Konfiguration gebaut werden |
+| `npm run build` erfolgreich | Der TypeScript-Scan-Worker und die Pages-PWA können mit der aktuellen Konfiguration gebaut werden |
+| `npm run build:codec` erfolgreich | Der getrennte private Codec-Worker kann mit seiner separaten Konfiguration gebaut werden |
 
 ## Dokumentation eines Durchlaufs
 
@@ -51,6 +53,10 @@ Für den Status `verified` gelten zusätzlich die Regeln der jeweiligen Teststra
 
 Der Dry-Run meldet aktuell keine Bindings, da die reale Cloudflare-KV-Namespace-ID bewusst nicht als Platzhalter in `wrangler.toml` hinterlegt wird. Vor dem ersten Deployment muss die auskommentierte `TAG_CONFIG`-KV-Bindung mit einer echten Namespace-ID aktiviert und die Secrets `FEISTEL_SECRET`, `TAG_HMAC_SECRET` sowie `REDIRECT_SIGNING_SECRET` gesetzt werden.
 
+### Abgelöste HMAC-Evidenz — 2026-10-06
+
+> Die folgenden Codec- und Staging-Nachweise dokumentieren den früheren HMAC-/Slotvertrag für achtstellige IDs. Sie gelten **nicht** als Verifikation des aktuellen linearen 6/8/10-Vertrags und bleiben ausschließlich historisch nachvollziehbar.
+
 ### Verifizierter lokaler Codec-Worker-Durchlauf — 2026-10-06
 
 Der öffentliche Scan-Worker und der neue private Codec-Worker verwenden den gemeinsamen, lokalen Feistel-/HMAC-Kern. Es wurde kein Deployment, keine Route und kein Secret gesetzt.
@@ -62,6 +68,18 @@ Der öffentliche Scan-Worker und der neue private Codec-Worker verwenden den gem
 | `npm --prefix apps/edge-router run build:codec` | Erfolgreicher Codec-Worker-Wrangler-Dry-Run; keine Nicht-Secret-Bindungen; Bundle 11.74 KiB (gzip 3.24 KiB). |
 
 Der Codec-Dry-Run meldet absichtlich `No bindings found`: `FEISTEL_SECRET_S01`, `TAG_HMAC_SECRET_S01` und `TAG_CODEC_API_KEY_S01` werden ausschließlich als Cloudflare-Secrets zur Laufzeit gesetzt. KV- und Redirect-Signing-Bindungen sind für diesen Worker nicht konfiguriert.
+
+### Verifizierter lokaler 6/8/10-Durchlauf — 2026-10-27
+
+Der gemeinsame Codec-Kern, der Scan-Worker, der private Codec-Worker und die lokalen Generatorwerkzeuge verwenden den HMAC-freien linearen Vertrag für 6-, 8- und 10-stellige Base36-TAG-IDs. Die Feistel-Transformation und `FEISTEL_SECRET_S01` bleiben die einzige ID-bezogene kryptografische Abhängigkeit; `REDIRECT_SIGNING_SECRET_S01` bleibt ausschließlich für optionale kurzlebige Redirect-Signaturen zuständig.
+
+| Befehl | Ergebnis |
+| --- | --- |
+| `npm test` | Erfolgreich: Edge Router/Codec 64/64 und TAG-App 5/5 Tests bestanden (insgesamt 69). |
+| `npm run build` | Erfolgreich: Scan-Worker-Wrangler-Dry-Run mit Staging-`TAG_CONFIG`-/`SCAN_ENVIRONMENT`-Bindings sowie TAG-App-Produktionsbuild. |
+| `npm run build:codec` | Erfolgreich: Codec-Worker-Wrangler-Dry-Run; Bundle 10,65 KiB (gzip 2,93 KiB), keine Nicht-Secret-Bindungen. |
+
+Vor der erneuten Staging-Freigabe müssen Scan-Worker und Codec-Worker mit dem neuen Vertrag bereitgestellt werden. Danach sind für den Codec mindestens Auth-/Methodengate sowie autorisierte Encode-/Decode-Roundtrips für 6, 8 und 10 Stellen nachzuweisen. Bestehende 6-/8-Stellen-Live-Tests mit `TAG_HMAC_SECRET_S01` dürfen nicht fortgeschrieben werden.
 
 ### Bereitgestellter privater Codec-Worker — 2026-10-06
 

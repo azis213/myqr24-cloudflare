@@ -28,17 +28,17 @@
 | --- | --- | --- | --- | --- |
 | `CC-TC-RANGE-001` | CC-US-012 | Gültige 6-stellige Range anlegen | kanonische, aktive und nicht überlappende Range wird akzeptiert | Unit/Integration |
 | `CC-TC-RANGE-002` | CC-US-012 | Überlappende oder unsortierte Range anlegen | Validierung verweigert Speicherung bzw. Publish | Unit/Integration |
-| `CC-TC-RANGE-003` | CC-US-012 | 8-stellige Range ohne vollständige Slotgrenzen | Range wird abgewiesen | Unit |
+| `CC-TC-RANGE-003` | CC-US-012 | gültige lineare 8- oder 10-stellige Range im kanonischen Raum | Speicherung ist ohne Slotgrenzen zulässig | Unit |
 | `CC-TC-RANGE-004` | CC-US-012 | Range-/Gruppen-/Feature-Identifier ungültig | Eingabe wird serverseitig abgewiesen | Unit |
 | `CC-TC-POOL-001` | CC-US-015 | gültigen Pool für private, Partner- oder Enterprise-Ausgabe anlegen | UI übergibt kanonische Pooldaten; bestätigter Control-Plane-Status und Kapazität werden angezeigt | UI/Contract |
 | `CC-TC-POOL-002` | CC-US-015 | überlappende, erschöpfte oder fremd gebundene Poolkonfiguration | UI zeigt neutrale Control-Plane-Ablehnung; keine lokale Umgehung ist möglich | UI/Contract |
 | `CC-TC-POOL-003` | CC-US-015 | Poolgrenzen als sichtbare Feistel-`tagId` interpretieren | UI erklärt/validiert `decodedValue`-Modell und sendet keine unzulässige Darstellung | UI |
 | `CC-TC-POOL-004` | CC-US-015 | Pool-/Kundensegment-/Ownerdaten in Routing- oder öffentliche Vorschau aufnehmen | Ansicht schließt private Felder aus; Contract/Leak-Test schlägt bei Durchreichung fehl | UI/Security |
 | `CC-TC-ALLOC-001` | CC-US-011 | 6-stellige TAG-ID vergeben | `tagId`, `decodedValue`, Länge und Range-Kontext sind eindeutig reserviert | Integration |
-| `CC-TC-ALLOC-002` | CC-US-011 | 8-stellige TAG-ID vergeben | nächster 16er-Basisslot und korrekter HMAC-Nibble werden verwendet; voller Wert wird gespeichert | Unit/Integration |
+| `CC-TC-ALLOC-002` | CC-US-011 | 8- oder 10-stellige TAG-ID vergeben | nächster freier linearer `decodedValue` wird durch den privaten Codec eindeutig als `tagId` reserviert und gespeichert | Unit/Integration |
 | `CC-TC-ALLOC-003` | CC-US-011 | Parallele Vergaben derselben Range | keine Duplikate bei `tagId` oder `(length, decodedValue)` | Integration |
-| `CC-TC-ALLOC-004` | CC-US-011 | Wiederholung nach Request-/Jobfehler | keine unerwartete zweite Reservierung und keine Slotüberschneidung | Integration |
-| `CC-TC-ALLOC-005` | CC-US-011 | Secret-Leak-Prüfung | Feistel-/HMAC-Secrets fehlen in DB-Ausgaben, Logs, Fixtures und Responses | Security |
+| `CC-TC-ALLOC-004` | CC-US-011 | Wiederholung nach Request-/Jobfehler | keine unerwartete zweite Reservierung oder Doppelvergabe | Integration |
+| `CC-TC-ALLOC-005` | CC-US-011 | Secret-Leak-Prüfung | Feistel-Secrets fehlen in DB-Ausgaben, Logs, Fixtures und Responses | Security |
 | `CC-TC-LIFECYCLE-001` | CC-US-010 / CC-US-013 | Erlaubter Ablauf `draft → pending-review → ready-to-publish` | Statuswechsel ist mit korrekter Rolle möglich und auditiert | Integration |
 | `CC-TC-LIFECYCLE-002` | CC-US-013 | Ungültiger Statussprung, etwa `draft → active` | Statuswechsel wird verweigert | Unit |
 | `CC-TC-PRINT-001` | CC-US-014 | Staging-QR-Daten erzeugen | kanonische Staging-URL ohne Secrets, klar als Staging markiert | Unit |

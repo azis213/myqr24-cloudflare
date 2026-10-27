@@ -118,7 +118,7 @@ flowchart TD
 | Nr. | Aktivität | Verantwortlich | Ergebnis | Verbindlicher Kontrollpunkt |
 | --- | --- | --- | --- | --- |
 | A1 | Produkt-, Zielgruppen- und Kapazitätsbedarf erfassen | TAG-Manager / Produkt | Bedarf mit Produktklasse und Ausgabeweg | keine direkte TAG-Vergabe ohne zugelassene Produktpolicy |
-| A2 | Range und Gruppe definieren oder auswählen | TAG-Manager | gültiger numerischer TAG-Raum | sechs-/achtstelliger Raum, Nichtüberlappung, 8-stellige 16er-Slotgrenze |
+| A2 | Range und Gruppe definieren oder auswählen | TAG-Manager | gültiger numerischer TAG-Raum | 6-, 8- oder 10-stelliger kanonischer Raum, Nichtüberlappung, lineare aufeinanderfolgende Integer-Grenzen |
 | A3 | Feature-/Routing-Grundkontext prüfen | TAG-Manager | veröffentlichungsfähiger Gruppen-/Range-Kontext | fehlende oder ungültige Feature-Referenz blockiert Publikation |
 | A4 | Allocation Pool bereitstellen | TAG-Manager / Organisation | Pool mit Zielgruppe, Produkt-, Claim- und Kapazitätspolicy | Pool ist aktiv, organisationsgebunden falls erforderlich, nicht erschöpft |
 | A5 | konkrete Menge und Ausgabemodell festlegen | TAG-Manager / Auftraggeber | Reservierungsauftrag | Modell: offene Charge, Vorabzuweisung, Self-Print, Ersatz oder Demo |
@@ -142,7 +142,7 @@ flowchart TD
 2. Ein Pool wird über kanonische Werte verwaltet; sichtbar fortlaufende Feistel-IDs sind keine fachliche Poolgrenze.
 3. Eine Reservierung kann wiederholt werden, ohne unbeabsichtigt weitere TAGs zu erzeugen.
 4. Ein reservierter TAG besitzt genau einen kontrollierten Provisionierungsweg, bis dieser abgeschlossen, storniert oder ersetzt wurde.
-5. Feistel- und HMAC-Secrets verbleiben vollständig serverseitig.
+5. Feistel-, Codec-API- und Redirect-Signing-Secrets verbleiben vollständig außerhalb der Fachdaten, Clients, Exporte und Auditdaten.
 6. Ein Reservierungsstatus allein führt niemals zu öffentlicher Scan-Auflösung oder Aktivität.
 
 ## 5. Kernprozess B – Herstellung, QA, Fulfillment und Self-Print

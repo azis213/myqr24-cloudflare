@@ -7,7 +7,7 @@
 
 1. Testdaten sind synthetisch, reproduzierbar und eindeutig als Test/Staging markiert.
 2. Produktionsdaten, echte Personen, reale Betreiberkontakte, echte Standortnachweise, Zugangsdaten und Secrets dürfen weder in Fixtures noch in Screenshots/Evidenz erscheinen.
-3. Feistel- und HMAC-Secretwerte werden niemals als Fixture geführt. Tests verwenden einen isolierten Test-Secret-Provider oder vordefinierte, nicht produktive Testvektoren außerhalb von Versionskontrolle, soweit erforderlich.
+3. Feistel-Secretwerte werden niemals als Fixture geführt. Tests verwenden einen isolierten Test-Secret-Provider oder vordefinierte, nicht produktive Testvektoren außerhalb von Versionskontrolle, soweit erforderlich.
 4. Cloudflare-Tokens, echte Account-/Namespace-IDs, Datenbankzugänge und Mail-/MFA-Credentials gehören ausschließlich in den Secret-Store der jeweiligen Umgebung.
 5. Jede Fixture muss ihre Datenklassifikation (öffentlich, intern-synthetisch, secret-external) erkennen lassen.
 6. Staging und Produktion teilen niemals dieselben Testdaten, Tokens, Namespace-IDs oder Datenbankverbindungen.
@@ -17,7 +17,7 @@
 | ID | Klasse | Zweck | Zulässiger Inhalt | Nicht zulässig |
 | --- | --- | --- | --- | --- |
 | `CC-TD-001` | Admin/Rollen | AuthZ-Matrix und Audit | synthetische Konten wie `admin@example.invalid`, Rollen, deaktivierte Konten | echte E-Mail-Adressen, Passwörter, MFA-Secrets |
-| `CC-TD-002` | TAG-Range | Range-Validierung | kleine kanonische 6-/8-stellige Testbereiche, Gruppen-IDs | Produktionsranges, echte Secret-Derivate |
+| `CC-TD-002` | TAG-Range | Range-Validierung | kleine kanonische lineare 6-/8-/10-stellige Testbereiche, Gruppen-IDs | Produktionsranges, echte Secret-Derivate |
 | `CC-TD-003` | TAG-Allocator | Vergabe, Parallelität und Retry | deterministische Startwerte, reservierte Test-TAGs, Test-Korrelationen | Produktions-TAGs oder echte Ausgabeaufträge |
 | `CC-TD-004` | Routing-Projektion | KV-Schema und Edge-Contract | minimale Gruppen, Regeln, sichere HTTPS-Testziele, Feature-Dokumente | Owner-/Kontaktdaten, Vault-Inhalte, Token, Nachweise |
 | `CC-TD-005` | Publisher-Sandbox | Publish/Unpublish/Retry | Fake-Cloudflare-Client, isolierte Staging-Referenzen, simulierte Fehler | Produktionsnamespace, Produktions-API-Token |
@@ -52,9 +52,9 @@ Passwort-Hashwerte werden nur testlokal generiert oder als eindeutig nicht produ
 | --- | --- | --- |
 | gültige 6-stellige Test-Range | positive Range-Prüfung | Range ist kanonisch und nicht überlappend |
 | überlappende 6-stellige Test-Range | negative Validierung | Speicherung/Publish wird verweigert |
-| gültige 8-stellige Range mit vollständigen 16er-Slots | Slotregel | akzeptiert |
-| 8-stellige Range mit `start % 16 != 0` | Slotregel | abgewiesen |
-| 8-stellige Range mit `end % 16 != 15` | Slotregel | abgewiesen |
+| gültige lineare 8-stellige Test-Range | positive Range-Prüfung | Range ist ohne Slotgrenzen zulässig |
+| gültige lineare 10-stellige Test-Range | positive Range-Prüfung | Range ist ohne Slotgrenzen zulässig |
+| 8- oder 10-stellige Range außerhalb ihres kanonischen Raums | negative Validierung | Speicherung/Publish wird verweigert |
 | parallele Reservierung auf gleicher Range | Konkurrenztest | einzigartige IDs ohne Lückenannahme |
 | Retry mit gleicher Idempotenz-/Korrelation-ID | Wiederholung | kein zweiter fachlicher Vergabevorgang |
 

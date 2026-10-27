@@ -32,8 +32,8 @@ Nicht verhandelbare Regeln:
 1. **MySQL und serverseitige Control-Plane-Domänenlogik sind fachlich autoritativ.**
 2. **Cloudflare KV ist keine Fachquelle.** Es enthält nur die minimale, nicht personenbezogene Routing-Projektion für den Edge Router.
 3. **Browser besitzen niemals DB-, KV-, R2-, Publisher- oder Cloudflare-Token-Zugriff.**
-4. Die TAG-App implementiert **keine** Feistel-, HMAC-, Range-, Feature- oder Redirect-Signaturentscheidung.
-5. TAG-ID, HMAC-Secrets und `decodedValue` werden ausschließlich nach [`DOMAIN_RULES.md`](../../DOMAIN_RULES.md) verarbeitet.
+4. Die TAG-App implementiert **keine** Feistel-, Range-, Feature- oder Redirect-Signaturentscheidung.
+5. TAG-ID und `decodedValue` werden ausschließlich nach dem HMAC-freien Feistel-/Cycle-Walk-Vertrag in [`DOMAIN_RULES.md`](../../DOMAIN_RULES.md) verarbeitet.
 6. Public APIs, KV, Logs, Evidenz und reguläre Audit-Metadaten enthalten weder Credentials, Secretwerte, Ownerdaten, Audit-Rohdaten, Nachweise noch private Vault-Inhalte.
 7. Eine Produktivveröffentlichung ist außerhalb dieser Orchestrierung gesperrt, bis alle dokumentierten Staging- und Sicherheitsgates erfüllt und ausdrücklich freigegeben sind.
 
@@ -251,13 +251,13 @@ Ergebnisse:
 
 Ergebnisse:
 
-- Range-/Pool-Domäne und atomare 6-/8-stellige Reservierung;
-- vollständige 16er-Slot-Validierung, Unique Constraints, Retry-/Idempotenz-Logik;
+- Range-/Pool-Domäne und atomare lineare 6-/8-/10-stellige Reservierung;
+- Validierung kanonischer linearer Integer-Intervalle ohne Slotgrenzen, Unique Constraints, Retry-/Idempotenz-Logik;
 - Statusautomat und Audit;
 - Control-Center-Ansichten für Entwurf, Pool, Range, Reservierung und Status;
 - keine Cloudflare-Veröffentlichung.
 
-**Gate W2L:** `CP-G2`; Parallel-, Retry-, Slot-, Status- und Rollen-Negativtests lokal grün.  
+**Gate W2L:** `CP-G2`; Parallel-, Retry-, Range-, Status- und Rollen-Negativtests lokal grün.
 **Testtag-Vorbereitung:** lokale synthetische Reservierungen sind zulässig. Staging-IDs und jede KV-Projektion bleiben bis zur nachgelagerten Deploymentstufe gesperrt.
 
 ### Welle 3 – Routing-Projektion, Publisher und realer Staging-Scan

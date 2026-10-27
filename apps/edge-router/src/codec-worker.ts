@@ -2,8 +2,8 @@
  * Private myQR24 TAG codec Worker.
  *
  * This Worker intentionally has no KV binding and no redirect-signing secret.
- * It exposes the shared Feistel/HMAC codec only to the server-side control
- * plane through an authenticated API.
+ * It exposes the shared Feistel codec only to the server-side control plane
+ * through an authenticated API.
  */
 import {
   decodeTagId,
@@ -15,7 +15,6 @@ import {
 
 export interface CodecEnv {
   FEISTEL_SECRET_S01: string;
-  TAG_HMAC_SECRET_S01: string;
   TAG_CODEC_API_KEY_S01: string;
 }
 
@@ -120,7 +119,7 @@ function isDecodeRequest(value: unknown): value is DecodeRequest {
 
   return (
     typeof candidate.tagId === "string" &&
-    /^(?:[0-9a-z]{6}|[0-9a-z]{8})$/i.test(candidate.tagId)
+    /^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/i.test(candidate.tagId)
   );
 }
 
@@ -163,10 +162,7 @@ async function handleEncode(
 
   const value = parseDecimal(body.value)!;
 
-  if (
-    !isCanonicalValue(value, body.length) ||
-    (body.length === 8 && value % 16n !== 0n)
-  ) {
+  if (!isCanonicalValue(value, body.length)) {
     return invalidRequest();
   }
 

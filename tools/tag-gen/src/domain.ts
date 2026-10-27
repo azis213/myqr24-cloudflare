@@ -1,4 +1,4 @@
-export type TagLength = 6 | 8;
+export type TagLength = 6 | 8 | 10;
 export type InputLocale = "de-DE" | "en-US";
 export type QrIdCase = "upper" | "lower";
 export type QrErrorCorrectionLevel = "L" | "M" | "Q" | "H";
@@ -249,8 +249,7 @@ export function upperBound(length: TagLength): bigint {
 }
 
 export function maximumOffset(length: TagLength): bigint {
-  const availableValues = upperBound(length) - lowerBound(length);
-  return length === 8 ? availableValues / 16n - 1n : availableValues - 1n;
+  return upperBound(length) - lowerBound(length) - 1n;
 }
 
 export function resolveRangeValues(
@@ -283,20 +282,17 @@ export function resolveRangeValues(
     };
   }
 
-  const multiplier = length === 8 ? 16n : 1n;
   return {
     ok: true,
     value: {
-      start: (lowerBound(length) + startResult.value * multiplier).toString(),
-      end: (lowerBound(length) + endResult.value * multiplier).toString(),
+      start: (lowerBound(length) + startResult.value).toString(),
+      end: (lowerBound(length) + endResult.value).toString(),
     },
   };
 }
 
 export function countRange(range: TagRangeDefinition): bigint {
-  const start = BigInt(range.start);
-  const end = BigInt(range.end);
-  return range.tagLength === 8 ? (end - start) / 16n + 1n : end - start + 1n;
+  return BigInt(range.end) - BigInt(range.start) + 1n;
 }
 
 export function validateBaseUrl(input: string): ValidationResult<string> {
@@ -367,7 +363,13 @@ export function validateRange(
   if (!name) errors.push("Ein Bereichsname ist erforderlich.");
   if (name.length > 120) errors.push("Der Bereichsname darf höchstens 120 Zeichen enthalten.");
   if (candidate.labelText.length > 500) errors.push("Der Etikettentext darf höchstens 500 Zeichen enthalten.");
-  if (candidate.tagLength !== 6 && candidate.tagLength !== 8) errors.push("Ungültige TAG-Länge.");
+  if (
+    candidate.tagLength !== 6 &&
+    candidate.tagLength !== 8 &&
+    candidate.tagLength !== 10
+  ) {
+    errors.push("Ungültige TAG-Länge.");
+  }
   const qrProfile = validateQrProfile(candidate.qrProfile ?? defaultQrProfile());
   if (!qrProfile.ok) errors.push(...qrProfile.errors);
 
@@ -383,10 +385,6 @@ export function validateRange(
     if (start < lowerBound(length) || end >= upperBound(length)) {
       errors.push(`Die Grenzen müssen im kanonischen ${length}-stelligen Base36-Wertebereich liegen.`);
     }
-    if (length === 8 && (start % 16n !== 0n || end % 16n !== 0n)) {
-      errors.push("Achtstellige Bereiche müssen bei Von und Bis 16-ausgerichtet sein.");
-    }
-
     for (const current of existingRanges) {
       if (current.id === candidate.id || current.tagLength !== length) continue;
       const overlaps = start <= BigInt(current.end) && end >= BigInt(current.start);

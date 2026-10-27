@@ -84,8 +84,8 @@ Eine Story wird erst `verified`, wenn die verknüpften Tests erfolgreich sind un
 2. Jede fachliche Änderung, die eine Routing-Projektion erfordert, schreibt in der Control Plane innerhalb derselben DB-Transaktion einen Outbox-Auftrag und ein Audit-Ereignis.
 3. Nur ein serverseitiger Publisher darf mit einem minimal berechtigten Cloudflare-Token nach KV schreiben; Browser erhalten niemals diesen Token.
 4. Staging und Produktion verwenden getrennte Datenbanken bzw. Konfigurationen, Cloudflare-Tokens, KV-Namespaces und Secrets.
-5. Die Vergabe von sechs- und achtstelligen TAGs erfolgt atomar und nutzt eindeutige Constraints für `tagId` sowie `(length, decodedValue)`.
-6. Range-Änderungen werden vor Veröffentlichung auf kanonische Räume, globale Sortierung, Nichtüberlappung und bei acht Stellen auf vollständige 16er-Slots validiert.
+5. Die Vergabe von sechs-, acht- und zehnstelligen TAGs erfolgt atomar und nutzt eindeutige Constraints für `tagId` sowie `(length, decodedValue)`.
+6. Range-Änderungen werden vor Veröffentlichung auf kanonische Räume, globale Sortierung, Nichtüberlappung und lineare Integer-Intervalle ohne Slotgrenzen validiert.
 7. Routing-Projektionen enthalten nur die in `DOMAIN_RULES.md` erlaubten Ranges, Gruppen, Regelzuweisungen und Feature-Dokumente.
 8. Öffentliche Read-APIs liefern ausschließlich explizit veröffentlichte Daten und behandeln unbekannte, gesperrte oder nicht veröffentlichte TAGs neutral.
 9. Jede neue Story erhält vor dem Status `implemented` Testfälle und Traceability-Verweise.

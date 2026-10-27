@@ -13,6 +13,7 @@
     "dev:app": "npm run dev --workspace=@myqr24/tag-app",
     "build": "npm run build:router && npm run build:app",
     "build:router": "npm run build --workspace=@myqr24/edge-router",
+    "build:codec": "npm run build:codec --workspace=@myqr24/edge-router",
     "build:app": "npm run build --workspace=@myqr24/tag-app",
     "test": "npm run test:router && npm run test:app",
     "test:router": "npm run test --workspace=@myqr24/edge-router",

@@ -68,18 +68,21 @@ describe("private TAG codec API", () => {
     });
   });
 
-  it("TC-CODEC-002 creates a HMAC-protected eight-character tag from an aligned base", async () => {
-    const base = (base36LowerBound(8) + 64n) & ~0x0fn;
+  it("TC-CODEC-002 creates a linear eight-character tag without slot alignment", async () => {
+    const value = base36LowerBound(8) + 65n;
     const encodeResponse = await call(
-      request("encode", { length: 8, value: base.toString() }),
+      request("encode", { length: 8, value: value.toString() }),
     );
     const encoded = (await encodeResponse.json()) as {
       tag: { id: string; length: number; value: string };
     };
 
     expect(encodeResponse.status).toBe(200);
+    expect(encoded.tag).toMatchObject({
+      length: 8,
+      value: value.toString(),
+    });
     expect(encoded.tag.id).toMatch(/^[0-9a-z]{8}$/);
-    expect(BigInt(encoded.tag.value) & ~0x0fn).toBe(base);
 
     const decodeResponse = await call(
       request("decode", { tagId: encoded.tag.id }),
@@ -91,7 +94,33 @@ describe("private TAG codec API", () => {
     });
   });
 
-  it("TC-CODEC-003 fails closed for unknown paths, methods and missing credentials", async () => {
+  it("TC-CODEC-003 round-trips a high canonical ten-character value", async () => {
+    const value = base36LowerBound(10) + 1_000_000_000_000_000n;
+    const encodeResponse = await call(
+      request("encode", { length: 10, value: value.toString() }),
+    );
+    const encoded = (await encodeResponse.json()) as {
+      tag: { id: string; length: number; value: string };
+    };
+
+    expect(encodeResponse.status).toBe(200);
+    expect(encoded.tag).toMatchObject({
+      length: 10,
+      value: value.toString(),
+    });
+    expect(encoded.tag.id).toMatch(/^[0-9a-z]{10}$/);
+
+    const decodeResponse = await call(
+      request("decode", { tagId: encoded.tag.id }),
+    );
+
+    expect(decodeResponse.status).toBe(200);
+    await expect(decodeResponse.json()).resolves.toMatchObject({
+      tag: encoded.tag,
+    });
+  });
+
+  it("TC-CODEC-004 fails closed for unknown paths, methods and missing credentials", async () => {
     const unknown = await call(
       new Request("https://codec.s.myqr24.com/api/v1/tag-codec/unknown"),
     );
@@ -112,25 +141,22 @@ describe("private TAG codec API", () => {
     expect(unauthorizedResponse.headers.get("access-control-allow-origin")).toBeNull();
   });
 
-  it("TC-CODEC-004 rejects malformed, non-canonical and non-aligned input without exposing crypto details", async () => {
+  it("TC-CODEC-005 rejects malformed and non-canonical input without exposing crypto details", async () => {
     const malformed = await call(
       request("encode", { length: 6, value: "12.5" }),
     );
     const sixBelowCanonical = await call(
       request("encode", { length: 6, value: "1" }),
     );
-    const unalignedEight = await call(
-      request("encode", {
-        length: 8,
-        value: (base36LowerBound(8) + 1n).toString(),
-      }),
+    const tenBelowCanonical = await call(
+      request("encode", { length: 10, value: base36LowerBound(8).toString() }),
     );
     const badTag = await call(request("decode", { tagId: "invalid!" }));
 
     for (const response of [
       malformed,
       sixBelowCanonical,
-      unalignedEight,
+      tenBelowCanonical,
       badTag,
     ]) {
       expect(response.status).toBe(400);

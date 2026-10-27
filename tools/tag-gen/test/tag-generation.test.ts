@@ -8,7 +8,6 @@ import {
 
 const testSecrets = {
   feistelSecret: "tag-generator-test-feistel-secret",
-  hmacSecret: "tag-generator-test-hmac-secret",
 };
 
 const ranges: TagRangeDefinition[] = [
@@ -27,9 +26,20 @@ const ranges: TagRangeDefinition[] = [
     id: "eight",
     name: "Achtstelliger Bereich",
     start: "78364164096",
-    end: "78364164128",
+    end: "78364164098",
     tagLength: 8,
     labelText: "Test 8",
+    qrProfile: { version: "auto", errorCorrectionLevel: "M", quietZoneModules: 4 },
+    createdAt: "2026-10-07T15:00:00.000Z",
+    updatedAt: "2026-10-07T15:00:00.000Z",
+  },
+  {
+    id: "ten",
+    name: "Zehnstelliger Bereich",
+    start: "101559956668416",
+    end: "101559956668418",
+    tagLength: 10,
+    labelText: "Test 10",
     qrProfile: { version: "auto", errorCorrectionLevel: "M", quietZoneModules: 4 },
     createdAt: "2026-10-07T15:00:00.000Z",
     updatedAt: "2026-10-07T15:00:00.000Z",
@@ -44,14 +54,16 @@ describe("TAG-Generierung mit Edge-Router-Codec", () => {
       testSecrets,
     );
 
-    expect(tags).toHaveLength(6);
+    expect(tags).toHaveLength(9);
     expect(new Set(tags.map((tag) => tag.tagId)).size).toBe(tags.length);
     expect(tags.filter((tag) => tag.tagLength === 6)).toHaveLength(3);
     expect(tags.filter((tag) => tag.tagLength === 8)).toHaveLength(3);
+    expect(tags.filter((tag) => tag.tagLength === 10)).toHaveLength(3);
 
     for (const tag of tags) {
       expect(tag.url).toBe(`https://s.myqr24.com/t/${tag.tagId}`);
-      expect(tag.tagId).toMatch(tag.tagLength === 6 ? /^[0-9a-z]{6}$/ : /^[0-9a-z]{8}$/);
+      expect(tag.tagId).toMatch(new RegExp(`^[0-9a-z]{${tag.tagLength}}$`));
+      expect(tag.requestedValue).toBe(tag.decodedValue);
     }
   });
 
@@ -68,7 +80,6 @@ describe("TAG-Generierung mit Edge-Router-Codec", () => {
     const json = createTagListJson("https://s.myqr24.com/t/", [ranges[0]], tags);
 
     expect(json).not.toContain(testSecrets.feistelSecret);
-    expect(json).not.toContain(testSecrets.hmacSecret);
 
     const imported = parseTagListJson(json);
     expect(imported.tags).toEqual(tags);

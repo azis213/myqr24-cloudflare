@@ -21,7 +21,7 @@ Die Teststrategie sichert insbesondere:
 
 | Ebene | Zweck | Beispiele | Ausführung |
 | --- | --- | --- | --- |
-| Unit | deterministische Fach- und Sicherheitslogik | Statusübergänge, Range-Prüfung, 8-stelliger Slot-Fortschritt, URL-/Feature-Schema | bei jedem Commit |
+| Unit | deterministische Fach- und Sicherheitslogik | Statusübergänge, Range-Prüfung, lineare 6/8/10-stellige Vergabe, URL-/Feature-Schema | bei jedem Commit |
 | Component / Service | Zusammenarbeit innerhalb der Anwendung | AuthZ-Policy, Audit-Service, Projektionsgenerator, Outbox-Planung | bei jedem Commit |
 | Integration | Datenbank, Transaktionen, Queue und Cloudflare-API-Adapter | eindeutige Constraints, konkurrierende Vergabe, Publisher-Retry, Unpublish | CI mit isolierten Ressourcen |
 | Contract | Grenzen zu Edge Router und TAG-App | KV-Dokumente, `PublicTagView`-Response, Fehler- und Cache-Vertrag | CI und vor Staging |
@@ -41,7 +41,7 @@ Die Teststrategie sichert insbesondere:
 
 ### 3.2 CC-I02 – Pools, TAG-Vergabe, Claiming und Lebenszyklus
 
-- UI-/Contract-Tests für kanonische Base36-Räume, 6-/8-stellige Werte, Pool-/Range-Grenzen und kapazitätsbezogene Rückmeldungen.
+- UI-/Contract-Tests für kanonische Base36-Räume, 6-/8-/10-stellige Werte, lineare Pool-/Range-Grenzen und kapazitätsbezogene Rückmeldungen.
 - Manipulations- und Retrytests: Die UI kann Control-Plane-Idempotenz, Poolbindung oder Owner-Grenzen nicht umgehen.
 - Auswahltests für die zulässige Claim-Strategie: Einzelcredential, Bogen-/Chargencredential, Vorabzuweisung oder Self-Print nur entsprechend Pool-/Produktpolicy.
 - Sichtbarkeitstests: Credential-Hashes und nach der Freigabe nicht mehr abrufbare Klartextwerte erscheinen nie in UI, Fehlern, Auditansicht oder Browser-Storage.
@@ -52,7 +52,7 @@ Die Teststrategie sichert insbesondere:
 ### 3.3 CC-I03 – Projektion und Publishing
 
 - Schema- und Referenzintegritätstests für `tag-range-index`, Gruppen, Regeln und Feature-Dokumente.
-- Negativtests für Überlappung, unsortierte Ranges, falsche 8-stellige Slotgrenzen, ungültige Identifier, unbekannte Featuretypen und unsichere URLs.
+- Negativtests für Überlappung, unsortierte Ranges, unzulässige Längen- oder Raumgrenzen, ungültige Identifier, unbekannte Featuretypen und unsichere URLs.
 - Transaktionstest: Mutation, Audit und Outbox sind gemeinsam erfolgreich oder gemeinsam zurückgerollt.
 - Publisher-Adaptertests gegen einen Fake-/Sandbox-Cloudflare-Client.
 - Idempotenz- und Retrieszenarien bei Timeout, 429, 5xx und Prozessabbruch.

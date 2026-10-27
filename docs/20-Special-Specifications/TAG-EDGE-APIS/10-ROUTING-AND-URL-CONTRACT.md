@@ -26,7 +26,7 @@ Diese Rollen dürfen nicht vermischt werden:
 
 | Begriff | Bedeutung |
 | --- | --- |
-| `tagId` | Öffentliche, kanonische Base36-TAG-ID mit 6 oder 8 Stellen; in URLs kleingeschrieben |
+| `tagId` | Öffentliche, kanonische Base36-TAG-ID mit 6, 8 oder 10 Stellen; in URLs kleingeschrieben |
 | Scan-Familie | Pfadfamilie, die das Decoder-/Kryptografieprotokoll einer physischen Scan-URL kennzeichnet |
 | App-Route | Browserroute, welche die TAG-App als HTML/PWA rendert |
 | Runtime-View | Bereinigte Repräsentation eines TAGs, die der aktuelle Zugriff sehen darf |
@@ -152,7 +152,7 @@ flowchart LR
 | `/t/{tagId}` | aktuelle kanonische Scan-Familie | `GET`, `HEAD` | Redirect oder erlaubtes JSON-Aktionsdokument |
 | `/t1/{tagId}` | reservierte Scan-Familie für einen künftigen, explizit dokumentierten Decoder-/Secret-Kontext | `GET`, `HEAD` | bis Aktivierung dieselbe Decoderkonfiguration wie `/t/` |
 
-Die vollständigen Validierungs-, Feistel-, HMAC-, Range- und Feature-Regeln stehen verbindlich in [`../../DOMAIN_RULES.md`](../../DOMAIN_RULES.md).
+Die vollständigen Validierungs-, Feistel-, Range- und Feature-Regeln stehen verbindlich in [`../../DOMAIN_RULES.md`](../../DOMAIN_RULES.md).
 
 ### 5.2 Scan-URL ist nicht gleich App-URL
 
@@ -171,7 +171,7 @@ Ein erfolgreicher Scan kann für ein `tag-vault`-Feature auf die TAG-App weiterl
 Die Route `/8/{tagId}` wird nicht eingeführt, um achtstellige IDs zu kennzeichnen:
 
 - die ID-Länge ist bereits aus `tagId` eindeutig erkennbar;
-- `/t/` akzeptiert gemäß `DOMAIN_RULES.md` sechs- und achtstellige TAG-IDs;
+- `/t/` akzeptiert gemäß `DOMAIN_RULES.md` sechs-, acht- und zehnstellige TAG-IDs;
 - zusätzliche URL-Formen erschweren QR-/NFC-Kompatibilität, Tests, Analytics und Support.
 
 Eine neue Scanroute wie `/t2/{tagId}` darf ausschließlich eine neue langlebige **Scan-Protokollfamilie** markieren, etwa bei einer neuen kryptografischen Decoder-Version. Sie wird erst nach eigener Spezifikation, Migrationsstrategie und Tests aktiviert.

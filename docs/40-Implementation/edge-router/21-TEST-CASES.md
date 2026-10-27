@@ -8,7 +8,8 @@ Lokale Testfälle werden automatisiert in Vitest umgesetzt; ihre Kennungen werde
 | --- | --- | --- | --- |
 | TC-URL-001 | US-001 | `https://p.qr4.uk/t/Ab12Cd` | Tag-ID `ab12cd`, Länge 6 |
 | TC-URL-002 | US-001 | `https://p.myqr24.com/t/Ab12Cd34` | Tag-ID `ab12cd34`, Länge 8 |
-| TC-URL-003 | US-001/US-002 | Falscher Host, falscher Pfad, Zusatzsegment, falsche Länge oder ungültiges Alphabet | `404` |
+| TC-URL-003 | US-001 | `https://p.qr4.uk/t/Ab12Cd34Ef` | Tag-ID `ab12cd34ef`, Länge 10 |
+| TC-URL-004 | US-001/US-002 | Falscher Host, falscher Pfad, Zusatzsegment, falsche Länge oder ungültiges Alphabet | `404` |
 | TC-HOME-001 | US-001/US-002 | `GET /` auf jedem erlaubten Scan-Host in seiner Umgebung | `302`, `Location: https://www.myqr24.com/` |
 | TC-HOME-002 | US-002 | `HEAD /?source=bot` auf erlaubtem Scan-Host | `302`, leerer Body; Query-Parameter nicht im `Location`-Header |
 | TC-HOME-003 | US-001/US-002 | `GET /` auf Apex, fremdem oder umgebungsfremdem Host | `404` |
@@ -23,21 +24,23 @@ Lokale Testfälle werden automatisiert in Vitest umgesetzt; ihre Kennungen werde
 | --- | --- | --- | --- |
 | TC-CRYPTO-001 | US-003 | 6-stelliger Testvektor | Decodierter Wert liegt in `I(6)` |
 | TC-CRYPTO-002 | US-003 | 8-stelliger Testvektor | Decodierter Wert liegt in `I(8)` |
-| TC-CRYPTO-003 | US-003 | Werte unterhalb der kanonischen Untergrenze | Kein kanonischer Tag-Wert |
-| TC-CRYPTO-004 | US-003 | Base36-Parsing sehr großer Wert | Verlustfreie `BigInt`-Verarbeitung |
-| TC-HMAC-001 | US-004 | Gültiger 8-stelliger Vektor | Vollständiger `decodedValue` inklusive Nibble wird geliefert |
-| TC-HMAC-002 | US-004 | Gleiche Basis mit manipuliertem Nibble | `null` bzw. Edge-`404` |
-| TC-HMAC-003 | US-004 | Ungültiger HMAC-Request mit KV-Spy | `404`, keine KV-Leseoperation |
-| TC-HMAC-004 | US-004 | Gültiger 8-stelliger Wert in Range | vollständiger Integer wird als Range-Key verwendet |
+| TC-CRYPTO-003 | US-003 | 10-stelliger Testvektor | Decodierter Wert liegt in `I(10)` |
+| TC-CRYPTO-004 | US-003 | Werte unterhalb der kanonischen Untergrenze | Kein kanonischer Tag-Wert |
+| TC-CRYPTO-005 | US-003 | Base36-Parsing sehr großer Wert | Verlustfreie `BigInt`-Verarbeitung |
+| TC-ID-001 | US-004 | Gültige 6-, 8- und 10-stellige Feistel-Testvektoren | Jeder vollständige `decodedValue` wird ohne Prüfnibble geliefert |
+| TC-ID-002 | US-004 | Vollständiger 8- oder 10-stelliger Wert in passender Range | Vollständiger Integer wird unverändert als Range-Key verwendet |
+| TC-ID-003 | US-004 | 8- oder 10-stelliger Wert ohne Slot-Ausrichtung | Bei kanonischem Feistel-Wert erfolgt die normale Auflösung; keine zusätzliche Ablehnung |
+| TC-ID-004 | US-004 | Fehlgeschlagener Feistel-/Cycle-Walk-Fall mit KV-Spy | `404`, keine KV-Leseoperation |
 
 ## Private Codec-API
 
 | ID | Story | Setup / Eingabe | Erwartetes Ergebnis |
 | --- | --- | --- | --- |
 | TC-CODEC-001 | CP-US-011 | Authentisierter `POST /api/v1/tag-codec/encode` für kanonischen 6-stelligen Wert, anschließend `decode` | Lowercase-ID sowie identischer vollständiger Wert im Encode-/Decode-Roundtrip |
-| TC-CODEC-002 | CP-US-011/CP-US-013 | Authentisierter 8-stelliger Encode mit kanonischer, durch 16 teilbarer Basis, anschließend `decode` | HMAC-geschützte 8-stellige ID; Decode liefert vollständigen Wert inklusive Nibble |
-| TC-CODEC-003 | CP-BLK-005 | Unbekannter Pfad, `GET` oder fehlender Bearer-Key | `404`, `405` mit `Allow: POST` bzw. neutrale `401`; keine CORS-Freigabe |
-| TC-CODEC-004 | CP-US-011/CP-US-013 | Nicht-JSON, Schemafehler, nichtkanonischer 6-stelliger Wert, nicht ausgerichtete 8-stellige Basis oder ungültige ID | Neutrale `400 {"error":{"code":"invalid_request"}}` ohne Kryptografiedetails |
+| TC-CODEC-002 | CP-US-011 | Authentisierter 8-stelliger Encode für kanonischen Wert, anschließend `decode` | Lowercase-ID sowie identischer vollständiger Wert im Encode-/Decode-Roundtrip |
+| TC-CODEC-003 | CP-US-011 | Authentisierter 10-stelliger Encode für kanonischen Wert, anschließend `decode` | Lowercase-ID sowie identischer vollständiger Wert im Encode-/Decode-Roundtrip |
+| TC-CODEC-004 | CP-BLK-005 | Unbekannter Pfad, `GET` oder fehlender Bearer-Key | `404`, `405` mit `Allow: POST` bzw. neutrale `401`; keine CORS-Freigabe |
+| TC-CODEC-005 | CP-US-011 | Nicht-JSON, Schemafehler, nichtkanonischer 6-/8-/10-stelliger Wert oder ungültige ID | Neutrale `400 {"error":{"code":"invalid_request"}}` ohne Kryptografiedetails |
 
 ## Codec-Staging-Live-Tests
 
@@ -45,7 +48,8 @@ Lokale Testfälle werden automatisiert in Vitest umgesetzt; ihre Kennungen werde
 | --- | --- | --- | --- |
 | TC-CODEC-STAGING-001 | CP-BLK-005 | Nicht autorisierter `POST` und `GET` auf `https://codec.s.myqr24.com/api/v1/tag-codec/encode` | `POST` liefert neutrale `401`-Antwort mit `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` und ohne CORS-Freigabe; `GET` liefert `405` mit `Allow: POST`. |
 | TC-CODEC-STAGING-002 | CP-US-011 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für einen künstlichen kanonischen 6-stelligen Wert | Beide Requests liefern `200 OK`; Länge und decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
-| TC-CODEC-STAGING-003 | CP-US-011/CP-US-013 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für eine künstliche kanonische, durch 16 teilbare 8-stellige Basis | Beide Requests liefern `200 OK`; Länge und HMAC-validierter decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
+| TC-CODEC-STAGING-003 | CP-US-011 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für einen künstlichen kanonischen 8-stelligen Wert | Beide Requests liefern `200 OK`; Länge und decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
+| TC-CODEC-STAGING-004 | CP-US-011 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für einen künstlichen kanonischen 10-stelligen Wert | Beide Requests liefern `200 OK`; Länge und decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
 
 ## Range-Index
 
@@ -55,7 +59,7 @@ Lokale Testfälle werden automatisiert in Vitest umgesetzt; ihre Kennungen werde
 | TC-RANGE-002 | US-005 | Inaktive passende Range | `404` |
 | TC-RANGE-003 | US-005 | Passender Zahlenwert, aber andere Range-Länge | kein Treffer |
 | TC-RANGE-004 | US-005 | Überlappende, unsortierte oder syntaktisch ungültige Ranges | kompletter Index fail-closed |
-| TC-RANGE-005 | US-005 | Achtstellige Range nicht auf Slotgrenzen ausgerichtet | kompletter Index fail-closed |
+| TC-RANGE-005 | US-005 | Aktive lineare 8- oder 10-stellige Range ohne Slotgrenzen | passender vollständiger Integer wird gefunden |
 
 ## Zuweisungspriorität
 

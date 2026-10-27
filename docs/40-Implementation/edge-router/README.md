@@ -21,7 +21,7 @@ Der aktuelle Worker-Code befindet sich unter [`../../../apps/edge-router/`](../.
 Der Edge Router:
 
 - validiert öffentliche Scan-Hosts, Pfade und kanonische TAG-IDs;
-- prüft Feistel-/HMAC-Integrität und Range-Invarianten;
+- prüft Feistel-/Cycle-Walk-Validität und Range-Invarianten für lineare 6-, 8- und 10-stellige Werte;
 - löst Routing-Konfiguration und Feature-Zuweisungen aus `TAG_CONFIG` auf;
 - liefert einen fail-closed Redirect oder ein Aktionsdokument.
 
@@ -49,7 +49,7 @@ Diese Verantwortlichkeiten gehören zur [TAG-App und ihrer späteren Application
 
 Die vorhandenen IDs `US-*`, `TC-*` und `WP-*` bleiben unverändert, da sie Teil der bereits verifizierten Router-Nachweiskette sind. Sie dürfen nicht für TAG-App-Stories verwendet oder stillschweigend umbenannt werden.
 
-Den aktuellen verifizierten Stand dokumentiert [`STATUS.md`](STATUS.md). Der Nachweis von `npm test`, `npm run build` und des bisherigen öffentlichen Staging-Scans befindet sich in [`../evidence/README.md`](../evidence/README.md).
+Den aktuellen Implementierungs- und Verifikationsstand dokumentiert [`STATUS.md`](STATUS.md). Der Nachweis von `npm test`, `npm run build` und des bisherigen öffentlichen Staging-Scans befindet sich in [`../evidence/README.md`](../evidence/README.md). Die dort dokumentierten HMAC-basierten Staging-Tests sind historisch; für den aktuellen linearen 6/8/10-Vertrag sind lokale Regression und ein erneuter Staging-Nachweis erforderlich.
 
 ## Router→TAG-App-Grenze
 

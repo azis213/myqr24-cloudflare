@@ -10,7 +10,7 @@
 | Iteration | Ziel | Wesentliche Ergebnisse | Abhängigkeiten | Status |
 | --- | --- | --- | --- | --- |
 | `CP-I01` | Plattformfundament | PHP-/MySQL-Grundstruktur, Konfiguration, AuthZ-Grenzen, Audit, Migrationen, Transaktions- und Secret-Modell | Dogado PHP/MySQL/Composer/Cron, Auth-Entscheidung | planned |
-| `CP-I02` | Pools, Ranges und TAG-Lebenszyklus | Allocation Pools für Zielgruppen/Partner/Großkunden, Range-Validator, atomarer 6-/8-stelliger Allocator, TAG-Stammdaten, Statusautomat und Sperrung | serverseitige Testsecrets, freigegebene Produkt-/Pooldefaults | planned |
+| `CP-I02` | Pools, Ranges und TAG-Lebenszyklus | Allocation Pools für Zielgruppen/Partner/Großkunden, Range-Validator, atomarer linearer 6-/8-/10-stelliger Allocator, TAG-Stammdaten, Statusautomat und Sperrung | serverseitige Testsecrets, freigegebene Produkt-/Pooldefaults | planned |
 | `CP-I03` | Claiming und kontrollierter JSON-Export | Claim-Gruppen und -Credentials, verschlüsselte Claim-PIN-Persistenz, Owner-Vorabzuweisung, persistente JSON-Exportaufträge für logische TAG-Ranges, unveränderliche Snapshots mit `exportOrderId` sowie externe QA-/Ausschuss-/Nachdruck-/Übergabereferenzen | Exportcontract, Claim- und Qualitätsprozess | planned |
 | `CP-I04` | Routing-Projektion und Publishing | Feature-Validator, Projektion, Outbox, idempotenter KV-Publisher, Publish/Unpublish und Rollback | Staging-KV, least-privilege Cloudflare-Token, Edge-Vertrag | planned |
 | `CP-I05` | Öffentliche Basisdaten | veröffentlichter Basis-Vault, Public Read API, CORS/Cache/Rate Limits und TAG-App-Contract | Staging-API-Origin und PWA-Integration | planned |
@@ -54,7 +54,7 @@
 | --- | --- | --- | --- |
 | `CP-BLK-001` | CP-I01 | PHP-Version, Framework, Composer, MySQL-Version, Queue/Cron und Secret-Speicher des Dogado-Hostings sind nicht bestätigt. | Staging-Hostingmatrix und Technologieentscheidung liegen vor. |
 | `CP-BLK-002` | CP-I01 | Das verbindliche Authentisierungs-/MFA-Modell wird von Control Center und Plane gemeinsam benötigt. | Rollen-, Session-, Recovery- und MFA-Policy ist freigegeben. |
-| `CP-BLK-003` | CP-I02 | Feistel-/HMAC-Secrets und serverseitige kompatible Testvektoren fehlen für reale Vergabe. | getrennte Staging-Secret-Integration und Testvektoren sind verfügbar. |
+| `CP-BLK-003` | CP-I02 | Feistel-Secrets und serverseitige kompatible Testvektoren fehlen für reale Vergabe. | getrennte Staging-Secret-Integration und Testvektoren für den linearen 6/8/10-Vertrag sind verfügbar. |
 | `CP-BLK-004` | CP-I03 | JSON-Exportcontract, Auftrags- und Wiederdownloadregel, PIN-Verschlüsselung, Berechtigung, Qualitätsprüfprozess, Nachdruckregel, Support-Reset und Lager-/Übergabemodell sind offen. PDF-Layout, Drucksystem und Druckerei bleiben externe Verantwortlichkeiten. | versionierte Export-, Claim- und QA-Policy ist freigegeben. |
 | `CP-BLK-005` | CP-I04 | Aktiver Staging-Worker, gebundener KV-Namespace und minimaler Cloudflare-Publisher-Token sind nicht abschließend identifiziert. | Ressourcen, Tokenumfang und Sandbox-Namespace sind dokumentiert. |
 | `CP-BLK-006` | CP-I05 | Staging-Origin der Public Read API, CORS-Allowlist und Cache-Widerrufsbudget sind offen. | HTTPS-/CORS-/Cache-/Rate-Limit-Policy ist bestätigt. |

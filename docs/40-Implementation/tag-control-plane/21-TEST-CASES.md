@@ -21,17 +21,17 @@
 | --- | --- | --- | --- | --- |
 | `CP-TC-RANGE-001` | CP-US-010 | gültige kanonische 6-stellige Range | Speicherung ist zulässig | Unit/Integration |
 | `CP-TC-RANGE-002` | CP-US-010 | überlappende oder global unsortierte Range | Speicherung und Projektion werden verweigert | Unit/Integration |
-| `CP-TC-RANGE-003` | CP-US-010 | 8-stellige Range ohne Start-/End-Slotgrenzen | Validierung verweigert die Range | Unit |
+| `CP-TC-RANGE-003` | CP-US-010 | gültige lineare 8- oder 10-stellige Range im kanonischen Raum | Speicherung ist ohne Slotgrenzen zulässig | Unit |
 | `CP-TC-RANGE-004` | CP-US-010 | inaktive oder erschöpfte Range für Reservierung | keine neue TAG-ID wird vergeben | Integration |
 | `CP-TC-POOL-001` | CP-US-013 | gültigen Pool für private, Partner- oder Enterprise-Ausgabe anlegen | Pool akzeptiert nur gültige kanonische Range(s), Policy und optionalen Organisationskontext | Integration |
 | `CP-TC-POOL-002` | CP-US-013 | überlappende Poolrange oder sichtbare `tagId`-Grenze verwenden | Speicherung wird verweigert; Poolgrenzen bleiben `decodedValue`-basiert | Unit/Integration |
 | `CP-TC-POOL-003` | CP-US-013 | aus erschöpftem, inaktivem oder fremd gebundenem Pool reservieren | Reservierung wird serverseitig verweigert | Integration |
 | `CP-TC-POOL-004` | CP-US-013 | Pool-/Kundensegment-/Ownerdaten in KV oder Public Response einbringen | Leak-Test blockiert Projektion bzw. Response | Security |
 | `CP-TC-ALLOC-001` | CP-US-011 | sechsstelligen TAG reservieren | eindeutige `tagId` und vollständiger `decodedValue` werden transaktional gespeichert | Integration |
-| `CP-TC-ALLOC-002` | CP-US-011 | achtstelligen TAG reservieren | nächster 16er-Slot und serverseitig berechneter HMAC-Nibble werden korrekt genutzt | Unit/Integration |
+| `CP-TC-ALLOC-002` | CP-US-011 | acht- und zehnstelligen TAG reservieren | nächster freier linearer `decodedValue` wird je kanonischer Range über den Codec eindeutig als `tagId` gespeichert | Unit/Integration |
 | `CP-TC-ALLOC-003` | CP-US-011 | parallele Reservierungen derselben Range | keine doppelte `tagId` oder `(length, decodedValue)` | Integration |
 | `CP-TC-ALLOC-004` | CP-US-011 | Wiederholung mit gleicher Idempotenz-/Korrelation-ID | keine zweite fachliche Reservierung | Integration |
-| `CP-TC-ALLOC-005` | CP-US-011 | Secret-Leak-Prüfung bei Vergabe | keine Feistel-/HMAC-Secrets in DB-Antworten, Logs oder Fixtures | Security |
+| `CP-TC-ALLOC-005` | CP-US-011 | Secret-Leak-Prüfung bei Vergabe | kein Feistel-Secret in DB-Antworten, Logs oder Fixtures | Security |
 | `CP-TC-LIFECYCLE-001` | CP-US-012 | zulässiger Statuswechsel bis `ready-to-publish` | Wechsel wird geprüft und auditiert | Integration |
 | `CP-TC-LIFECYCLE-002` | CP-US-012 | Aktivierung eines physischen TAGs ohne QA/Übergabe | Wechsel wird verweigert | Integration |
 | `CP-TC-LIFECYCLE-003` | CP-US-012 | Sperrung/Archivierung eines aktiven TAGs | sichere Unpublish-/Neutralisierungsaktion wird geplant | Integration |

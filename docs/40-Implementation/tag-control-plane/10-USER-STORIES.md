@@ -44,7 +44,7 @@
 **Akzeptanzkriterien**
 
 1. Länge, kanonischer Raum, Reihenfolge und Nichtüberlappung werden geprüft.
-2. Achtstellige Ranges erfüllen vollständige 16er-Slotgrenzen.
+2. Ranges sind je Länge lineare, aufeinanderfolgende Integer-Intervalle ohne Slotgrenzen.
 3. Inaktive oder erschöpfte Ranges vergeben keine neuen TAGs.
 4. Fehlende Gruppen-/Feature-Referenzen verhindern Veröffentlichung.
 
@@ -58,7 +58,7 @@
 
 1. Ein Pool besitzt mindestens Name, Zielgruppe/Ausgabekanal, Länge, eine oder mehrere gültige Ranges, Status, Kapazitätskennzahlen und Produkt-/Claim-Policy.
 2. Pool-Ranges werden im kanonischen `decodedValue`-Raum verwaltet; öffentliche Feistel-`tagId`-Strings sind keine Poolgrenzen.
-3. Pool-Ranges sind global nicht überlappend und erfüllen bei acht Stellen vollständige 16er-Slotgrenzen.
+3. Pool-Ranges sind je Länge global nicht überlappend und umfassen lineare aufeinanderfolgende Integer ohne Slotgrenzen.
 4. Ein Pool kann optional an eine Organisation oder einen Partner gebunden werden.
 5. Nur aktive Pools dürfen TAGs reservieren; Warnschwellen und Erschöpfung sind autoritativ berechenbar.
 6. Poolname, Kundensegment, Bestellung und Owner-Zuordnung gehören nie in KV oder öffentliche Antworten.
@@ -66,17 +66,17 @@
 ### CP-US-011 – TAG atomar reservieren
 
 **Als** Control-Plane-Service  
-**möchte ich** konkrete sechs- oder achtstellige TAGs atomar reservieren,  
+**möchte ich** konkrete sechs-, acht- oder zehnstellige TAGs atomar reservieren,  
 **damit** parallele Herstellung, Selbstprint und Verwaltungsanfragen niemals doppelte TAGs erzeugen.
 
 **Akzeptanzkriterien**
 
 1. `tagId` sowie `(length, decodedValue)` sind eindeutig constrained.
-2. Sechsstellige Werte stammen ausschließlich aus `I(6)`.
-3. Achtstellige Werte nutzen den nächsten vollständigen 16er-Basisslot; der interne Cloudflare-Codec ergänzt danach das HMAC-Nibble.
-4. Der vollständige validierte `decodedValue` sowie die vom Codec zurückgelieferte öffentliche `tagId` werden gespeichert.
+2. Werte stammen ausschließlich aus dem kanonischen Raum `I(6)`, `I(8)` oder `I(10)` der angeforderten Länge.
+3. Die Vergabe reserviert den nächsten freien linearen Integer der gewählten aktiven Range.
+4. Der vollständige kanonische `decodedValue` sowie die vom Codec zurückgelieferte öffentliche `tagId` werden gespeichert.
 5. Retry/Idempotenz erzeugt keine ungewollte zweite Reservierung oder zweite Codec-Wirkung.
-6. Die Control Plane besitzt niemals `FEISTEL_SECRET` oder `TAG_HMAC_SECRET`; sie ruft ausschließlich den authentisierten Encode-Vertrag [`tag-codec-internal-v1`](../../10-Architecture/35-Contracts/tag-codec-internal-v1.md) auf.
+6. Die Control Plane besitzt niemals `FEISTEL_SECRET`; sie ruft ausschließlich den authentisierten Encode-Vertrag [`tag-codec-internal-v1`](../../10-Architecture/35-Contracts/tag-codec-internal-v1.md) auf.
 
 ### CP-US-012 – TAG-Lebenszyklus serverseitig steuern
 
@@ -149,7 +149,7 @@
 
 1. Vorabzuweisung erfolgt atomar für die konkret reservierte Menge eines zulässigen Pools.
 2. Jeder TAG speichert die autoritative Owner-/Organisationsbindung und Besitzstatus `preassigned`; die Daten bleiben privat.
-3. Eine Self-Print-ID-/Druckliste ist ein zeitlich begrenzter, auditierter und vertraulicher Export ohne Feistel-/HMAC-Secrets oder Cloudflare-Tokens.
+3. Eine Self-Print-ID-/Druckliste ist ein zeitlich begrenzter, auditierter und vertraulicher Export ohne Feistel-Secrets oder Cloudflare-Tokens.
 4. Pool-, Produkt-, QA-, Übergabe- und Aktivierungspolicy werden vor Ausgabe durchgesetzt.
 5. Widerruf, Ersatz oder Besitzerwechsel hinterlassen keine unklare Doppelzuweisung und werden auditiert.
 
@@ -179,7 +179,7 @@
 2. Für jeden nicht organisationsgebunden freigeschalteten claimbaren TAG enthält der JSON-Snapshot zusätzlich dessen Claim-PIN. Organisationsgebunden vorab zugewiesene oder freigeschaltete TAGs enthalten keine Claim-PIN.
 3. Snapshot und JSON-Download werden genau einem Exportauftrag zugeordnet; ein erneuter Download mit derselben `exportOrderId` liefert denselben Inhalt und dieselbe Prüfsumme, keine Neuberechnung.
 4. Die Entschlüsselung einer gespeicherten Claim-PIN ist ausschließlich innerhalb der autorisierten JSON-Snapshot-Erzeugung erlaubt. Sie wird weder separat abrufbar noch in Audit, Logs, Browserpersistenz, KV oder Public APIs abgelegt.
-5. Der Export enthält keine Feistel-/HMAC-Secrets, Cloudflare-Tokens, Ownerdaten, privaten Vault-Inhalte, Credential-Hashes, Fehlversuchszähler oder internen Schlüsselmaterialien.
+5. Der Export enthält keine Feistel-Secrets, Cloudflare-Tokens, Ownerdaten, privaten Vault-Inhalte, Credential-Hashes, Fehlversuchszähler oder internen Schlüsselmaterialien.
 6. Änderungen an Range, TAG-Menge, Claim-Modell oder Exportdaten erzeugen einen neuen, autorisiert freizugebenden Exportauftrag statt stiller Manipulation des bestehenden Snapshots.
 
 ### CP-US-022 – Druck-, QA- und Ausschussstatus führen

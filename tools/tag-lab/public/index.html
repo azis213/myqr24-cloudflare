@@ -344,8 +344,8 @@
           Claiming- und Plattformtests.
         </p>
         <aside class="notice">
-          Feistel- und HMAC-Schlüssel verbleiben auf dem lokalen Server. Der
-          Browser erhält ausschließlich öffentliche Tag-IDs und Scan-URLs.
+          Der Feistel-Schlüssel verbleibt auf dem lokalen Server. Der Browser
+          erhält ausschließlich öffentliche Tag-IDs und Scan-URLs.
         </aside>
       </header>
 
@@ -365,9 +365,8 @@
         <section class="panel" aria-labelledby="generator-title">
           <h2 id="generator-title">Neuen Testtag erzeugen</h2>
           <p class="muted">
-            6-stellige Tags sind mit der vorhandenen lokalen Konfiguration
-            verfügbar. 8-stellige Tags werden erst aktiviert, wenn der lokale
-            HMAC-Schlüssel hinterlegt wurde.
+            Erzeugt kryptografisch gültige lineare Testtags mit 6, 8 oder 10
+            Zeichen. Die Länge ist Teil der kanonischen ID-Domäne.
           </p>
           <div class="button-stack">
             <button type="button" data-length="6">
@@ -375,6 +374,9 @@
             </button>
             <button type="button" data-length="8">
               8-stelligen Tag erzeugen
+            </button>
+            <button type="button" data-length="10">
+              10-stelligen Tag erzeugen
             </button>
             <button type="button" id="print-button">Tag-Liste drucken</button>
           </div>
@@ -519,8 +521,10 @@
           throw new Error(payload.error ?? "Testtags konnten nicht geladen werden.");
         }
 
-        document.querySelector('[data-length="8"]').disabled =
-          !payload.capabilities.generate8;
+        for (const button of elements.generationButtons) {
+          const length = Number(button.dataset.length);
+          button.disabled = !payload.capabilities[`generate${length}`];
+        }
         renderTags(payload.tags);
       }
 
@@ -550,12 +554,7 @@
             true,
           );
         } finally {
-          elements.generationButtons.forEach(
-            (button) =>
-              (button.disabled =
-                Number(button.dataset.length) === 8 &&
-                document.querySelector('[data-length="8"]').disabled),
-          );
+          await loadTags();
         }
       }
 
