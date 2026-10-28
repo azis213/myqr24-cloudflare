@@ -1,7 +1,7 @@
 # Testfälle: TAG Control Plane
 
-**Planungsstand:** 2026-10-06  
-**Status:** Alle Testfälle sind geplant und werden erst mit der jeweiligen serverseitigen Implementierung ausgeführt.
+**Letzte Aktualisierung:** 2026-10-28  
+**Status:** CP-I01-Audit- und Authentisierungsgrundlagen sind lokal implementiert und gegen die isolierte MySQL-8.4-Testtopologie ausgeführt; spätere Fachtestfälle bleiben geplant.
 
 ## CP-I01 – Fundament und Audit
 
@@ -14,6 +14,13 @@
 | `CP-TC-SCHEMA-002` | CP-WP-02 | Migration und Wiederherstellung | vorherige Version wird konsistent migriert bzw. wiederhergestellt | Betrieb |
 | `CP-TC-AUDIT-001` | CP-US-002 | kritische TAG-/Produktions-/Publish-Mutation | genau ein korreliertes Audit-Ereignis entsteht | Integration |
 | `CP-TC-AUDIT-002` | CP-US-002 | Audit-/Log-Sanitizing | Secrets, Zugangsdaten und vollständige Nachweise fehlen | Security |
+| `CP-TC-AUTH-001` | CP-US-001 | Passwortlogin bei deaktivierter E-Mail-MFA | Aktiver lokaler Nutzer erhält eine serverseitige Web-Session; das Login-Audit enthält gültige Korrelation und keine Zugangsdaten | Integration |
+| `CP-TC-AUTH-002` | CP-US-001 | Passwortlogin bei aktivierter E-Mail-MFA | Nutzer bleibt vor Codeverifikation Gast; eine kurzlebige MFA-Challenge mit Hash, Ablaufzeit und Einmalverwendung entsteht | Integration/Security |
+| `CP-TC-AUTH-003` | CP-US-001 | Falscher E-Mail-MFA-Code | Keine Anmeldung; Versuchszähler steigt, Audit wird geschrieben und die Clientantwort bleibt neutral | Integration/Security |
+| `CP-TC-AUTH-004` | CP-US-001 | Richtiger E-Mail-MFA-Code | Challenge wird verbraucht; Session wird erst dann erzeugt und MFA-Erfolg auditiert | Integration/Security |
+| `CP-TC-AUTH-005` | CP-US-001 | Wiederholter Bootstrap-Command mit geänderter Konfiguration | Bestehendes Konto bleibt unverändert; Passwortänderung erfolgt ausschließlich mit `--reset-password` und Audit-Ereignis | Integration/Security |
+
+**Lokale Evidenz:** `tests/Feature/AuthenticationFlowTest.php` wird durch `npm run local:test` gegen MySQL 8.4 ausgeführt. Am 2026-10-28: 10 Tests, 60 Assertions erfolgreich.
 
 ## CP-I02 – Ranges, Vergabe und Lifecycle
 

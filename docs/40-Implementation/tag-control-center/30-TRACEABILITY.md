@@ -1,7 +1,7 @@
 # Rückverfolgbarkeit: TAG Control Center
 
-**Planungsstand:** 2026-10-06  
-**Status:** Planung. Es bestehen noch keine Implementierungs- oder Evidenzreferenzen für das TAG Control Center.
+**Letzte Aktualisierung:** 2026-10-28  
+**Status:** In Arbeit. Die TCC-Shell implementiert Login, serverseitigen Session-Status, E-Mail-MFA und Logout über den lokalen TCP-Contract. Fachliche Verwaltungsstories, Rollenverwaltung und produktive Staging-Nachweise bleiben geplant.
 
 ## 1. Verweisregeln
 
@@ -18,9 +18,10 @@ Ein Eintrag unter „Geplante Implementierung“ ist ausdrücklich **kein** vorh
 
 ## 2. Traceability-Matrix
 
-| Story | Arbeitspaket | Tests | Testdaten | Geplante Implementierung | Erforderliche Evidenz | Status |
+| Story | Arbeitspaket | Tests | Testdaten | Implementierung | Erforderliche Evidenz | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| CC-US-001 sicherer Admin-Zugang | CC-WP-01, CC-WP-02 | CC-TC-AUTH-001 bis 004 | CC-TD-001, CC-TD-010 | Auth-, Session-, CSRF- und Recovery-Modul | automatisierte Auth-/Sessiontests, Security-Review | planned |
+| TCC-Shell (kein fachlicher Verwaltungscommand) | CC-WP-01 | `npm run build:tcc` erfolgreich am 2026-10-28; `npm run local:test` erfolgreich (10 Tests, 60 Assertions) | keine | `apps/tag-control-center/src/App.tsx`, `main.tsx`, `styles.css`; Login-, MFA-, Session-Status-, Logout- und Readiness-UI. `vite.config.ts` leitet im lokalen Betrieb `/tcp` same-origin an TCP weiter. | erfolgreicher Produktionsbuild; TCP-Featuretests für Session/MFA; keine browserseitigen Secrets oder Verwaltungscommands | implemented |
+| CC-US-001 sicherer Admin-Zugang | CC-WP-01, CC-WP-02 | `tests/Feature/AuthenticationFlowTest.php`; `npm run build:tcc` | CC-TD-001, CC-TD-010 | TCC: `apps/tag-control-center/src/App.tsx` fordert CSRF-Token an und verwendet ausschließlich die TCP-Endpunkte für Login, E-Mail-MFA, Session-Status und Logout. TCP: serverseitige Web-Session, Rate Limits, Audit und Bootstrap-Admin. Recovery, Passkey/TOTP und produktive Mail-Evidenz fehlen. | automatisierte Auth-/Sessiontests und TCC-Build liegen vor; Security-Review, Staging-Mailtransport und Ziel-MFA-/Recovery-Verfahren offen | implemented |
 | CC-US-002 Rollen serverseitig durchsetzen | CC-WP-02 | CC-TC-AUTHZ-001 bis 002 | CC-TD-001, CC-TD-008 | RBAC-/Policy-Modul und serverseitige Request-Guards | Rollenmatrix, negative AuthZ-Tests | planned |
 | CC-US-003 Audit | CC-WP-02, CC-WP-03 | CC-TC-AUDIT-001 bis 002 | CC-TD-010 | Audit-Service, append-only Speicherstrategie, Audit-Ansicht | Audit-/Sanitizingtests | planned |
 | CC-US-004 Desktop-/Mobile-Verwaltungs-UX | CC-WP-01, CC-WP-05A | CC-TC-UX-001 bis 004 | CC-TD-001, CC-TD-010, CC-TD-011 | responsive desktop-first Verwaltungsoberfläche und mobile Support-Ansichten | Desktop-/Mobile-E2E, Touch-/Tastatur- und Re-Auth-Nachweis | planned |
@@ -58,7 +59,8 @@ Ein Eintrag unter „Geplante Implementierung“ ist ausdrücklich **kein** vorh
 | Der reguläre Claim startet in der TAG-App; ein manueller Control-Center-Support-Claim verwendet denselben serverseitigen Claim-Service und ersetzt keine Fachentscheidung | CC-US-004, 017 | Cross-Channel-Claim-Contract sowie mobile/desktop Support-E2E |
 | Claim-Credentials, Hashes, Owner-Zuordnung und Lockout werden nur in der Control Plane verarbeitet; die UI zeigt ausschließlich erlaubte Metadaten | CC-US-004, 014, 016, 017 sowie zurückgestellter Exportumfang | CP-Claim-Tests sowie CC-Contract-, Export-, Mobile- und Browser-Leak-Tests |
 | TCC/TCP erzeugen ausschließlich autorisierte, unveränderliche Exportdaten; PDF-/Label-Aufbereitung, Druckeransteuerung und physische Ausgabe erfolgen außerhalb von TCC/TCP | zurückgestellter Exportumfang | Export-Contract-, Datenminimierungs-, Snapshot-/Prüfsummen- und lokale Aufbereitungstests |
-| Geheimnisse bleiben serverseitig und umgebungsgetrennt | CC-US-001, 004, 011, 014, 016, 017, 022 | Konfigurations- und Leak-Tests |
+| Geheimnisse bleiben serverseitig und umgebungsgetrennt; der Browser erhält weder SMTP- noch Cloudflare-, Datenbank-, Bootstrap- oder MFA-Geheimnisse | CC-US-001, 004, 011, 014, 016, 017, 022 | TCP-Auth-Flow-Tests, TCC-Produktionsbuild und spätere Konfigurations-/Leak-Tests |
+| Deployment-/Server-Administration, Break-glass und reguläre Platform-Administration sind getrennt; TCC verwaltet keine Infrastruktur-Secrets | CC-US-001–004 | [ADR-002](../../../10-Architecture/ADR-002-ADMINISTRATION_BOOTSTRAP_AND_SECRET_BOUNDARIES.md), statische Shell-Prüfung, spätere Auth-/AuthZ-/Audit-Tests |
 | POI-Nachweise und Betreiberinformationen bleiben privat | CC-US-041–043 | Zugriffskontroll- und Leak-Tests |
 
 ## 4. Ergänzungsprozess bei Implementierungsbeginn

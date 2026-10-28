@@ -1,0 +1,99 @@
+name: myqr24-local-test
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${LOCAL_MYSQL_DATABASE:?Set LOCAL_MYSQL_DATABASE in .env.local}
+      MYSQL_USER: ${LOCAL_MYSQL_USER:?Set LOCAL_MYSQL_USER in .env.local}
+      MYSQL_PASSWORD: ${LOCAL_MYSQL_PASSWORD:?Set LOCAL_MYSQL_PASSWORD in .env.local}
+      MYSQL_ROOT_PASSWORD: ${LOCAL_MYSQL_ROOT_PASSWORD:?Set LOCAL_MYSQL_ROOT_PASSWORD in .env.local}
+      LOCAL_MYSQL_TEST_DATABASE: ${LOCAL_MYSQL_TEST_DATABASE:?Set LOCAL_MYSQL_TEST_DATABASE in .env.local}
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+      - --skip-log-bin
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping --host=127.0.0.1 --user=$${MYSQL_USER} --password=$${MYSQL_PASSWORD} --silent",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks:
+      - local_test
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+
+  tag-control-plane:
+    build:
+      context: .
+      dockerfile: Dockerfile.php
+    environment:
+      APP_ENV: local
+      APP_KEY: ${LOCAL_APP_KEY:?Set LOCAL_APP_KEY in .env.local}
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:${LOCAL_TCP_PORT:-8080}
+      APP_TIMEZONE: UTC
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: ${LOCAL_MYSQL_DATABASE:?Set LOCAL_MYSQL_DATABASE in .env.local}
+      DB_USERNAME: ${LOCAL_MYSQL_USER:?Set LOCAL_MYSQL_USER in .env.local}
+      DB_PASSWORD: ${LOCAL_MYSQL_PASSWORD:?Set LOCAL_MYSQL_PASSWORD in .env.local}
+      TEST_DB_DATABASE: ${LOCAL_MYSQL_TEST_DATABASE:?Set LOCAL_MYSQL_TEST_DATABASE in .env.local}
+      DB_CHARSET: utf8mb4
+      DB_COLLATION: utf8mb4_0900_ai_ci
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: file
+    depends_on:
+      mysql:
+        condition: service_healthy
+    entrypoint: ["sh"]
+    command: ["/workspace/local-test/scripts/start-tag-control-plane.sh"]
+    ports:
+      - "${LOCAL_TCP_PORT:-8080}:8000"
+    networks:
+      - local_test
+    volumes:
+      - ../../apps/tag-control-plane:/workspace/tag-control-plane
+      - ./scripts:/workspace/local-test/scripts:ro
+      - tcp_storage:/workspace/tag-control-plane/storage
+
+  tag-control-center:
+    image: node:22-alpine
+    working_dir: /workspace/tag-control-center
+    environment:
+      TCC_TCP_PROXY_TARGET: http://tag-control-plane:8000
+    depends_on:
+      tag-control-plane:
+        condition: service_started
+    command:
+      [
+        "sh",
+        "-c",
+        "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0",
+      ]
+    ports:
+      - "${LOCAL_TCC_PORT:-5174}:5174"
+    networks:
+      - local_test
+    volumes:
+      - ../../apps/tag-control-center:/workspace/tag-control-center
+      - tcc_node_modules:/workspace/tag-control-center/node_modules
+
+networks:
+  local_test:
+    internal: false
+
+volumes:
+  mysql_data:
+  tcp_storage:
+  tcc_node_modules:

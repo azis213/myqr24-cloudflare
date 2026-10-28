@@ -1,15 +1,15 @@
 # Implementierungsstatus: TAG Control Center
 
-**Letzte Planung:** 2026-10-06  
+**Letzte Aktualisierung:** 2026-10-28  
 **Statusregeln:** [README.md](README.md)  
 **Fachliche Stories:** [10-USER-STORIES.md](10-USER-STORIES.md)  
-**Wichtig:** Dieser Strang dokumentiert nur den geplanten Umfang. Es existiert noch keine TAG-Control-Center-Anwendung.
+**Wichtig:** Eine separate React-/Vite-TCC-Shell existiert unter `apps/tag-control-center/`. Sie enthält einen serverseitig abgesicherten Login-/E-Mail-MFA-/Logout-Flow, aber weiterhin keine fachlichen Verwaltungscommands oder Secret-Konfiguration.
 
 ## Iterationen
 
 | Iteration | Ziel | Wesentliche Ergebnisse | Abhängigkeiten | Status |
 | --- | --- | --- | --- | --- |
-| `CC-I01` | Fundament und Sicherheitsbasis | Technologieentscheidung, Projektgrundgerüst, MySQL-Migrationen, Admin-Authentisierung, Rollen, Audit und Konfigurationsgrenzen | Dogado-Laufzeit, PHP-/MySQL-Versionen, Auth-/MFA-Entscheidung | planned |
+| `CC-I01` | Fundament und Sicherheitsbasis | ADR-002, separates React-/Vite-Projektgrundgerüst, TCP-Readiness-Check, serverseitiger Passwort-/Session-/E-Mail-MFA-/Logout-Flow und Bootstrap-Admin; Rollen, Recovery und Ziel-MFA verbleiben offen | Dogado-Laufzeit, Staging-Mailtransport, Rollen-/Recovery-/Ziel-MFA-Entscheidung | in-progress |
 | `CC-I02` | Pools, TAG-Stammdaten und sichere Vergabe | Allocation-Pool-Verwaltung, Ranges, Gruppen, Control-Plane-gestützte lineare 6-/8-/10-stellige Vergabe, TAG-Lebenszyklus, Claim-/Vorabzuweisungs- und QR-/Druckvorbereitung | freigegebene Staging-Secret-Integration, Produkt-/Pool-/Claim-Defaults | planned |
 | `CC-I03` | Routing-Projektion und Publishing | Feature-Schemas, Projektion, Outbox, idempotenter Publisher, Publish-Diff, Retry, Unpublish | Cloudflare-Token, Staging-KV-Namespace, Edge-Router-Vertrag | planned |
 | `CC-I04` | Öffentlicher Basis-Vault | veröffentlichte Basisinhalte, öffentliche Read-API, CORS/Cache/Rate-Limits, TAG-App-Adaptervertrag | API-Origin, TAG-App-Integration, Staging-Deployment | planned |
@@ -21,8 +21,8 @@
 
 | ID | Arbeitspaket | Iteration | Status | Abhängigkeit / erwartete Evidenz |
 | --- | --- | --- | --- | --- |
-| `CC-WP-01` | Architekturvertrag, Projektgrenzen und Konfigurationsmodell | CC-I01 | planned | bestätigte PHP-/Framework- und Hostingentscheidung |
-| `CC-WP-02` | Admin-Authentisierung, Rollen, Sessions, CSRF und Audit-Grundlage | CC-I01 | planned | CC-TC-AUTH-*, CC-TC-AUDIT-*, Sicherheitsreview |
+| `CC-WP-01` | Architekturvertrag, Projektgrenzen und Konfigurationsmodell | CC-I01 | implemented | [ADR-002](../../../10-Architecture/ADR-002-ADMINISTRATION_BOOTSTRAP_AND_SECRET_BOUNDARIES.md), eigenständige TCC-Shell unter `apps/tag-control-center/`, keine browserseitige Secret- oder Deployment-Konfiguration |
+| `CC-WP-02` | Admin-Authentisierung, Rollen, Sessions, CSRF und Audit-Grundlage | CC-I01 | implemented | TCP-Web-Session, CSRF, Rate-Limits, Audit, Bootstrap-Admin und E-Mail-MFA mit TCC-Login/Logout sind lokal implementiert und getestet; Rollenverwaltung, Recovery, Passkey/TOTP, Re-Authentisierung und Staging-Mail-Evidenz bleiben offen |
 | `CC-WP-03` | Autoritatives MySQL-Kernschema und Migrationsstrategie | CC-I01 | planned | CC-TC-SCHEMA-*, Restore-/Migrationsevidenz |
 | `CC-WP-04` | Allocation-Pool-, Range-, Gruppen- und Feature-Verwaltung | CC-I02 | planned | CC-TC-POOL-*, CC-TC-RANGE-*, CC-TC-FEATURE-* |
 | `CC-WP-05` | Control-Plane-gestützte TAG-Vergabe und Lebenszyklusverwaltung | CC-I02 | planned | CC-TC-ALLOC-*, CC-TC-LIFECYCLE-* |
@@ -44,10 +44,10 @@
 
 | Bereich | Aktueller Stand | Bewusste Grenze |
 | --- | --- | --- |
-| Dokumentation | Control-Plane-Architektur und Fachregeln sind vorhanden; dieser Implementierungsplan ergänzt den Nachweisstrang | kein umgesetztes PHP-Projekt |
+| Dokumentation | Control-Plane-Architektur, Fachregeln und ADR-002 für Administration, Bootstrap, MFA und Secret-Grenzen sind vorhanden | kein produktiver Admin- oder Secret-Konfigurationspfad |
 | Edge Router | Cloudflare-Worker-Code und Testbasis existieren | keine Verwaltungslogik oder Fachdaten im Worker/KV |
 | TAG-App | öffentlicher Fixture-MVP auf Cloudflare Pages existiert | keine autoritative API, keine Owner- oder Vault-Verwaltung |
-| Control Center | keine Anwendung, keine Migrationen, keine DB oder API im Repository | erst nach Plan- und Produktfreigabe implementieren; Druck ist keine frühe TAG-Verwaltungsfunktion |
+| Control Center | separate React-/Vite-Shell auf Port `5174`, Sicherheits-/Rollenübersicht, lokaler TCP-Readiness-Check sowie Passwort-Login, Session-Status, E-Mail-MFA und Logout über den same-origin Dev-Proxy `/tcp` | keine fachlichen TAG-/Publish-/Secret-Mutationen, keine Rollenverwaltung oder Recovery; produktive Origin-/CORS-/Cookie-Policy fehlt bewusst |
 | Cloudflare-Publishing | als Zielprozess dokumentiert | keine Browser-Tokens, keine manuelle KV-Fachpflege |
 | Produktion | keine Control-Center-Produktivfreigabe | Staging-Abnahme ist zwingend vorgeschaltet |
 
@@ -56,7 +56,7 @@
 | ID | Betroffener Bereich | Beschreibung | Auflösungskriterium |
 | --- | --- | --- | --- |
 | `CC-BLK-001` | CC-I01 | PHP-Version, Framework, Composer-Verfügbarkeit, MySQL-Version sowie Cron-/Queue-Möglichkeiten des Dogado-Hostings sind noch nicht verbindlich bestätigt. | Hosting-Matrix und gewählter technischer Stack sind dokumentiert und für Staging verfügbar. |
-| `CC-BLK-002` | CC-I01 | Admin-Authentisierung, verpflichtende MFA und möglicher Passkey-/Mail-Provider sind noch nicht festgelegt. | Sicherheitsentscheidung einschließlich Recovery-, Session- und MFA-Policy ist freigegeben. |
+| `CC-BLK-002` | CC-I01 | partially-resolved: Bootstrap-Admin, serverseitige Session, CSRF, Audit und übergangsweise E-Mail-MFA sind lokal implementiert und getestet. Passkey/TOTP, Recovery, Rollenverwaltung, Re-Authentisierung, produktiver Mail-Transport sowie Origin-/Cookie-Policy bleiben offen. | Ziel-Auth-/MFA-/Recovery-/Rollencontract, Mail-Provider und serverseitige Sicherheitsimplementierung sind gegen Staging getestet und freigegeben. |
 | `CC-BLK-003` | CC-I02 | Für reale TAG-Ausgabe müssen sichere serverseitige Feistel- und Claim-Credential-Integration, Produkt-/Pool-/Claim-Policies sowie Staging-Secrets verfügbar sein; diese dürfen nie in Fixtures liegen. | Staging-Secret-Prozess und versionierte Pool-/Claim-Policies sind freigegeben, Secrets sind serverseitig hinterlegt und die Ausgabelogik gegen Testvektoren geprüft. |
 | `CC-BLK-004` | CC-I03 | Der aktive Staging-Worker und sein tatsächlich gebundener `TAG_CONFIG`-Namespace müssen vor jeder echten KV-Änderung identifiziert werden. | Cloudflare-Ressourcenzuordnung, Least-Privilege-Token und Testnamespace sind dokumentiert. |
 | `CC-BLK-005` | CC-I04 | Die endgültige Origin der öffentlichen PHP-Read-API und die CORS-Allowlist für die TAG-App sind noch offen. | Staging-Origin, HTTPS/TLS, CORS-Policy, Rate-Limit- und Cache-Policy sind freigegeben. |
