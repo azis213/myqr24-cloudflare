@@ -29,6 +29,41 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
 
+  tag-control-plane-verify:
+    build:
+      context: .
+      dockerfile: Dockerfile.php
+    environment:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_DEBUG: "false"
+      APP_URL: http://localhost
+      APP_TIMEZONE: UTC
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: ${LOCAL_MYSQL_DATABASE:?Set LOCAL_MYSQL_DATABASE in .env.local}
+      DB_USERNAME: ${LOCAL_MYSQL_USER:?Set LOCAL_MYSQL_USER in .env.local}
+      DB_PASSWORD: ${LOCAL_MYSQL_PASSWORD:?Set LOCAL_MYSQL_PASSWORD in .env.local}
+      DB_CHARSET: utf8mb4
+      DB_COLLATION: utf8mb4_0900_ai_ci
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+    depends_on:
+      mysql:
+        condition: service_healthy
+    entrypoint: ["php"]
+    command: ["/workspace/scripts/verify-tag-control-plane.php"]
+    working_dir: /workspace/tag-control-plane
+    networks:
+      - local_php_mysql
+    profiles:
+      - verify-tcp
+    volumes:
+      - ./scripts:/workspace/scripts:ro
+      - ../../apps/tag-control-plane:/workspace/tag-control-plane:ro
+
   php:
     build:
       context: .
@@ -51,6 +86,7 @@ services:
       - verify
     volumes:
       - ./scripts:/workspace/scripts:ro
+      - ../../apps/tag-control-plane:/workspace/tag-control-plane:ro
 
 networks:
   local_php_mysql:

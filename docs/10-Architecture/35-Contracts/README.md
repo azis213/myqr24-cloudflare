@@ -16,7 +16,7 @@
 | Vertrag | Owner | Status | Zweck |
 | --- | --- | --- | --- |
 | [`tag-codec-internal-v1.md`](tag-codec-internal-v1.md) | Cloudflare TAG Codec Worker | `implemented` | Interne, authentisierte Erzeugung öffentlicher TAG-IDs aus autoritativ reservierten linearen kanonischen Werten für 6, 8 und 10 Stellen |
-| `tag-routing-projection-v1` | TAG Control Plane | `planned` | Minimale Control-Plane-zu-Edge-Router-KV-Projektion |
+| [`tag-routing-projection-v1.md`](tag-routing-projection-v1.md) | TAG Control Plane | `implemented-contract` | Minimale, nicht personenbezogene Control-Plane-zu-Edge-Router-KV-Projektion; lokale Erzeugung und Fake-Publisher folgen in W3L |
 | `control-plane-admin-api-v1` | TAG Control Plane | `planned` | Authentisierte Admin-Queries und -Commands des Control Centers |
 | `public-tag-view-v1` | TAG Control Plane | `planned` | Öffentliche, datensparsame TAG-App-Read-API |
 | `public-tag-claim-v1` | TAG Control Plane | `planned` | Neutralisierter öffentlicher Claim-Command |

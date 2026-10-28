@@ -62,7 +62,17 @@ Der Verifikationstest baut bei Bedarf das PHP-Image, erstellt ausschließlich di
 docker compose --env-file tools/local-php-mysql/.env.local -f tools/local-php-mysql/compose.yaml --profile verify run --rm php /workspace/scripts/verify-mysql.php
 ```
 
-### 3. Umgebung anhalten
+### 3. TAG-Control-Plane-Migration prüfen
+
+Der separate Verifikationsservice startet die Laravel-Anwendung nur lesend im Container. Er führt gegen die isolierte lokale MySQL-Instanz die vorhandenen Laravel-Migrationen aus, prüft den MySQL-Connection-Charset `utf8mb4`, die Session-Zeitzone `+00:00` sowie das Audit-Schema und rollt den erzeugten Migrationsbatch anschließend wieder zurück:
+
+```powershell
+docker compose --env-file tools/local-php-mysql/.env.local -f tools/local-php-mysql/compose.yaml --profile verify-tcp run --rm tag-control-plane-verify
+```
+
+Der Aufruf benötigt einen vorhandenen lokalen `vendor/`-Ordner unter `apps/tag-control-plane`, da die Anwendung bewusst nur read-only eingebunden wird. Er ist kein Ersatz für Staging-, Backup-/Restore- oder Dogado-Evidenz.
+
+### 4. Umgebung anhalten
 
 ```powershell
 docker compose --env-file tools/local-php-mysql/.env.local -f tools/local-php-mysql/compose.yaml down
@@ -70,7 +80,7 @@ docker compose --env-file tools/local-php-mysql/.env.local -f tools/local-php-my
 
 Dies entfernt Container und Netzwerk, behält aber die rein lokale benannte Datenbank-Volume bei.
 
-### 4. Destruktiver lokaler Reset
+### 5. Destruktiver lokaler Reset
 
 > **Achtung:** Der folgende Befehl entfernt ausschließlich die Volume dieser lokalen Compose-Topologie. Trotzdem löscht er alle darin enthaltenen lokalen Daten endgültig.
 

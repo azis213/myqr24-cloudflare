@@ -18,6 +18,13 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Local TAG Control Plane runtime configuration and secrets
+apps/tag-control-plane/config/tcp-config.local.json
+apps/tag-control-plane/config/tcp-config.*.local.json
+apps/tag-control-plane/config/tcp-secrets.local.json
+apps/tag-control-plane/config/tcp-secrets.*.local.json
+
 .vscode/
 .DS_Store
 
