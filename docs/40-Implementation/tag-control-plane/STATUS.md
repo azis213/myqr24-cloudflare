@@ -1,17 +1,17 @@
 # Implementierungsstatus: TAG Control Plane
 
-**Letzte Aktualisierung:** 2026-10-28  
+**Letzte Aktualisierung:** 2026-10-29  
 **Statusregeln:** [README.md](README.md)  
 **Fachliche Stories:** [10-USER-STORIES.md](10-USER-STORIES.md)  
 
-Die TAG Control Plane (TCP) ist das künftige autoritative Laravel-/MySQL-Backend. Sie enthält ein technisches Sicherheitsfundament mit lokalem Bootstrap-Admin, serverseitiger Session-Authentisierung und übergangsweiser E-Mail-MFA; sie ist weiterhin weder als fachliche Admin-API noch als öffentliche Runtime-API freigegeben.
+Die TAG Control Plane (TCP) ist das künftige autoritative Laravel-/MySQL-Backend. Sie enthält ein technisches Sicherheitsfundament mit lokalem Bootstrap-Admin, serverseitiger Session-Authentisierung und übergangsweiser E-Mail-MFA. Der aktuelle browserseitige W1L-Schnitt ist als [`control-plane-admin-api-v1`](../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) `implemented-local`; eine fachliche Admin-API oder öffentliche Runtime-API ist weiterhin nicht freigegeben.
 
 ## Iterationen
 
 | Iteration | Ziel | Wesentliche Ergebnisse | Abhängigkeiten | Status |
 | --- | --- | --- | --- | --- |
-| `CP-I01` | Plattformfundament | Laravel-13-Anwendung, MySQL-/UTC-Defaults, Audit-Basis, requestweite Korrelation, Health-/Readiness-Endpunkte, lokale MySQL-8.4-Tests | Dogado PHP/MySQL/Composer/Cron, Auth-Entscheidung | in-progress |
-| `CP-I02` | Pools, Ranges und TAG-Lebenszyklus | Allocation Pools für Zielgruppen/Partner/Großkunden, Range-Validator, atomarer linearer 6-/8-/10-stelliger Allocator, TAG-Stammdaten, Statusautomat und Sperrung | serverseitige Testsecrets, freigegebene Produkt-/Pooldefaults | planned |
+| `CP-I01` | Plattformfundament | Laravel-13-Anwendung, MySQL-/UTC-Defaults, Audit-Basis, requestweite Korrelation, Health-/Readiness-Endpunkte, lokale MySQL-8.4-Tests sowie TCC-Contract-UI-Nachweis für den W1L-Browservertrag | Dogado PHP/MySQL/Composer/Cron, Auth-Entscheidung | implemented |
+| `CP-I02` | Pools, Ranges und TAG-Lebenszyklus | Allocation Pools für Zielgruppen/Partner/Großkunden, Range-Validator, atomarer linearer 6-/8-/10-stelliger Allocator, TAG-Stammdaten, Statusautomat und Sperrung | serverseitige AuthZ-Matrix, Codec-Testadapter/-vektoren, freigegebene Produkt-/Pooldefaults | blocked |
 | `CP-I03` | Claiming und kontrollierter JSON-Export | Claim-Gruppen und -Credentials, verschlüsselte Claim-PIN-Persistenz, Owner-Vorabzuweisung, persistente JSON-Exportaufträge für logische TAG-Ranges, unveränderliche Snapshots mit `exportOrderId` sowie externe QA-/Ausschuss-/Nachdruck-/Übergabereferenzen | Exportcontract, Claim- und Qualitätsprozess | planned |
 | `CP-I04` | Routing-Projektion und Publishing | Feature-Validator, Projektion, Outbox, idempotenter KV-Publisher, Publish/Unpublish und Rollback | Staging-KV, least-privilege Cloudflare-Token, Edge-Vertrag | planned |
 | `CP-I05` | Öffentliche Basisdaten | veröffentlichter Basis-Vault, Public Read API, CORS/Cache/Rate Limits und TAG-App-Contract | Staging-API-Origin und PWA-Integration | planned |
@@ -24,9 +24,9 @@ Die TAG Control Plane (TCP) ist das künftige autoritative Laravel-/MySQL-Backen
 | --- | --- | --- | --- | --- |
 | `CP-WP-01` | Backend-Architektur, Konfigurations- und Secret-Grenzen | CP-I01 | in-progress | Laravel-13-Projekt und MySQL-/UTC-Defaults vorhanden; reale Dogado-Hosting- und Secrets-Integration ausstehend |
 | `CP-WP-02` | MySQL-Kernschema, Migrationen und Transaktionskonzept | CP-I01 | in-progress | Laravel-Migration für append-only Audit-Ereignisse vorhanden; lokaler MySQL-8.4-Migrations- und Rollback-Test gegen isolierte Testdatenbank erfolgreich; Wiederherstellungsnachweis bleibt ausstehend |
-| `CP-WP-03` | Serverseitige AuthZ-Grenzen und Audit-Infrastruktur | CP-I01 | implemented | Audit-Redaktion, Korrelation, lokaler Bootstrap-Admin, serverseitige Web-Session, CSRF-geschützte Auth-Endpunkte und kurzlebige E-Mail-MFA-Challenges sind implementiert und lokal gegen MySQL getestet; fachliche Rollenverwaltung, Recovery, Passkey/TOTP und Re-Authentisierung bleiben offen |
-| `CP-WP-04` | Allocation-Pool-, Range- und Gruppendomäne | CP-I02 | planned | Pool-/Range-Invarianten- und Negativtests |
-| `CP-WP-05` | TAG-Allocator, Reservierung und Statusautomat | CP-I02 | planned | Parallelitäts-, Retry-, Lifecycle- und Secret-Tests |
+| `CP-WP-03` | Serverseitige AuthZ-Grenzen und Audit-Infrastruktur | CP-I01 | implemented | [`control-plane-admin-api-v1`](../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) dokumentiert Audit-Redaktion, Korrelation, lokalen Bootstrap-Admin, serverseitige Web-Session, CSRF-geschützte Auth-Endpunkte und kurzlebige E-Mail-MFA-Challenges. `npm run local:test` ist am 2026-10-29 mit 11 Tests/65 Assertions erfolgreich; die TCC-Contract-UI-Suite läuft mit 6 Tests und `npm audit --workspace=@myqr24/tag-control-center --omit=optional` meldet 0 Vulnerabilities. Fachliche Rollenverwaltung, Recovery, Passkey/TOTP und Re-Authentisierung bleiben offen |
+| `CP-WP-04` | Allocation-Pool-, Range- und Gruppendomäne | CP-I02 | blocked | [`control-plane-tag-management-api-v1`](../../10-Architecture/35-Contracts/control-plane-tag-management-api-v1.md) ist `blocked-contract`: serverseitige AuthZ-/Organisations-/Re-Auth-Matrix für schreibende Fachcommands fehlt |
+| `CP-WP-05` | TAG-Allocator, Reservierung und Statusautomat | CP-I02 | blocked | zusätzlich zu `W2L-BLK-AUTHZ` fehlen ein serverseitiger Fake-/Contract-Adapter für `internal.[s|p].myqr24.com/api/v1/codec/*`, kompatible 6-/8-/10-stellige Vektoren mit `codecVersion`, 1.000er-Chunking sowie Timeout-/Rollback-/Idempotenznachweise; keine `tagId`-Persistenz vorher |
 | `CP-WP-05A` | Claim- und Owner-Zuordnungsdomäne | CP-I03 | planned | Credential-/Versuchslimit-/Parallelclaim-/Owner-Konflikttests |
 | `CP-WP-06` | Scan-URL-, QR-Payload- und JSON-Exportversionsservice | CP-I03 | planned | Kanonisierungs- und vertrauliche JSON-Exporttests |
 | `CP-WP-07` | Persistente JSON-Exportaufträge und unveränderliche Snapshots | CP-I03 | planned | Auftrags-ID-/Snapshot-/Prüfsummen-/Berechtigungstests |
@@ -56,10 +56,11 @@ Die TAG Control Plane (TCP) ist das künftige autoritative Laravel-/MySQL-Backen
 - `GET /api/v1/health` bestätigt die Prozess-Erreichbarkeit ohne Datenbankzugriff.
 - `GET /api/v1/ready` prüft eine Datenbankverbindung und liefert bei fehlender Verbindung kontrolliert `503 not_ready`.
 - Die API-Antworten werden als JSON gerendert; beide Betriebsendpunkte enthalten ihre Korrelations-ID auch im Antwortkörper.
-- Unter `/api/v1/auth` existieren ausschließlich serverseitige Session-Endpunkte für CSRF-Token, Session-Status, Passwortschritt, E-Mail-MFA-Verifikation und Logout. Schreibende Endpunkte liegen in der `web`-Middlewaregruppe, verwenden CSRF und Rate-Limits; der Browser erhält keine Secrets oder MFA-Codes.
+- Unter `/api/v1/auth` existieren ausschließlich serverseitige Session-Endpunkte für CSRF-Token, Session-Status, Passwortschritt, E-Mail-MFA-Verifikation und Logout. Der vollständige aktuelle Browservertrag ist versioniert in [`control-plane-admin-api-v1`](../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md). Schreibende Endpunkte liegen in der `web`-Middlewaregruppe, verwenden CSRF und Rate-Limits; der Browser erhält keine Secrets oder MFA-Codes.
 - `tcp:bootstrap-platform-admin` ist der einzige Initialpfad für `TCP_BOOTSTRAP_ADMIN_EMAIL` (Default `azis213@gmail.com`). Er erstellt das Konto idempotent; eine Passwortänderung aus `TCP_BOOTSTRAP_ADMIN_INITIAL_PASSWORD` erfordert explizit `--reset-password`. Beide Mutationen werden auditiert.
 - `.env.example` enthält nur nicht geheime Dogado-SMTP-Parameter (`web218.dogado.net`, SMTPS/465, Absender `reg01@azis.de`); Benutzername, Passwort und Bootstrap-Passwort bleiben leer und gehören ausschließlich in den Deployment-Secret-Store.
-- Lokaler Qualitätsnachweis: `npm run local:test` erfolgreich gegen eine isolierte MySQL-8.4-Testdatenbank (`myqr24_test`) mit **10 Tests und 60 Assertions**. Der Lauf führt `migrate:fresh` ausschließlich gegen die Testdatenbank aus und prüft Auditpersistenz, Auth-Session, gehashte MFA-Challenge, MFA-Fehlversuch und Bootstrap-Reset-Schutz.
+- Lokaler Qualitätsnachweis: `npm run local:test` erfolgreich gegen eine isolierte MySQL-8.4-Testdatenbank (`myqr24_test`) mit **11 Tests und 65 Assertions**. Der Lauf führt `migrate:fresh` ausschließlich gegen die Testdatenbank aus und prüft Auditpersistenz, Auth-Session, neutrale Login-Fehlernormalisierung, gehashte MFA-Challenge, MFA-Fehlversuch und Bootstrap-Reset-Schutz.
+- Der zugehörige TCC-Browservertrag ist mit `apps/tag-control-center/src/App.test.tsx` lokal automatisiert: **6 Tests** für Sessionstatus, CSRF-Login, neutrale Ablehnung, MFA-Zwischenzustand/-Erfolg, Logout, Readiness und UI-Zustandsbereinigung. `npm run build:tcc` und der TCC-Dependency-Auditlauf sind ebenfalls grün.
 
 ### Bewusste Grenzen
 
@@ -86,7 +87,8 @@ Die TAG Control Plane (TCP) ist das künftige autoritative Laravel-/MySQL-Backen
 | --- | --- | --- | --- |
 | `CP-BLK-001` | CP-I01 | `partially-resolved`: Laravel-/MySQL-Laufzeitbasis ist lokal vorhanden. Reale Dogado-Stagingwerte für VHost, Dateirechte, Composer, Cron, MySQL-TLS, Backups und Secret-Speicher sind weiterhin nicht als Betriebsevidenz bestätigt. | Redigierte Staging-Hostingmatrix, Technologieentscheidung und externer Betriebsnachweis liegen vor. |
 | `CP-BLK-002` | CP-I01 | partially-resolved: lokaler Bootstrap-Admin, Session, CSRF und übergangsweise E-Mail-MFA sind implementiert. Passkey/TOTP-Zielverfahren, Recovery, Rollenverwaltung, Re-Authentisierung sowie produktive Mail-/Staging-Evidenz fehlen weiterhin. | Ziel-MFA-/Recovery-/Rollenpolicy ist freigegeben und gegen Staging-Mailtransport nachgewiesen. |
-| `CP-BLK-003` | CP-I02 | Feistel-Secrets und serverseitige kompatible Testvektoren fehlen für reale Vergabe. | getrennte Staging-Secret-Integration und Testvektoren für den linearen 6/8/10-Vertrag sind verfügbar. |
+| `CP-BLK-003` | CP-I02 | `W2L-BLK-CODEC`: Feistel-Secrets verbleiben ausschließlich in den Cloudflare Scan-/Internal-Codec-Workern. Für Reservierung fehlen ein serverseitiger Fake-/Contract-Adapter für `internal.[s|p].myqr24.com/api/v1/codec/*`, kompatible synthetische 6-/8-/10-stellige Vektoren mit `codecVersion`, 1.000er-Chunking sowie festgelegte Timeout-/Rollback-/Idempotenzregeln. | Nicht versionierte serverseitige Testzugangsdaten, Fake-/Contract-Adapter und kompatible Testvektoren sind vorhanden; TCP persistiert `length`, `decodedValue`, `tagId` und `codecVersion`, und atomarer Chunk-Rollback/Retry ist nachgewiesen. |
+| `CP-BLK-009` | CP-I02 | `W2L-BLK-AUTHZ`: Für Range-, Pool-, Reservierungs- und Lifecycle-Commands fehlen die verbindliche serverseitige Rollen-/Policy-Matrix, Organisationsgrenzen und Re-Authentisierungsregeln. | Versionierte Policy-Matrix ist entschieden, in TCP als Guard implementiert und durch neutrale AuthZ-/Mandantengrenztests nachgewiesen. |
 | `CP-BLK-004` | CP-I03 | JSON-Exportcontract, Auftrags- und Wiederdownloadregel, PIN-Verschlüsselung, Berechtigung, Qualitätsprüfprozess, Nachdruckregel, Support-Reset und Lager-/Übergabemodell sind offen. | versionierte Export-, Claim- und QA-Policy ist freigegeben. |
 | `CP-BLK-005` | CP-I04 | Aktiver Staging-Worker, gebundener KV-Namespace und minimaler Cloudflare-Publisher-Token sind nicht abschließend identifiziert. | Ressourcen, Tokenumfang und Sandbox-Namespace sind dokumentiert. |
 | `CP-BLK-006` | CP-I05 | Staging-Origin der Public Read API, CORS-Allowlist und Cache-Widerrufsbudget sind offen. | HTTPS-/CORS-/Cache-/Rate-Limit-Policy ist bestätigt. |
@@ -95,9 +97,9 @@ Die TAG Control Plane (TCP) ist das künftige autoritative Laravel-/MySQL-Backen
 
 ## Nächster zulässiger Implementierungsschritt
 
-1. Den Auth- und MFA-API-Vertrag samt TCC-UI in Traceability und Testfallkatalog fortschreiben.
-2. CP-WP-02 bleibt bis zum Restore-/Dogado-Nachweis `in-progress`; CP-I02 kann ausschließlich contract-first ohne reale Feistel-Secrets vorbereitet werden.
-3. Für produktive Administration Passkey/TOTP, Recovery, Re-Authentisierung, Session-Widerruf und Staging-Mailtransport vor fachlichen Mutationsendpunkten festlegen und nachweisen.
+1. `W2L-BLK-AUTHZ` lösen: verbindliche serverseitige Rollen-/Policy-Matrix, Organisationsgrenzen und Re-Authentisierung für Range-, Pool-, Reservierungs- und Lifecycle-Commands entscheiden und im `control-plane-tag-management-api-v1` fortschreiben.
+2. `W2L-BLK-CODEC` für Reservierungen lösen: sicheren serverseitigen Fake-/Contract-Adapter für `internal.[s|p].myqr24.com/api/v1/codec/*`, nicht versionierte lokale Zugangsdaten, synthetische 6-/8-/10-stellige Vektoren mit `codecVersion`, 1.000er-Chunking sowie Timeout-/Rollback-/Idempotenzregeln festlegen.
+3. CP-WP-02 bleibt bis zum Restore-/Dogado-Nachweis `in-progress`; erst nach den beiden W2L-Blockerauflösungen dürfen CP-WP-04/05 mit synthetischen lokalen Daten implementiert werden.
 
 ## Aktualisierungsregel
 

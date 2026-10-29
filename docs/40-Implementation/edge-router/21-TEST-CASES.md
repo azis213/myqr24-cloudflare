@@ -36,20 +36,25 @@ Lokale Testfälle werden automatisiert in Vitest umgesetzt; ihre Kennungen werde
 
 | ID | Story | Setup / Eingabe | Erwartetes Ergebnis |
 | --- | --- | --- | --- |
-| TC-CODEC-001 | CP-US-011 | Authentisierter `POST /api/v1/tag-codec/encode` für kanonischen 6-stelligen Wert, anschließend `decode` | Lowercase-ID sowie identischer vollständiger Wert im Encode-/Decode-Roundtrip |
-| TC-CODEC-002 | CP-US-011 | Authentisierter 8-stelliger Encode für kanonischen Wert, anschließend `decode` | Lowercase-ID sowie identischer vollständiger Wert im Encode-/Decode-Roundtrip |
-| TC-CODEC-003 | CP-US-011 | Authentisierter 10-stelliger Encode für kanonischen Wert, anschließend `decode` | Lowercase-ID sowie identischer vollständiger Wert im Encode-/Decode-Roundtrip |
+| TC-CODEC-001 | CP-US-011 | Authentisierter `POST /api/v1/codec/encode` für kanonischen 6-stelligen Wert, anschließend `decode` | Lowercase-ID, feste `codecVersion` sowie identischer vollständiger Wert im Encode-/Decode-Roundtrip |
+| TC-CODEC-002 | CP-US-011 | Authentisierter 8-stelliger Encode für kanonischen Wert, anschließend `decode` | Lowercase-ID, feste `codecVersion` sowie identischer vollständiger Wert im Encode-/Decode-Roundtrip |
+| TC-CODEC-003 | CP-US-011 | Authentisierter 10-stelliger Encode für kanonischen Wert, anschließend `decode` | Lowercase-ID, feste `codecVersion` sowie identischer vollständiger Wert im Encode-/Decode-Roundtrip |
 | TC-CODEC-004 | CP-BLK-005 | Unbekannter Pfad, `GET` oder fehlender Bearer-Key | `404`, `405` mit `Allow: POST` bzw. neutrale `401`; keine CORS-Freigabe |
 | TC-CODEC-005 | CP-US-011 | Nicht-JSON, Schemafehler, nichtkanonischer 6-/8-/10-stelliger Wert oder ungültige ID | Neutrale `400 {"error":{"code":"invalid_request"}}` ohne Kryptografiedetails |
+| TC-CODEC-006 | CP-US-011 | Authentisierter `POST /api/v1/codec/encode-batch` mit je 1.000 kanonischen 6-, 8- oder 10-stelligen Werten | genau 1.000 geordnete Ergebnisse; jeder Wert, Länge und jede `codecVersion` stimmen zur Eingabe bzw. Worker-Umgebung |
+| TC-CODEC-007 | CP-US-011 | Batch mit 0, mehr als 1.000 oder doppelten Werten sowie einem nichtkanonischen Wert | vollständige neutrale `400`-Ablehnung ohne Teilergebnis |
+| TC-CODEC-008 | CP-BLK-005 | Body oberhalb des jeweiligen Single-/Batch-Limits, Browser-Origin oder Browser-Credentials | fail-closed ohne CORS; weder Service-Key noch Codec-Response sind für Browser verwendbar |
 
 ## Codec-Staging-Live-Tests
 
 | ID | Story | Setup / Eingabe | Erwartetes Ergebnis |
 | --- | --- | --- | --- |
-| TC-CODEC-STAGING-001 | CP-BLK-005 | Nicht autorisierter `POST` und `GET` auf `https://codec.s.myqr24.com/api/v1/tag-codec/encode` | `POST` liefert neutrale `401`-Antwort mit `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` und ohne CORS-Freigabe; `GET` liefert `405` mit `Allow: POST`. |
+| TC-CODEC-STAGING-001 | CP-BLK-005 | Nicht autorisierter `POST` und `GET` auf `https://internal.s.myqr24.com/api/v1/codec/encode` | `POST` liefert neutrale `401`-Antwort mit `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` und ohne CORS-Freigabe; `GET` liefert `405` mit `Allow: POST`. |
 | TC-CODEC-STAGING-002 | CP-US-011 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für einen künstlichen kanonischen 6-stelligen Wert | Beide Requests liefern `200 OK`; Länge und decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
 | TC-CODEC-STAGING-003 | CP-US-011 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für einen künstlichen kanonischen 8-stelligen Wert | Beide Requests liefern `200 OK`; Länge und decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
-| TC-CODEC-STAGING-004 | CP-US-011 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für einen künstlichen kanonischen 10-stelligen Wert | Beide Requests liefern `200 OK`; Länge und decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
+| TC-CODEC-STAGING-004 | CP-US-011 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für einen künstlichen kanonischen 10-stelligen Wert | Beide Requests liefern `200 OK`; Länge, `codecVersion` und decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
+| TC-CODEC-STAGING-005 | CP-US-011/CP-BLK-005 | Autorisierter `POST /encode-batch` mit 1.000 künstlichen kanonischen Werten | `200 OK`; geordnete vollständige Antwort mit identischer Länge, Werten und `codecVersion`; keine Cloudflare- oder TCP-Secrets in Nachweis oder Antwort. |
+| TC-CODEC-STAGING-006 | CP-BLK-005 | Kontrollierter Routenwechsel vom abzulösenden `codec.s.myqr24.com/api/v1/*` zu `internal.s.myqr24.com/api/v1/codec/*` | nur neue Internal-Route ist aktiviert; WAF-/Rate-Limit-/Access-Grenzen und erneute 6/8/10-Roundtrips sind redigiert nachgewiesen. |
 
 ## Range-Index
 

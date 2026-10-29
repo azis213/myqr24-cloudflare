@@ -37,10 +37,22 @@ final class ApiAuthenticationController extends Controller
 
     public function login(Request $request, AuthenticationService $authentication): JsonResponse
     {
-        $validated = $request->validate([
-            'email' => ['required', 'email:rfc,dns', 'max:191'],
-            'password' => ['required', 'string', 'max:1024'],
-        ]);
+        $invalidCredentialsMessage = 'Die Anmeldedaten sind ungültig oder das Konto ist nicht aktiv.';
+
+        $validated = $request->validate(
+            [
+                'email' => ['required', 'email:rfc,dns', 'max:191'],
+                'password' => ['required', 'string', 'max:1024'],
+            ],
+            [
+                'email.required' => $invalidCredentialsMessage,
+                'email.email' => $invalidCredentialsMessage,
+                'email.max' => $invalidCredentialsMessage,
+                'password.required' => $invalidCredentialsMessage,
+                'password.string' => $invalidCredentialsMessage,
+                'password.max' => $invalidCredentialsMessage,
+            ],
+        );
 
         try {
             $result = $authentication->beginLogin(
@@ -50,7 +62,7 @@ final class ApiAuthenticationController extends Controller
             );
         } catch (RuntimeException) {
             throw ValidationException::withMessages([
-                'email' => ['Die Anmeldedaten sind ungültig oder das Konto ist nicht aktiv.'],
+                'email' => [$invalidCredentialsMessage],
             ]);
         }
 

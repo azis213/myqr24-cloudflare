@@ -4,7 +4,8 @@
 **Version:** `v1`  
 **Owner:** Cloudflare TAG Codec Worker  
 **Implementierende Komponenten:** Cloudflare TAG Codec Worker (`apps/edge-router/src/codec-worker.ts`); spätere serverseitige TAG Control Plane  
-**Stand:** 2026-10-06
+**Stand:** 2026-10-29  
+**Nächste spezifizierte Welle:** Internal-API-Umzug und Batch-Encoding; noch nicht implementiert oder deployt.
 
 ## 1. Zweck und fachliche Grenze
 
@@ -31,7 +32,8 @@ Der implementierte Slice umfasst einzelne Encode- und Decode-Operationen. Er bie
 - keine KV-Bindung und kein `REDIRECT_SIGNING_SECRET_S01`;
 - keine CORS-Freigabe;
 - keine Ausgabe von Feistel-, Redirect- oder Publisher-Secrets;
-- kein Batch-Encoding, keine `Idempotency-Key`-Verarbeitung und keine Worker-seitige Idempotenzspeicherung;
+- keine Worker-seitige Idempotenzspeicherung oder fachliche Batch-Reservierung;
+- noch kein implementiertes Batch-Encoding und noch kein `codecVersion`-Responsefeld;
 - kein im Worker implementiertes Rate Limit, IP-Allowlisting oder Cloudflare Access.
 
 Diese aufgeschobenen Betriebs- und Batch-Funktionen bleiben Teil von `CP-BLK-005` und sind vor einer produktiven oder breiter erreichbaren Route verbindlich zu ergänzen. Die Cloudflare-Routenbindung, WAF-/Rate-Limit-Regeln und optionale Access-/IP-Regeln sind daher absichtlich nicht in `wrangler.codec.toml` hinterlegt.
@@ -42,11 +44,13 @@ Diese aufgeschobenen Betriebs- und Batch-Funktionen bleiben Teil von `CP-BLK-005
 
 | Secret | Speicherort | Verwendung |
 | --- | --- | --- |
-| `FEISTEL_SECRET_S01` | Cloudflare Staging Worker Secret: Scan-Worker und Codec-Worker | feste 10-Runden-Feistel-Codierung bzw. -Decodierung |
-| `TAG_CODEC_API_KEY_S01` | Cloudflare Staging Codec-Worker Secret und serverseitiger Dogado-Secret-Speicher der Staging Control Plane | Authentisierung Control Plane → Codec-Worker |
-| `REDIRECT_SIGNING_SECRET_S01` | Cloudflare Staging Scan-Worker Secret | nicht an den Codec-Worker gebunden |
+| `FEISTEL_SECRET_S01` | Cloudflare Staging Worker Secret: Scan-Worker und Internal-Codec-Worker | feste 10-Runden-Feistel-Codierung bzw. -Decodierung für 6, 8 und 10 Stellen |
+| `TAG_CODEC_API_KEY_S01` | Cloudflare Staging Internal-Codec-Worker Secret und serverseitiger Staging-TCP-Secret-Speicher | Authentisierung TCP → Internal-Codec-Worker |
+| `FEISTEL_SECRET_P01` | Cloudflare Production Worker Secret: Scan-Worker und Internal-Codec-Worker | Produktionsäquivalent; separater Wert zu `S01` |
+| `TAG_CODEC_API_KEY_P01` | Cloudflare Production Internal-Codec-Worker Secret und serverseitiger Production-TCP-Secret-Speicher | Produktionsäquivalent; separater Wert zu `S01` |
+| `REDIRECT_SIGNING_SECRET_S01` / `P01` | jeweiliges Cloudflare Scan-Worker Secret | nicht an den Codec-Worker gebunden |
 
-Alle kryptografischen Werte enthalten mindestens 32 zufällige Bytes; die bevorzugte portable Repräsentation ist 64 Zeichen lowercase Hex. `TAG_CODEC_API_KEY_S01` ist davon unabhängig und rotierbar. Sein konkreter Wert darf nie in Git, Browsern, Cloudflare Pages, Logs, Auditmetadaten, Evidenz, URL-Parametern oder Fehlerantworten erscheinen.
+Ein Feistel-Secret gilt pro Codec-Version und Umgebung, nicht pro TAG-Länge. Die Längen verwenden getrennte kanonische Domänen; drei Secretwerte pro Umgebung sind daher weder erforderlich noch vorgesehen. Alle kryptografischen Werte enthalten mindestens 32 zufällige Bytes; die bevorzugte portable Repräsentation ist 64 Zeichen lowercase Hex. `TAG_CODEC_API_KEY_*` ist davon unabhängig und rotierbar. Sein konkreter Wert darf nie in Git, Browsern, Cloudflare Pages, Logs, Auditmetadaten, Evidenz, URL-Parametern oder Fehlerantworten erscheinen.
 
 Der Codec-Worker wird über `apps/edge-router/wrangler.codec.toml` bereitgestellt. Die Konfiguration enthält absichtlich weder `TAG_CONFIG` noch Redirect-Signing-Bindungen. Staging-Secrets werden ausschließlich per `wrangler secret put ... --config wrangler.codec.toml --env staging` gesetzt.
 
@@ -55,11 +59,19 @@ Der Codec-Worker wird über `apps/edge-router/wrangler.codec.toml` bereitgestell
 ### 4.1 Implementierte Endpunkte
 
 ```http
-POST /api/v1/tag-codec/encode
-POST /api/v1/tag-codec/decode
+POST /api/v1/codec/encode
+POST /api/v1/codec/encode-batch
+POST /api/v1/codec/decode
 ```
 
-Die Route wird erst nach der W0-Freigabe an einen ausschließlich dafür vorgesehenen, nicht über Scan- oder Pages-Domains erreichbaren Host gebunden. Der vorgesehene Staging-Name ist `codec.s.myqr24.com`; eine Produktionsroute wird vor dem Production-Gate separat festgelegt.
+Der Internal-Host ist die allgemeine private technische Grenze und kein Browser-API-Host:
+
+| Umgebung | Internal-Host | Öffentlicher Scan-Host |
+| --- | --- | --- |
+| Staging | `https://internal.s.myqr24.com` | `https://s.myqr24.com` |
+| Produktion | `https://internal.p.myqr24.com` | `https://p.myqr24.com` |
+
+Die bisher aktive Staging-Route `codec.s.myqr24.com/api/v1/*` ist ein abzulösender Slice. Ihr Umzug auf `internal.s.myqr24.com/api/v1/codec/*` erfolgt erst in der nächsten kontrollierten Edge-Deployment-Welle. Der öffentliche Scan-Worker decodiert unverändert lokal und ruft den Internal-Worker nie über das Netzwerk auf.
 
 ### 4.2 Pflicht-Request-Header
 
@@ -75,14 +87,15 @@ Regeln:
 3. Fehlende oder ungültige Authentisierung erhält die neutrale Antwort `401 {"error":{"code":"unauthorized"}}`.
 4. Der Key darf nur aus der serverseitigen Control Plane gesendet werden, niemals aus Browsercode.
 5. Der Worker sendet `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` und keine CORS-Header.
-6. Request-Bodies müssen JSON sein und dürfen höchstens 1.024 Bytes umfassen.
+6. Request-Bodies müssen JSON sein. Einzel-Requests dürfen höchstens 1.024 Bytes; `encode-batch`-Requests höchstens 256 KiB umfassen.
+7. Ausschließlich die serverseitige TCP hält den Codec-Service-Key. TCC, TAG-App, lokale Druck-SPA und jeder sonstige Browser dürfen den Internal-Codec weder direkt aufrufen noch einen dauerhaften Service-Key erhalten.
 
 ## 5. Request- und Response-Schema
 
 ### 5.1 Encode
 
 ```http
-POST /api/v1/tag-codec/encode
+POST /api/v1/codec/encode
 ```
 
 ```json
@@ -107,6 +120,7 @@ Erfolgsantwort:
 
 ```json
 {
+  "codecVersion": "S01",
   "tag": {
     "id": "ab12cd",
     "length": 6,
@@ -117,10 +131,42 @@ Erfolgsantwort:
 
 `tag.id` ist lowercase Base36 und exakt `length` Zeichen lang. `tag.value` entspricht für jede Länge unverändert dem vollständigen kanonischen Eingabewert.
 
-### 5.2 Decode
+### 5.2 Batch-Encode (nächste Welle)
 
 ```http
-POST /api/v1/tag-codec/decode
+POST /api/v1/codec/encode-batch
+```
+
+```json
+{
+  "length": 8,
+  "values": ["78364164096", "78364164097"]
+}
+```
+
+| Feld | Typ | Regeln |
+| --- | --- | --- |
+| `length` | Integer | Ausschließlich `6`, `8` oder `10`. |
+| `values` | Array von Dezimalstrings | Mindestens ein und höchstens 1.000 eindeutige, kanonische Werte derselben Länge. |
+
+Der Worker speichert, reserviert oder iteriert keine Range. TCP sendet nur bereits fachlich geprüfte konkrete Werte. Bei einem ungültigen Wert schlägt der gesamte Request neutral fehl; es gibt keine Teilergebnisse. Die Ergebnisreihenfolge entspricht der Eingabereihenfolge.
+
+```json
+{
+  "codecVersion": "S01",
+  "tags": [
+    { "id": "7f9k2mxa", "length": 8, "value": "78364164096" },
+    { "id": "example1", "length": 8, "value": "78364164097" }
+  ]
+}
+```
+
+Der Codec ist deterministisch und zustandslos. Transport-Wiederholungen sind kryptografisch unkritisch; fachliche Idempotenz, Chunk-Fortschritt und Persistenz bleiben ausschließlich Aufgabe der TCP.
+
+### 5.3 Decode
+
+```http
+POST /api/v1/codec/decode
 ```
 
 ```json
@@ -137,6 +183,7 @@ Erfolgsantwort:
 
 ```json
 {
+  "codecVersion": "S01",
   "tag": {
     "id": "7f9k2mxa",
     "length": 8,
@@ -188,6 +235,9 @@ Worker-Logs dürfen weder `Authorization` noch Request-Bodies, `value`-Listen, T
 | `TC-CODEC-002` | Kanonische acht- und zehnstellige Werte erzeugen öffentliche IDs und werden jeweils vollständig wieder decodiert. |
 | `TC-CODEC-003` | Unbekannter Pfad, falsche Methode und fehlende Credentials werden fail-closed behandelt; es existiert keine CORS-Freigabe. |
 | `TC-CODEC-004` | Ungültiges JSON-Schema, nichtkanonische Werte und ungültige IDs liefern neutrale `400`-Antworten. |
+| `TC-CODEC-005` | Batch mit 1.000 kanonischen Werten für jede unterstützte Länge liefert gleich viele, geordnete Roundtrip-kompatible Ergebnisse. |
+| `TC-CODEC-006` | Batch mit mehr als 1.000 Werten, Duplikat, ungültigem Wert oder Überschreitung des Body-Limits scheitert vollständig neutral ohne Teilergebnis. |
+| `TC-CODEC-007` | Jede Encode-/Decode-Antwort enthält die für Umgebung und Worker feste `codecVersion`; Browser-Origin und Browser-Credentials erhalten keinen Internal-Codec-Zugriff. |
 | `TC-CRYPTO-001` bis `TC-CRYPTO-006` | Scan- und Codec-Worker verwenden dieselben Feistel-Primitive, Parameter und kompatible Testsecrets für 6, 8 und 10 Stellen. |
 
 Nicht implementierte Nachweise für Batch-Idempotenz, Rate Limits, Access/IP-Restriktionen, Key-Rotation und deployed Staging-Smoke-Tests bleiben vor einer produktiven Freigabe offen.
@@ -200,4 +250,5 @@ Nicht implementierte Nachweise für Batch-Idempotenz, Rate Limits, Access/IP-Res
 | `CP-US-013` | Poolgrenzen verbleiben im `decodedValue`-Raum |
 | `CP-US-020` / `CP-US-021` | deterministische TAG-ID für Druck-/Snapshotdaten |
 | `CP-BLK-003` | getrennte Cloudflare-Staging-Testsecrets und kompatible Testvektoren |
-| `CP-BLK-005` | vor extern erreichbarer Route: verbindlicher Betriebsweg, Rate Limit sowie Netzwerk-/Access-Grenzen |
+| `CP-BLK-003` / `W2L-BLK-CODEC` | TCP verwendet einen serverseitigen Fake-/Contract-Adapter und kompatible 6-/8-/10-stellige Vektoren; keine Feistel-Secrets in TCP |
+| `CP-BLK-005` | vor Internal-Host-Umzug: verbindlicher Betriebsweg, Route/WAF-/Rate-Limit- sowie Netzwerk-/Access-Grenzen |

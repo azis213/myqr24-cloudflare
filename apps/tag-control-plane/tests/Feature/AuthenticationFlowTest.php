@@ -47,6 +47,25 @@ final class AuthenticationFlowTest extends TestCase
         ]);
     }
 
+    public function test_login_normalizes_invalid_and_unknown_email_failures(): void
+    {
+        config()->set('security.email_mfa.enabled', false);
+
+        foreach ([
+            ['email' => 'not-an-email', 'password' => 'any-password'],
+            ['email' => 'unknown@example.test', 'password' => 'any-password'],
+        ] as $credentials) {
+            $this->postJson('/api/v1/auth/login', $credentials)
+                ->assertUnprocessable()
+                ->assertJsonPath(
+                    'errors.email.0',
+                    'Die Anmeldedaten sind ungültig oder das Konto ist nicht aktiv.',
+                );
+        }
+
+        $this->assertGuest();
+    }
+
     public function test_email_mfa_challenge_is_hashed_and_requires_verification_before_authentication(): void
     {
         config()->set('security.email_mfa.enabled', true);

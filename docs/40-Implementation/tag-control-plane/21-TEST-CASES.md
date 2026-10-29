@@ -38,7 +38,10 @@
 | `CP-TC-ALLOC-002` | CP-US-011 | acht- und zehnstelligen TAG reservieren | nächster freier linearer `decodedValue` wird je kanonischer Range über den Codec eindeutig als `tagId` gespeichert | Unit/Integration |
 | `CP-TC-ALLOC-003` | CP-US-011 | parallele Reservierungen derselben Range | keine doppelte `tagId` oder `(length, decodedValue)` | Integration |
 | `CP-TC-ALLOC-004` | CP-US-011 | Wiederholung mit gleicher Idempotenz-/Korrelation-ID | keine zweite fachliche Reservierung | Integration |
-| `CP-TC-ALLOC-005` | CP-US-011 | Secret-Leak-Prüfung bei Vergabe | kein Feistel-Secret in DB-Antworten, Logs oder Fixtures | Security |
+| `CP-TC-ALLOC-005` | CP-US-011 | Secret-Leak-Prüfung bei Vergabe | kein Feistel-Secret, Codec-Service-Key oder Internal-Codec-Response in DB-Antworten, Logs oder Fixtures | Security |
+| `CP-TC-ALLOC-006` | CP-US-011 | 1.000 bereits gesperrte kanonische Werte für 6, 8 oder 10 Stellen an den Fake-/Contract-Codec-Adapter übergeben | TCP sendet maximal 1.000 konkrete Werte, prüft Reihenfolge/Wert/Länge/`codecVersion` und persistiert je TAG eindeutiges Mapping | Integration/Contract |
+| `CP-TC-ALLOC-007` | CP-US-011 | Codec-Timeout, ungültige Batch-Antwort oder DB-/Auditfehler während eines Chunks | keine unklare Mapping-Teilmenge; Chunk-Fehler ist sichtbar und derselbe fachliche Idempotency-Key nimmt ausschließlich dieselben reservierten Werte wieder auf | Integration |
+| `CP-TC-ALLOC-008` | CP-US-011 | persistiertes Mapping sowie TAG-Eigenschaften und JSON-Template-Konfiguration prüfen | `length`, `decodedValue`, `tagId`, `codecVersion`, Range-/Poolkontext und Status sind persistiert; Templates verbleiben in TCP und fehlen im Codec-Request/-Response | Integration/Security |
 | `CP-TC-LIFECYCLE-001` | CP-US-012 | zulässiger Statuswechsel bis `ready-to-publish` | Wechsel wird geprüft und auditiert | Integration |
 | `CP-TC-LIFECYCLE-002` | CP-US-012 | Aktivierung eines physischen TAGs ohne QA/Übergabe | Wechsel wird verweigert | Integration |
 | `CP-TC-LIFECYCLE-003` | CP-US-012 | Sperrung/Archivierung eines aktiven TAGs | sichere Unpublish-/Neutralisierungsaktion wird geplant | Integration |

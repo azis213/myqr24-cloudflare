@@ -1,7 +1,7 @@
 # Rückverfolgbarkeit: TAG Control Plane
 
-**Letzte Aktualisierung:** 2026-10-28  
-**Status:** CP-I01 besitzt lokal implementierte und gegen eine isolierte MySQL-8.4-Compose-Topologie getestete Audit-, Bootstrap-Admin-, Session- und E-Mail-MFA-Grundlagen. Externe Hosting-, Staging-Mail- sowie Ziel-AuthZ-/MFA-Nachweise bleiben offen.
+**Letzte Aktualisierung:** 2026-10-29  
+**Status:** CP-I01 besitzt lokal implementierte und gegen eine isolierte MySQL-8.4-Compose-Topologie getestete Audit-, Bootstrap-Admin-, Session- und E-Mail-MFA-Grundlagen. Der browserseitige W1L-Schnitt ist als [`control-plane-admin-api-v1`](../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) versioniert und durch TCC-Contract-UI-Tests ergänzt. W2L ist als [`control-plane-tag-management-api-v1`](../../10-Architecture/35-Contracts/control-plane-tag-management-api-v1.md) dokumentiert, bleibt jedoch bis zur serverseitigen AuthZ-Matrix und für Reservierungen zusätzlich bis zum Codec-Adapter-/Testvektor-Gate blockiert.
 
 ## 1. Verweisregeln
 
@@ -20,12 +20,12 @@ Das TAG Control Center referenziert diese Backendschnittstellen später, impleme
 
 | Story | Arbeitspaket | Tests | Testdaten | Geplante Implementierung | Erforderliche Evidenz | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| CP-US-001 autoritative Mutation | CP-WP-01 bis CP-WP-03 | CP-TC-TX-001, CP-TC-AUTHZ-001, CP-TC-CONFIG-001 | CP-TD-008, CP-TD-010 | CP-I01-Grundlage: Laravel-13 unter `apps/tag-control-plane/`, MySQL-/UTC-Defaults, Korrelation in `app/Http/Middleware/AssignCorrelationId.php`; `app/Services/AuthenticationService.php`, `app/Http/Controllers/ApiAuthenticationController.php` und `routes/api.php` setzen CSRF-geschützte Web-Sessions und E-Mail-MFA durch. `app/Console/Commands/BootstrapPlatformAdmin.php` erstellt nur den konfigurierten Start-Admin; Passwortreset nur mit explizitem Flag. Fachliche AuthZ-Guards bleiben offen. | Lokaler MySQL-8.4-Lauf `npm run local:test` am 2026-10-28 mit `tests/Feature/AuthenticationFlowTest.php`; Dogado-/Staging- und Ziel-AuthZ-Nachweis offen | in-progress |
+| CP-US-001 autoritative Mutation | CP-WP-01 bis CP-WP-03 | CP-TC-TX-001, CP-TC-AUTHZ-001, CP-TC-CONFIG-001, CP-TC-AUTH-001 bis 005 | CP-TD-008, CP-TD-010 | CP-I01-Grundlage: Laravel-13 unter `apps/tag-control-plane/`, MySQL-/UTC-Defaults, Korrelation in `app/Http/Middleware/AssignCorrelationId.php`; `app/Services/AuthenticationService.php`, `app/Http/Controllers/ApiAuthenticationController.php` und `routes/api.php` setzen den versionierten [`control-plane-admin-api-v1`](../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) mit CSRF-geschützten Web-Sessions und E-Mail-MFA durch. `app/Console/Commands/BootstrapPlatformAdmin.php` erstellt nur den konfigurierten Start-Admin; Passwortreset nur mit explizitem Flag. Fachliche AuthZ-Guards bleiben offen. | Lokaler MySQL-8.4-Lauf `npm run local:test` am 2026-10-28 mit `tests/Feature/AuthenticationFlowTest.php`; TCC-Contract-/Build-Nachweis in `CC-TC-AUTH-001` bis `CC-TC-AUTH-006`; Dogado-/Staging- und Ziel-AuthZ-Nachweis offen | in-progress |
 | CP-US-002 Audit | CP-WP-02, CP-WP-03 | CP-TC-AUDIT-001 bis 002 | CP-TD-010 | `database/migrations/2026_10_28_000000_create_audit_events_table.php`, `app/Models/AuditEvent.php`, `app/Services/AuditService.php` und `app/Support/AuditSanitizer.php`; Persistenz nur mit valider UUID-Korrelation und rekursiver Secret-Redaktion | `tests/Unit/AuditSanitizerTest.php`, `tests/Feature/AuditServiceMySqlTest.php`, lokaler MySQL-8.4-Lauf `npm run local:test` am 2026-10-28 | implemented |
-| CP-US-010 Range-Validierung | CP-WP-04 | CP-TC-RANGE-001 bis 004 | CP-TD-001 | Range-Validator, Gruppen-/Referenzprüfung | Invarianten- und Negativtests | planned |
-| CP-US-013 Allocation Pools | CP-WP-04 | CP-TC-POOL-001 bis 004 | CP-TD-001, CP-TD-012 | Pool-Service, kanonische Poolrange-/Kapazitäts-/Policy-Prüfung | Poolgrenzen-, Erschöpfungs- und Leak-Tests | planned |
-| CP-US-011 atomare Reservierung | CP-WP-02, CP-WP-05 | CP-TC-ALLOC-001 bis 005 | CP-TD-001, CP-TD-002 | DB-gestützter Allocator, Lock-/Idempotenzservice, Secret-Provider | Parallelitäts-, Retry- und Leak-Tests | planned |
-| CP-US-012 TAG-Lebenszyklus | CP-WP-05 | CP-TC-LIFECYCLE-001 bis 003 | CP-TD-003 | Statusautomat und Unpublish-Planer | Status-/Sperr-/Outbox-Nachweis | planned |
+| CP-US-010 Range-Validierung | CP-WP-04 | CP-TC-RANGE-001 bis 004 | CP-TD-001 | [`control-plane-tag-management-api-v1`](../../10-Architecture/35-Contracts/control-plane-tag-management-api-v1.md): Range-Validator, Gruppen-/Referenzprüfung | `W2L-BLK-AUTHZ` lösen, dann Invarianten- und Negativtests | blocked |
+| CP-US-013 Allocation Pools | CP-WP-04 | CP-TC-POOL-001 bis 004 | CP-TD-001, CP-TD-012 | Vertragsgemäßer Pool-Service mit kanonischer Poolrange-/Kapazitäts-/Policy-Prüfung | `W2L-BLK-AUTHZ` lösen, dann Poolgrenzen-, Erschöpfungs- und Leak-Tests | blocked |
+| CP-US-011 atomare Reservierung | CP-WP-02, CP-WP-05 | CP-TC-ALLOC-001 bis 005 | CP-TD-001, CP-TD-002 | DB-gestützter Allocator, Lock-/Idempotenzservice, serverseitiger Codec-Adapter | `W2L-BLK-AUTHZ` und `W2L-BLK-CODEC` lösen, dann Parallelitäts-, Retry- und Leak-Tests | blocked |
+| CP-US-012 TAG-Lebenszyklus | CP-WP-05 | CP-TC-LIFECYCLE-001 bis 003 | CP-TD-003 | Statusautomat und späterer Unpublish-Planer | `W2L-BLK-AUTHZ` lösen; Outbox-/Neutralisierung bleibt W3L | blocked |
 | CP-US-025 Claim-Credentials | CP-WP-05A, CP-WP-06 | CP-TC-CLAIM-PREP-001 bis 003 | CP-TD-011 | Credential-Service mit individuellem Prüfhash, TAG-bezogen verschlüsseltem PIN-Wert, Claim-Gruppe und autorisiertem JSON-Export-Guard | Hash-, Verschlüsselungs-, Bogen-PIN-, organisationsbezogene Ausnahme- und Leak-Tests | planned |
 | CP-US-026 öffentlicher Claim | CP-WP-05A, CP-WP-08A | CP-TC-CLAIM-001 bis 006 | CP-TD-011 | Public Claim API und atomarer kanalneutraler Claim-Service mit Lockout-/Rate-Limit-Guards | Parallelclaim-, Lockout-, Drosselungs-, neutraler Fehler- und TAG-App-Contract-Test | planned |
 | CP-US-028 manueller Support-Claim | CP-WP-05A, CP-WP-08A | CP-TC-SUPPORT-CLAIM-001 bis 002 | CP-TD-011 | Support-Claim-Command über denselben Claim-Service, Re-Auth-/Audit-Guard | Cross-Channel-Contract, Secret-Sanitizing, Rollen-, Re-Auth- und Audit-Tests | planned |
@@ -51,8 +51,8 @@ Das TAG Control Center referenziert diese Backendschnittstellen später, impleme
 
 | Vertrag | Control-Plane-Verantwortung | Gegenstelle | Verifikation |
 | --- | --- | --- | --- |
-| Admin-Anmeldung | serverseitige Session, CSRF, Passwortprüfung, kurzlebige gehashte E-Mail-MFA-Challenge, Rate Limits und Audit; Bootstrap nur als CLI-Command | TAG Control Center | `tests/Feature/AuthenticationFlowTest.php`; TCC-Produktionsbuild |
-| Admin-Befehle | serverseitige Validierung, fachliche AuthZ, Workflow und Fehlervertrag | TAG Control Center | CP-TC-AUTHZ-001, fachliche Service-Tests; UI-Tests im CC-Strang |
+| [`control-plane-admin-api-v1`](../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) | serverseitige Session, CSRF, Passwortprüfung, kurzlebige gehashte E-Mail-MFA-Challenge, Rate Limits und Audit; Bootstrap nur als CLI-Command | TAG Control Center | `tests/Feature/AuthenticationFlowTest.php`; `CP-TC-AUTH-001` bis `CP-TC-AUTH-005`; `CC-TC-AUTH-001` bis `CC-TC-AUTH-006`; TCC-Produktionsbuild |
+| [`control-plane-tag-management-api-v1`](../../10-Architecture/35-Contracts/control-plane-tag-management-api-v1.md) | spätere serverseitige Range-, Pool-, Reservierungs- und Lifecycle-Validierung, AuthZ, Idempotenz, Audit und Fehlervertrag | TAG Control Center | CP-TC-RANGE-001 bis 004, CP-TC-POOL-001 bis 004, CP-TC-ALLOC-001 bis 005, CP-TC-LIFECYCLE-001 bis 003; bis `W2L-BLK-AUTHZ`/`W2L-BLK-CODEC` blocked |
 | KV-Projektion | minimaler, validierter, nicht geheimer Publish-Diff | Edge Router | CP-TC-PROJECTION-001 bis 003, CP-TC-PUBLISH-002 |
 | JSON-Druckexport | kanonische TAG-Daten je logischer Range, unveränderlicher JSON-Snapshot mit `exportOrderId`; Claim-PIN nur für nicht organisationsgebunden freigeschaltete claimbare TAGs | TAG Control Center / externe Druckaufbereitung / Druckerei | CP-TC-PRODUCTION-001 bis 003, CP-TC-SNAPSHOT-001 bis 004 |
 | PublicTagView | nur freigegebene öffentliche Daten, neutrale Fehler | TAG-App | CP-TC-API-001 bis 004, CP-TC-E2E-001 bis 002 |
@@ -69,13 +69,14 @@ Das TAG Control Center referenziert diese Backendschnittstellen später, impleme
 
 Der reproduzierbare Befehl `npm run local:test` startet die lokale Compose-Topologie, stellt ausschließlich die synthetische Datenbank `myqr24_test` bereit, führt `migrate:fresh` nur gegen diese Datenbank aus und startet dann PHPUnit.
 
-Der erfolgreiche Lauf vom 2026-10-28 lieferte:
+Der erfolgreiche Lauf vom 2026-10-29 lieferte:
 
 - PHP 8.4.27 und MySQL 8.4 im isolierten Compose-Netz;
 - Migration der Tabellen `audit_events`, `users` und `email_mfa_challenges`;
-- **10 Tests, 60 Assertions** ohne PHPUnit-Probleme;
+- **11 Tests, 65 Assertions** ohne PHPUnit-Probleme;
 - Auditpersistenz mit Korrelations-ID, rekursive Redaktion, Rollback und Health-Endpunkt-Korrelation;
-- Passwort-Login mit und ohne aktivierte E-Mail-MFA, gehashte Challenge, Fehlversuchszähler sowie den idempotenten Bootstrap-Admin mit explizitem Passwortreset.
+- Passwort-Login mit und ohne aktivierte E-Mail-MFA, neutrale Fehlernormalisierung für ungültige/ unbekannte Login-Eingaben, gehashte Challenge, Fehlversuchszähler sowie den idempotenten Bootstrap-Admin mit explizitem Passwortreset;
+- die zugehörige TCC-Contract-UI-Suite `apps/tag-control-center/src/App.test.tsx` erfolgreich mit **6 Tests** sowie TCC-Build und Dependency-Audit ohne bekannte Vulnerabilities.
 
 Dieser Nachweis ist lokal und enthält keine Staging-/Dogado-Secrets. Er bestätigt nicht den produktiven Dogado-SMTP-Transport, Passkey/TOTP, Recovery, fachliche Rollen-/Re-Auth-Guards oder eine Staging-/Produktionsfreigabe.
 

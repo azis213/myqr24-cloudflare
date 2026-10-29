@@ -1,16 +1,16 @@
 # Implementierungsstatus: TAG Control Center
 
-**Letzte Aktualisierung:** 2026-10-28  
+**Letzte Aktualisierung:** 2026-10-29  
 **Statusregeln:** [README.md](README.md)  
 **Fachliche Stories:** [10-USER-STORIES.md](10-USER-STORIES.md)  
-**Wichtig:** Eine separate React-/Vite-TCC-Shell existiert unter `apps/tag-control-center/`. Sie enthält einen serverseitig abgesicherten Login-/E-Mail-MFA-/Logout-Flow, aber weiterhin keine fachlichen Verwaltungscommands oder Secret-Konfiguration.
+**Wichtig:** Eine separate React-/Vite-TCC-Shell existiert unter `apps/tag-control-center/`. Sie implementiert den versionierten lokalen [`control-plane-admin-api-v1`](../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) für serverseitig abgesicherten Login, E-Mail-MFA, Sessionstatus und Logout, aber weiterhin keine fachlichen Verwaltungscommands oder Secret-Konfiguration.
 
 ## Iterationen
 
 | Iteration | Ziel | Wesentliche Ergebnisse | Abhängigkeiten | Status |
 | --- | --- | --- | --- | --- |
-| `CC-I01` | Fundament und Sicherheitsbasis | ADR-002, separates React-/Vite-Projektgrundgerüst, TCP-Readiness-Check, serverseitiger Passwort-/Session-/E-Mail-MFA-/Logout-Flow und Bootstrap-Admin; Rollen, Recovery und Ziel-MFA verbleiben offen | Dogado-Laufzeit, Staging-Mailtransport, Rollen-/Recovery-/Ziel-MFA-Entscheidung | in-progress |
-| `CC-I02` | Pools, TAG-Stammdaten und sichere Vergabe | Allocation-Pool-Verwaltung, Ranges, Gruppen, Control-Plane-gestützte lineare 6-/8-/10-stellige Vergabe, TAG-Lebenszyklus, Claim-/Vorabzuweisungs- und QR-/Druckvorbereitung | freigegebene Staging-Secret-Integration, Produkt-/Pool-/Claim-Defaults | planned |
+| `CC-I01` | Fundament und Sicherheitsbasis | ADR-002, separates React-/Vite-Projektgrundgerüst, TCP-Readiness-Check, versionierter W1L-Contract für serverseitigen Passwort-/Session-/E-Mail-MFA-/Logout-Flow und Bootstrap-Admin; lokale TCC-Contract-UI-Suite (6 Tests), TCP-MySQL-Suite (11 Tests/65 Assertions), TCC-Build und Dependency-Audit ohne bekannte Vulnerabilities; Rollen, Recovery und Ziel-MFA verbleiben offen | Dogado-Laufzeit, Staging-Mailtransport, Rollen-/Recovery-/Ziel-MFA-Entscheidung | implemented |
+| `CC-I02` | Pools, TAG-Stammdaten und sichere Vergabe | Allocation-Pool-Verwaltung, Ranges, Gruppen, Control-Plane-gestützte lineare 6-/8-/10-stellige Vergabe, TAG-Lebenszyklus, Claim-/Vorabzuweisungs- und QR-/Druckvorbereitung | `W2L-BLK-AUTHZ`, für Reservierung zusätzlich `W2L-BLK-CODEC`, freigegebene Produkt-/Pool-/Claim-Defaults | blocked |
 | `CC-I03` | Routing-Projektion und Publishing | Feature-Schemas, Projektion, Outbox, idempotenter Publisher, Publish-Diff, Retry, Unpublish | Cloudflare-Token, Staging-KV-Namespace, Edge-Router-Vertrag | planned |
 | `CC-I04` | Öffentlicher Basis-Vault | veröffentlichte Basisinhalte, öffentliche Read-API, CORS/Cache/Rate-Limits, TAG-App-Adaptervertrag | API-Origin, TAG-App-Integration, Staging-Deployment | planned |
 | `CC-I05` | Produktklassen, Organisationen und POI | Produktpolicies, Organisationsrollen, POI-Onboarding, Nachweise, Review, Meldungen und Moderationsdefaults | verbindliche Produkt-, Retention- und POI-Entscheidungen | planned |
@@ -22,10 +22,10 @@
 | ID | Arbeitspaket | Iteration | Status | Abhängigkeit / erwartete Evidenz |
 | --- | --- | --- | --- | --- |
 | `CC-WP-01` | Architekturvertrag, Projektgrenzen und Konfigurationsmodell | CC-I01 | implemented | [ADR-002](../../../10-Architecture/ADR-002-ADMINISTRATION_BOOTSTRAP_AND_SECRET_BOUNDARIES.md), eigenständige TCC-Shell unter `apps/tag-control-center/`, keine browserseitige Secret- oder Deployment-Konfiguration |
-| `CC-WP-02` | Admin-Authentisierung, Rollen, Sessions, CSRF und Audit-Grundlage | CC-I01 | implemented | TCP-Web-Session, CSRF, Rate-Limits, Audit, Bootstrap-Admin und E-Mail-MFA mit TCC-Login/Logout sind lokal implementiert und getestet; Rollenverwaltung, Recovery, Passkey/TOTP, Re-Authentisierung und Staging-Mail-Evidenz bleiben offen |
+| `CC-WP-02` | Admin-Authentisierung, Rollen, Sessions, CSRF und Audit-Grundlage | CC-I01 | implemented | [`control-plane-admin-api-v1`](../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) beschreibt TCP-Web-Session, CSRF, Rate-Limits, Audit, Bootstrap-Admin und E-Mail-MFA mit TCC-Login/Logout. `npm run test:tcc` (6 Tests), `npm run build:tcc`, TCP `npm run local:test` (11 Tests/65 Assertions) und `npm audit --workspace=@myqr24/tag-control-center --omit=optional` (0 Vulnerabilities) sind am 2026-10-29 erfolgreich; Rollenverwaltung, Recovery, Passkey/TOTP, Re-Authentisierung und Staging-Mail-/Cookie-Evidenz bleiben offen |
 | `CC-WP-03` | Autoritatives MySQL-Kernschema und Migrationsstrategie | CC-I01 | planned | CC-TC-SCHEMA-*, Restore-/Migrationsevidenz |
-| `CC-WP-04` | Allocation-Pool-, Range-, Gruppen- und Feature-Verwaltung | CC-I02 | planned | CC-TC-POOL-*, CC-TC-RANGE-*, CC-TC-FEATURE-* |
-| `CC-WP-05` | Control-Plane-gestützte TAG-Vergabe und Lebenszyklusverwaltung | CC-I02 | planned | CC-TC-ALLOC-*, CC-TC-LIFECYCLE-* |
+| `CC-WP-04` | Allocation-Pool-, Range-, Gruppen- und Feature-Verwaltung | CC-I02 | blocked | [`control-plane-tag-management-api-v1`](../../10-Architecture/35-Contracts/control-plane-tag-management-api-v1.md) ist bis zur serverseitigen AuthZ-/Organisations-/Re-Auth-Matrix `blocked-contract`; keine TCC-Fachformulare davor |
+| `CC-WP-05` | Control-Plane-gestützte TAG-Vergabe und Lebenszyklusverwaltung | CC-I02 | blocked | zusätzlich zu `W2L-BLK-AUTHZ` fehlen ein sicherer TCP-Codec-Testadapter, kompatible Testvektoren sowie Timeout-/Rollback-/Idempotenznachweise; keine Reservierungs-UI oder `tagId`-Persistenz vorher |
 | `CC-WP-05A` | Claim-Strategie, Vorabzuweisung und Claim-Support-UX | CC-I02 | planned | CC-TC-CLAIM-*, CC-TC-PREASSIGN-*; keine Credential-/Hash-Fachlogik in der UI |
 | `CC-WP-06` | QR-Code- und Scan-URL-Vorbereitung für reservierte TAGs | CC-I02 | planned | kanonische URL-/QR-Daten ohne Druckfreigabe, Produktion, Range-Export oder Aktivierungswirkung |
 | `CC-WP-16` | Kontrollierter TCC-JSON-Druckexport für logische TAG-Ranges | CC-I07 | deferred | Berechtigungsprüfung, Anlegen eines persistenten Exportauftrags für eine `decodedValue`-Range, Download und erneuter Download eines unveränderlichen JSON-Snapshots mit Auftrags-ID, Datenminimierung, Ablauf und Audit. Der JSON-Snapshot enthält je TAG ID, kanonische Scan-URL, QR-Payload und – nur sofern der TAG nicht organisationsgebunden freigeschaltet ist – die zugehörige Claim-PIN. Keine PDF-/Label-Aufbereitung, Druckeransteuerung oder physische Ausgabe. |
@@ -47,7 +47,7 @@
 | Dokumentation | Control-Plane-Architektur, Fachregeln und ADR-002 für Administration, Bootstrap, MFA und Secret-Grenzen sind vorhanden | kein produktiver Admin- oder Secret-Konfigurationspfad |
 | Edge Router | Cloudflare-Worker-Code und Testbasis existieren | keine Verwaltungslogik oder Fachdaten im Worker/KV |
 | TAG-App | öffentlicher Fixture-MVP auf Cloudflare Pages existiert | keine autoritative API, keine Owner- oder Vault-Verwaltung |
-| Control Center | separate React-/Vite-Shell auf Port `5174`, Sicherheits-/Rollenübersicht, lokaler TCP-Readiness-Check sowie Passwort-Login, Session-Status, E-Mail-MFA und Logout über den same-origin Dev-Proxy `/tcp` | keine fachlichen TAG-/Publish-/Secret-Mutationen, keine Rollenverwaltung oder Recovery; produktive Origin-/CORS-/Cookie-Policy fehlt bewusst |
+| Control Center | separate React-/Vite-Shell auf Port `5174`, Sicherheits-/Rollenübersicht, lokaler TCP-Readiness-Check sowie Passwort-Login, Session-Status, E-Mail-MFA und Logout nach `control-plane-admin-api-v1` über den same-origin Dev-Proxy `/tcp`; jsdom-/Vitest-Contract-UI-Suite für Session, CSRF, Login, MFA, Logout, Readiness und Browserzustandsbereinigung | keine fachlichen TAG-/Publish-/Secret-Mutationen, keine Rollenverwaltung oder Recovery; produktive Origin-/CORS-/Cookie-Policy und Ziel-MFA bleiben bewusst offen |
 | Cloudflare-Publishing | als Zielprozess dokumentiert | keine Browser-Tokens, keine manuelle KV-Fachpflege |
 | Produktion | keine Control-Center-Produktivfreigabe | Staging-Abnahme ist zwingend vorgeschaltet |
 
@@ -57,11 +57,18 @@
 | --- | --- | --- | --- |
 | `CC-BLK-001` | CC-I01 | PHP-Version, Framework, Composer-Verfügbarkeit, MySQL-Version sowie Cron-/Queue-Möglichkeiten des Dogado-Hostings sind noch nicht verbindlich bestätigt. | Hosting-Matrix und gewählter technischer Stack sind dokumentiert und für Staging verfügbar. |
 | `CC-BLK-002` | CC-I01 | partially-resolved: Bootstrap-Admin, serverseitige Session, CSRF, Audit und übergangsweise E-Mail-MFA sind lokal implementiert und getestet. Passkey/TOTP, Recovery, Rollenverwaltung, Re-Authentisierung, produktiver Mail-Transport sowie Origin-/Cookie-Policy bleiben offen. | Ziel-Auth-/MFA-/Recovery-/Rollencontract, Mail-Provider und serverseitige Sicherheitsimplementierung sind gegen Staging getestet und freigegeben. |
-| `CC-BLK-003` | CC-I02 | Für reale TAG-Ausgabe müssen sichere serverseitige Feistel- und Claim-Credential-Integration, Produkt-/Pool-/Claim-Policies sowie Staging-Secrets verfügbar sein; diese dürfen nie in Fixtures liegen. | Staging-Secret-Prozess und versionierte Pool-/Claim-Policies sind freigegeben, Secrets sind serverseitig hinterlegt und die Ausgabelogik gegen Testvektoren geprüft. |
+| `CC-BLK-003` | CC-I02 | `W2L-BLK-CODEC`: Für jede Reservierung fehlen ein sicherer serverseitiger TCP-Codec-Testadapter, kompatible synthetische 6-/8-/10-stellige Testvektoren sowie Timeout-/Rollback-/Idempotenznachweise; echte Feistel-/Claim-Secrets bleiben außerhalb von Fixtures und Browsern. | Nicht versionierte serverseitige Testzugangsdaten, Adapter und Testvektoren sind vorhanden und der atomare Reservierungsablauf ist gegen Compose-MySQL nachgewiesen. |
+| `CC-BLK-008` | CC-I02 | `W2L-BLK-AUTHZ`: Für Range-, Pool-, Reservierungs- und Lifecycle-Commands fehlen die verbindliche serverseitige Rollen-/Policy-Matrix, Organisationsgrenzen und Re-Authentisierungsregeln. | Versionierte Policy-Matrix ist entschieden, in TCP als Guard implementiert und durch neutrale AuthZ-/Mandantengrenztests nachgewiesen. |
 | `CC-BLK-004` | CC-I03 | Der aktive Staging-Worker und sein tatsächlich gebundener `TAG_CONFIG`-Namespace müssen vor jeder echten KV-Änderung identifiziert werden. | Cloudflare-Ressourcenzuordnung, Least-Privilege-Token und Testnamespace sind dokumentiert. |
 | `CC-BLK-005` | CC-I04 | Die endgültige Origin der öffentlichen PHP-Read-API und die CORS-Allowlist für die TAG-App sind noch offen. | Staging-Origin, HTTPS/TLS, CORS-Policy, Rate-Limit- und Cache-Policy sind freigegeben. |
 | `CC-BLK-006` | CC-I05 | Laufzeiten, Quoten, Verlängerungsregeln, POI-Nachweisform, Retention und Moderations-SLAs sind noch Produktentscheidungen. | Versionierte Produktpolicy und rechtlich/operativ bestätigte POI- und Löschregeln liegen vor. |
 | `CC-BLK-007` | CC-I07 / `LOCAL-PRINT-TOOL` | JSON-Exportschema, Freigabe, logische Range-Auswahl, persistente Exportaufträge, Wiederausgabe, PIN-Verschlüsselung, QA, Nachdruck und Übergabe sind noch nicht als Produktionsprozess freigegeben. PDF-/Label-Vorlagenversion und lokale Aufbereitungsregeln sind getrennt festzulegen. Das lokale Tool verarbeitet ausschließlich einen freigegebenen JSON-Export ohne Autoritäts- oder Aktivierungswirkung. | Versionierte Export-/QA-/Übergabepolicy, TCC-/TCP-JSON-Exportcontract einschließlich PIN-Schutz- und Wiederausgaberegeln; für das lokale Tool zusätzlich ein konkret versioniertes Zweckform-Format und lokale Sicherheits-/Datenminimierungsprüfung. |
+
+## Nächster zulässiger Implementierungsschritt
+
+1. `W2L-BLK-AUTHZ` lösen: verbindliche serverseitige Rollen-/Policy-Matrix, Organisationsgrenzen und Re-Authentisierung für Range-, Pool-, Reservierungs- und Lifecycle-Commands entscheiden und im [`control-plane-tag-management-api-v1`](../../10-Architecture/35-Contracts/control-plane-tag-management-api-v1.md) fortschreiben.
+2. Für tatsächliche Reservierungen anschließend `W2L-BLK-CODEC` lösen: sicheren serverseitigen TCP-Codec-Testadapter, synthetische 6-/8-/10-stellige Testvektoren sowie Timeout-/Rollback-/Idempotenzregeln nachweisen.
+3. Bis dahin bleiben CC-WP-04/05 gesperrt; keine TCC-Fachformulare, keine Reservierungs-UI und keine `tagId`-Persistenz implementieren.
 
 ## Aktualisierungsregel
 

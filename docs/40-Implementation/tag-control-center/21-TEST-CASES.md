@@ -1,16 +1,18 @@
 # Testfälle: TAG Control Center
 
-**Planungsstand:** 2026-10-06  
-**Status:** Alle Testfälle sind geplant. Sie werden erst mit der jeweiligen Implementierung automatisiert oder als kontrollierter Staging-Test ausgeführt.
+**Letzte Aktualisierung:** 2026-10-28  
+**Status:** Der lokale W1L-Auth-/Session-Schnitt ist gegen [`control-plane-admin-api-v1`](../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) implementiert und nachgewiesen: TCP-MySQL-Integration (**11 Tests, 65 Assertions**), TCC-Contract-UI-Suite (**6 Tests**) und TCC-Build sind am 2026-10-29 erfolgreich. Die Ziel-MFA/Re-Authentisierung für privilegierte Fachcommands, Rollenverwaltung, Recovery und Staging bleiben geplant.
 
 ## CC-I01 – Fundament, Authentisierung und Audit
 
 | ID | Bezug | Testfall | Erwartetes Ergebnis | Ebene |
 | --- | --- | --- | --- | --- |
-| `CC-TC-AUTH-001` | CC-US-001 | Berechtigte Anmeldung und Logout | Sitzung entsteht und wird beim Logout serverseitig widerrufen bzw. ungültig | Integration |
-| `CC-TC-AUTH-002` | CC-US-001 | Nicht vorhandenes Konto, falsches Secret und gesperrter Zugang | Neutrale Fehlerantwort ohne Kontoexistenz- oder Detailleck | Security |
-| `CC-TC-AUTH-003` | CC-US-001 | Cookie-/CSRF-Eigenschaften | Session-Cookie ist sicher konfiguriert; fehlendes/ungültiges CSRF verhindert Mutation | Integration |
-| `CC-TC-AUTH-004` | CC-US-001 | MFA-/starke Authentisierung für Plattformadministrator | privilegierte Aktion wird ohne beschlossene starke Authentisierung verweigert | E2E |
+| `CC-TC-AUTH-001` | CC-US-001 | Berechtigte Anmeldung und Logout | Sitzung entsteht und wird beim Logout serverseitig widerrufen bzw. ungültig | Integration, lokal automatisiert |
+| `CC-TC-AUTH-002` | CC-US-001 | Nicht vorhandenes Konto, falsches Secret und gesperrter Zugang | Neutrale Fehlerantwort ohne Kontoexistenz- oder Detailleck | Security, lokal automatisiert |
+| `CC-TC-AUTH-003` | CC-US-001 | Cookie-/CSRF-Eigenschaften | TCC fordert vor jeder Mutation einen TCP-CSRF-Token an und übergibt ihn im Request; die finale HTTPS-/`Secure`-/`SameSite`-Cookie-Policy sowie eine echte Browser-Negativprobe bleiben Staging-Aufgaben | UI/Contract, lokal automatisiert; Staging offen |
+| `CC-TC-AUTH-004` | CC-US-001 | MFA-/starke Authentisierung für Plattformadministrator | privilegierte Aktion wird ohne beschlossene starke Authentisierung verweigert; Ziel-MFA/Re-Authentisierung bleibt offen | E2E, geplant |
+| `CC-TC-AUTH-005` | CC-US-001 | TCP meldet `mfa_required`, danach richtige oder falsche Codebestätigung | TCC bleibt bis zur bestätigten TCP-Antwort unauthentisiert, zeigt nur neutrale Fehler und übernimmt anschließend ausschließlich den serverseitigen Session-Status | UI/Contract, lokal automatisiert |
+| `CC-TC-AUTH-006` | CC-US-001 | Passwort-, MFA-Code-, CSRF- und Session-Leak-Prüfung im TCC-Browserkontext | Zugangsdaten und MFA-Code fehlen nach Request, Fehler, Abbruch und Logout in URL, Verlauf, Browser-Storage, TCC-Status und UI-Log; nur TCP verwaltet Session und Audit | UI/Security, lokal automatisiert |
 | `CC-TC-AUTHZ-001` | CC-US-002 | `content-editor` versucht Publishing | Anfrage wird serverseitig verweigert und auditiert | Integration |
 | `CC-TC-AUTHZ-002` | CC-US-002 | Mandanten-/Organisationsgrenze manipulieren | Zugriff auf fremdes Objekt wird neutral verweigert | Security |
 | `CC-TC-AUDIT-001` | CC-US-003 | TAG-Statusänderung | genau ein Audit-Ereignis mit Akteur, Objekt, Aktion und Korrelation entsteht | Integration |

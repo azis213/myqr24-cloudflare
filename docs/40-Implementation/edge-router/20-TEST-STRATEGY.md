@@ -25,7 +25,8 @@ Unit-Tests prüfen reine oder gezielt isolierte Funktionen:
 - Template-Placeholder-Prüfung und Rendering;
 - Prüfung des finalen Redirect-Ziels;
 - gemeinsame Feistel-Codec-Funktionen für Scan- und Codec-Worker;
-- private Codec-API für 6-, 8- und 10-stellige Encode-/Decode-Roundtrips.
+- private Codec-API für 6-, 8- und 10-stellige Encode-/Decode-Roundtrips;
+- nächste Codec-Welle: `codecVersion`, 1.000er-Batch-Encode, Body-Limits, Reihenfolgetreue und browserfreie Internal-API.
 
 ### 2. Worker-Integrationstests
 
@@ -45,11 +46,20 @@ Der private Codec-Worker wird unabhängig mit direkten `handleCodecRequest`-Aufr
 
 ### 3. Cloudflare-Staging-End-to-End-Tests
 
-Die private Staging-Route wird zusätzlich gegen den tatsächlich bereitgestellten Worker geprüft:
+Der bestehende Staging-Slice ist über die abzulösende Route erreichbar:
 
 ```text
 https://codec.s.myqr24.com/api/v1/tag-codec
 ```
+
+Die nächste kontrollierte Deployment-Welle migriert auf die symmetrische Internal-Grenze:
+
+```text
+https://internal.s.myqr24.com/api/v1/codec
+https://internal.p.myqr24.com/api/v1/codec
+```
+
+Bis zum erfolgreichen Routenwechsel bleibt die alte Route historische Betriebsreferenz; neue Batch- oder Browser-Annahmen dürfen daraus nicht abgeleitet werden.
 
 Diese Prüfungen sind bewusst keine Vitest-Fälle, weil sie DNS, TLS, die Cloudflare-Route und nicht auslesbare Runtime-Secrets voraussetzen. Sie verwenden einen lokal bereitgestellten Bearer-Key ausschließlich im Arbeitsspeicher; weder Secret-Werte noch erzeugte öffentliche TAG-IDs oder reale Kundendaten dürfen ausgegeben oder versioniert werden.
 
@@ -60,6 +70,14 @@ Nach jedem Deployment oder Secret-Wechsel werden mindestens geprüft:
 - autorisierter 6-stelliger Encode-/Decode-Roundtrip gegen den ursprünglichen kanonischen Eingabewert;
 - autorisierter 8-stelliger Encode-/Decode-Roundtrip gegen den ursprünglichen kanonischen Eingabewert;
 - autorisierter 10-stelliger Encode-/Decode-Roundtrip gegen den ursprünglichen kanonischen Eingabewert.
+
+Vor Abschluss der nächsten Codec-Welle werden zusätzlich geprüft:
+
+- die neue Staging-Internal-Route `internal.s.myqr24.com/api/v1/codec/*` mit denselben Auth-/Methoden-/No-CORS-Grenzen;
+- ein authentisierter `encode-batch`-Roundtrip mit genau 1.000 künstlichen Werten, geordneter Response und fester `codecVersion`;
+- neutraler Fehler für 0, mehr als 1.000, doppelte oder nichtkanonische Batch-Werte sowie für übergroße Bodies;
+- dass kein Browser-Origin, keine Browser-Session und keine SPA Zugriff auf den Internal-Codec oder einen dauerhaften Codec-Service-Key erhält;
+- die deaktivierte alte Route erst nach erfolgreichem neuen Internal-Route-, WAF-/Rate-Limit-/Access- und 6/8/10-Staging-Nachweis.
 
 Die Ausführung wird ohne sensitive Daten in [`../evidence/README.md`](../evidence/README.md) dokumentiert.
 
@@ -78,7 +96,8 @@ Für jede fail-closed Grenze existiert mindestens ein Negativtest:
 - relatives, `javascript:`- oder `data:`-Redirect-Ziel;
 - fehlender API-Key, unbekannter Codec-Pfad oder falsche HTTP-Methode;
 - ungültiger JSON-Body, nichtkanonischer Wert oder nicht unterstützte ID-Länge;
-- browserseitige CORS-Freigabe am privaten Codec-Endpunkt.
+- browserseitige CORS-Freigabe, Browser-Session oder Browser-Service-Key am privaten Codec-Endpunkt;
+- Batch mit 0, mehr als 1.000, doppelten oder nichtkanonischen Werten sowie Batch-Body oberhalb des Limits.
 
 ### 5. Deterministische Testvektoren
 

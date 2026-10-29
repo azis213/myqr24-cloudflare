@@ -16,7 +16,8 @@
 | WP-07 | Sichere Redirect-Templates | verified | TC-TEMPLATE-001 bis TC-TEMPLATE-006 |
 | WP-08 | JSON-Aktionsantwort und HTTP-Verhalten | verified | TC-RESPONSE-001 bis TC-RESPONSE-004 |
 | WP-09 | Fixtures, automatisierte Tests, Build und Evidenz | verified | `npm test`, `npm run build`, `npm run build:codec` |
-| WP-10 | Gemeinsamer Codec-Kern und privater Codec-Worker | implemented | lokale Codec-Tests und `npm run build:codec` grün; TC-CODEC-STAGING-001 bis TC-CODEC-STAGING-004 nach Neu-Deployment offen |
+| WP-10 | Gemeinsamer Codec-Kern und privater Codec-Worker | implemented | lokale Codec-Tests und `npm run build:codec` grün; bisheriger Einzel-Codec-Slice auf `codec.s.myqr24.com` implementiert |
+| WP-11 | Internal-Codec-API, Batch-Encoding und symmetrische Umgebungsrouten | planned | `internal.s.myqr24.com` / `internal.p.myqr24.com`, `/api/v1/codec/*`, `codecVersion`, Batch-Limit 1.000, TC-CODEC-006 bis 008 und TC-CODEC-STAGING-005 bis 006 |
 
 ## Verifizierter Implementierungsstand
 
@@ -32,10 +33,10 @@
 | Redirects | Ausschließlich `url` xor `urlTemplate`; Server-Placeholder-Allowlist und HTTP(S)-Prüfung |
 | Testdaten | Versionierte nicht geheime JSON-Fixture unter `test/fixtures/` plus dynamisch berechnete Testwerte |
 | Gemeinsamer Codec | `src/codec/index.ts` wird vom öffentlichen Scan-Worker und dem separaten privaten Codec-Worker importiert |
-| Codec-Worker | `POST /api/v1/tag-codec/encode` und `/decode`; Bearer-Authentisierung, keine KV-/Redirect-Secret-Bindung, keine CORS-Header |
-| Codec-Deployment | Separate `wrangler.codec.toml`; keine KV-/Redirect-Bindungen; aktive Cloudflare Custom Route `codec.s.myqr24.com/api/v1/*` |
-| Codec-Staging-Secrets | `FEISTEL_SECRET_S01` und `TAG_CODEC_API_KEY_S01` als nicht auslesbare Cloudflare-Staging-Secrets; keine Werte im Repository |
-| Codec-Staging-Live-Tests | Vorherige 6-/8-Stellen-Evidenz gehört zum abgelösten HMAC-Vertrag; erneuter Staging-Roundtrip für 6, 8 und 10 Stellen ist vor einem Deployment erforderlich |
+| Codec-Worker | bestehender Slice: `POST /api/v1/tag-codec/encode` und `/decode`; Bearer-Authentisierung, keine KV-/Redirect-Secret-Bindung, keine CORS-Header. Nächste Welle: `/api/v1/codec/encode`, `/encode-batch`, `/decode` mit `codecVersion` |
+| Codec-Deployment | Separate `wrangler.codec.toml`; keine KV-/Redirect-Bindungen; aktive abzulösende Custom Route `codec.s.myqr24.com/api/v1/*`. Geplant sind symmetrisch `internal.s.myqr24.com/api/v1/codec/*` und `internal.p.myqr24.com/api/v1/codec/*` |
+| Codec-Secrets | Staging: `FEISTEL_SECRET_S01` und `TAG_CODEC_API_KEY_S01`; Produktion: separate `FEISTEL_SECRET_P01` und `TAG_CODEC_API_KEY_P01`. Je Umgebung gilt ein Feistel-Secret pro Codec-Version für 6, 8 und 10 Stellen; keine Werte im Repository |
+| Codec-Staging-Live-Tests | Vorherige 6-/8-Stellen-Evidenz gehört zum abgelösten HMAC-Vertrag; vor WP-11-Deployment sind Internal-Host-Migration, 6/8/10-Roundtrips, `codecVersion`, 1.000er-Batch sowie WAF-/Rate-Limit-/Access-Grenzen nachzuweisen |
 | Ausführungsnachweis | Lokale Regressionen und Builds für den 6/8/10-Vertrag sind am 2026-10-27 in `../evidence/README.md` nachgewiesen |
 
 ## Story-Status

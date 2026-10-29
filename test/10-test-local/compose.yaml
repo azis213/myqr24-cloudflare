@@ -53,6 +53,17 @@ services:
       CACHE_STORE: file
       QUEUE_CONNECTION: sync
       SESSION_DRIVER: file
+      MAIL_MAILER: ${MAIL_MAILER:?Set MAIL_MAILER in .env.local}
+      MAIL_HOST: ${MAIL_HOST:?Set MAIL_HOST in .env.local}
+      MAIL_PORT: ${MAIL_PORT:?Set MAIL_PORT in .env.local}
+      MAIL_SCHEME: ${MAIL_SCHEME:?Set MAIL_SCHEME in .env.local}
+      MAIL_USERNAME: ${MAIL_USERNAME:?Set MAIL_USERNAME in .env.local}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?Set MAIL_PASSWORD in .env.local}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:?Set MAIL_FROM_ADDRESS in .env.local}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:?Set MAIL_FROM_NAME in .env.local}
+      TCP_BOOTSTRAP_ADMIN_EMAIL: ${TCP_BOOTSTRAP_ADMIN_EMAIL:?Set TCP_BOOTSTRAP_ADMIN_EMAIL in .env.local}
+      TCP_BOOTSTRAP_ADMIN_INITIAL_PASSWORD: ${TCP_BOOTSTRAP_ADMIN_INITIAL_PASSWORD:?Set TCP_BOOTSTRAP_ADMIN_INITIAL_PASSWORD in .env.local}
+      TCP_EMAIL_MFA_ENABLED: ${TCP_EMAIL_MFA_ENABLED:?Set TCP_EMAIL_MFA_ENABLED in .env.local}
     depends_on:
       mysql:
         condition: service_healthy

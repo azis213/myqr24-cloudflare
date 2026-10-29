@@ -17,5 +17,6 @@ mkdir -p \
   bootstrap/cache
 
 php artisan migrate --force --no-interaction
+php artisan tcp:bootstrap-platform-admin --no-interaction
 
 exec php artisan serve --host=0.0.0.0 --port=8000
