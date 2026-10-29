@@ -98,6 +98,28 @@ final class ApiAuthenticationController extends Controller
         ]);
     }
 
+    public function reauthenticateTagManagement(
+        Request $request,
+        AuthenticationService $authentication,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'max:1024'],
+        ]);
+
+        try {
+            $authentication->reauthenticateForTagManagement($request, $validated['password']);
+        } catch (RuntimeException) {
+            throw ValidationException::withMessages([
+                'password' => ['Die erneute Authentisierung ist ungültig.'],
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'reauthenticated',
+            'correlation_id' => $request->attributes->get('correlation_id'),
+        ]);
+    }
+
     public function logout(Request $request, AuthenticationService $authentication): JsonResponse
     {
         $authentication->logout($request);

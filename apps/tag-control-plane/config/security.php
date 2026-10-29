@@ -35,4 +35,18 @@ return [
         'max_attempts' => (int) env('TCP_EMAIL_MFA_MAX_ATTEMPTS', 5),
         'resend_cooldown_seconds' => (int) env('TCP_EMAIL_MFA_RESEND_COOLDOWN_SECONDS', 60),
     ],
+
+    /*
+    |----------------------------------------------------------------------
+    | W2L administrative re-authentication
+    |----------------------------------------------------------------------
+    |
+    | Critical tag-management commands require a recent password check in
+    | addition to the authenticated web session and CSRF protection.
+    |
+    */
+
+    'tag_management' => [
+        'reauth_ttl_seconds' => (int) env('TCP_TAG_MANAGEMENT_REAUTH_TTL_SECONDS', 900),
+    ],
 ];

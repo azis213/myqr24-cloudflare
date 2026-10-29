@@ -1,7 +1,7 @@
 # Control Plane TAG Management API v1
 
 **Version:** `v1`  
-**Status:** `blocked-contract`  
+**Status:** `in-progress-local-slice`  
 **Owner:** TAG Control Plane (TCP)  
 **Konsument:** TAG Control Center (TCC)  
 **Abhängiger Basisvertrag:** [`control-plane-admin-api-v1`](control-plane-admin-api-v1.md)  
@@ -25,33 +25,40 @@ Der Vertrag erweitert nicht die öffentliche Routing- oder Runtime-Datenebene. C
 
 ### 2.1 `W2L-BLK-AUTHZ` – serverseitige Rollen-/Policy-Matrix
 
-Die W1L-Authentisierung liefert lediglich die dargestellte Sessionrolle. Es gibt noch keine implementierte oder freigegebene serverseitige Rollenmatrix für Range-, Pool-, Reservierungs- und Lifecycle-Commands.
-
-Vor jedem schreibenden Endpunkt muss verbindlich festgelegt und implementiert werden:
+Die W2L-Baseline ist verbindlich entschieden und für Pool-Read sowie Reservierung lokal implementiert. Rollen aus TCC oder Session sind lediglich Hinweise; TCP lädt Benutzer, Organisationsrollen und Objektgrenzen serverseitig.
 
 | Commandklasse | erforderliche Rolle/Policy | Organisationsgrenze | Re-Authentisierung |
 | --- | --- | --- | --- |
-| Range anlegen/ändern/deaktivieren | **offen** | **offen** | **offen** |
-| Pool anlegen/ändern/deaktivieren | **offen** | **offen** | **offen** |
-| Reservierung | **offen** | **offen** | **offen** |
-| Statuswechsel/Sperrung | **offen** | **offen** | **offen** |
-| Listen/Detailqueries | **offen** | **offen** | **offen** |
+| Range anlegen/ändern/deaktivieren | `platform-admin` | plattformweit | immer |
+| Pool der Plattform verwalten | `platform-admin` | plattformweit | immer |
+| eigenen Organisationspool verwalten | `platform-admin` oder `organization-admin` | nur explizite `organization_user_roles`-Bindung | immer |
+| Reservierung | `platform-admin`, `organization-admin` oder `allocation-operator` | Plattformrolle oder explizit zugewiesener aktiver Organisationspool | immer |
+| `draft → pending-review` | Plattformrolle, Organisationsadmin oder zugewiesener Operator | nur eigener/zugewiesener Pool | nein |
+| `pending-review → ready-to-publish`, Sperrung, Ablauf, Archivierung | Plattformrolle oder Organisationsadmin | nur eigener Pool | immer |
+| `active` | in W2L gesperrt | – | – |
+| Listen/Detailqueries | Plattformrolle oder zugewiesene Organisationsrolle | ausschließlich sichtbare Pools, keine Fremdobjektlecks | nein |
 
-Bis dahin sind alle diese HTTP-Commands fail-closed und werden nicht implementiert. Eine UI-Ausblendung oder die aktuell sichtbare Sessionrolle ist keine Autorisierung.
+Re-Authentisierung ist eine serverseitige, an dieselbe Web-Session gebundene Passwortprüfung mit einem konfigurierten 15-Minuten-Fenster (`TCP_TAG_MANAGEMENT_REAUTH_TTL_SECONDS`, Default `900`). Fehlende, abgelaufene oder fremde Re-Authentisierung wird neutral als `403` behandelt und auditiert. Eine UI-Ausblendung oder die sichtbare Sessionrolle ersetzt diese Prüfung nie.
+
+Der bisher implementierte Slice umfasst `GET /pools`, `POST /pools/{poolId}/reservations` sowie `POST /api/v1/auth/tag-management/reauthenticate`. Range-/Pool-Mutationen und Lifecycle-HTTP-Commands bleiben bis zu ihren Validatoren und Tests fail-closed.
 
 ### 2.2 `W2L-BLK-CODEC` – öffentliche TAG-ID bei Reservierung
 
 Eine vollständige Reservierung benötigt den authentisierten Encode-Aufruf gemäß [`tag-codec-internal-v1`](tag-codec-internal-v1.md). TCP besitzt kein Feistel-Secret.
 
-Vor Implementierung des Reservierungscommands müssen verfügbar sein:
+Der lokale W2L-Slice verwendet ausschließlich den injizierten `TagCodecClient` mit `FakeTagCodecClient`. Der Fake enthält kein Feistel-Secret, führt keine Netzwerkaufrufe aus und liefert deterministische lowercase-Test-IDs mit `codecVersion: TEST-S01`. Er erlaubt nur 6, 8 und 10 Stellen sowie maximal 1.000 eindeutige Werte.
 
-- serverseitig hinterlegte, nicht versionierte lokale Testzugangsdaten für einen Fake-/Contract-Adapter;
-- kompatible, synthetische 6-/8-/10-stellige Encode-Testvektoren;
-- ein festgelegtes Timeout-/Fehler-/Retry-Verhalten des TCP-Codec-Adapters für `internal.[s|p].myqr24.com`;
-- kompatible Fake-/Contract-Vektoren mit `codecVersion` für 6, 8 und 10 Stellen;
-- ein Contract-Test, der beweist, dass eine fehlgeschlagene Codec-Wirkung keine persistente Reservierung hinterlässt und derselbe Idempotency-Key keine zweite fachliche Reservierung erzeugt.
+Die lokale Retry-Grenze ist:
 
-Range-, Pool- und Lifecycle-Domäne können nach Auflösung von `W2L-BLK-AUTHZ` ohne diesen Blocker implementiert werden. Der Reservierungscommand bleibt bis dahin gesperrt.
+1. TCP persistiert erst einen idempotenten Allocation-Job und `codec-pending`-Wertreservierungen mit Unique-Constraint auf `(length, decodedValue)`.
+2. Der zustandslose Fake-/spätere Internal-Codec darf für denselben Job wiederholt werden.
+3. Erfolgreicher Codec-Response, TAG-Mapping, Jobabschluss, Idempotenzantwort und Audit entstehen atomar.
+4. Ein Codec-Fehler hinterlässt keinen fertigen Browser-Erfolg und kein publizierbares Mapping, aber die jobgebundene `codec-pending`-Reservierung bleibt gegen Doppelvergabe erhalten.
+5. Derselbe Akteur, Command und Idempotency-Key mit abweichendem kanonischen Request liefert `409`; mit identischem Request dieselbe fachliche Antwort.
+
+Für den späteren `InternalHttpTagCodecClient` bleiben 3 Sekunden Gesamt-Timeout, kein synchroner automatischer HTTP-Retry, neutrale `503`-Fehler für Timeout/429/5xx/ungültige Antworten und ein ausschließlich fachlicher Retry über denselben Job verbindlich. Echte Internal-HTTP-Anbindung und kompatible 6-/8-/10-Feistel-Vektoren bleiben vor Staging offen.
+
+Range-, Pool- und Lifecycle-Domäne können nach Auflösung der jeweiligen AuthZ-/Validator-Gates schrittweise implementiert werden. Die lokale synthetische Reservierung ist implementiert; echte Internal-HTTP-Codec- und Staging-Reservierungen bleiben bis zu den beschriebenen Nachweisen gesperrt.
 
 ## 3. Kanonische Datenformate und ausgeschlossene Daten
 
@@ -189,14 +196,14 @@ Beispiel:
 
 Der Idempotenzschlüssel wird ausschließlich als Header `Idempotency-Key: 00000000-0000-4000-8000-000000000000` übertragen.
 
-Dieser Command bleibt wegen `W2L-BLK-CODEC` unimplementiert. Nach Auflösung gilt:
+Der lokale synthetische Command ist implementiert. Er gilt ausschließlich unter `FakeTagCodecClient` und ohne Staging-/Produktionswirkung:
 
 1. TCP autorisiert Pool, Status und Organisationskontext;
-2. TCP sperrt/ermittelt den nächsten freien linearen `decodedValue` einer aktiven Range;
-3. TCP ruft serverseitig den Codec auf;
-4. TCP persistiert atomar `tagId`, `length`, `decodedValue`, `codecVersion`, Range-/Poolkontext, Status und Audit;
-5. der gleiche Idempotency-Key liefert dieselbe fachliche Antwort und löst keine zweite Codec-Wirkung aus;
-6. ein Codec-/DB-/Auditfehler hinterlässt weder neue Reservierung noch einen unklaren teilreservierten Wert.
+2. TCP reserviert den nächsten freien linearen `decodedValue` einer aktiven Range als jobgebundenes `codec-pending`;
+3. TCP ruft ausschließlich serverseitig den injizierten Codec-Adapter auf;
+4. TCP persistiert nach erfolgreichem Response atomar `tagId`, `length`, `decodedValue`, `codecVersion`, Range-/Poolkontext, Status und Audit;
+5. der gleiche Idempotency-Key liefert dieselbe fachliche Antwort und löst keine zweite fachliche Vergabe aus;
+6. ein Codec-/DB-/Auditfehler hinterlässt keinen Browser-Erfolg und kein fertiges Mapping; die jobgebundene Wertreservierung bleibt gegen Doppelvergabe bestehen.
 
 ### 5.4 Batch-Reservierung und Codec-Chunking (nächste Welle)
 
@@ -254,17 +261,17 @@ draft -> pending-review -> ready-to-publish
 | W1L-Basis | `control-plane-admin-api-v1`; `apps/tag-control-plane/tests/Feature/AuthenticationFlowTest.php`; `apps/tag-control-center/src/App.test.tsx` |
 | Ranges | `CP-TC-RANGE-001` bis `CP-TC-RANGE-004`; `CC-TC-RANGE-001` bis `CC-TC-RANGE-004` |
 | Pools | `CP-TC-POOL-001` bis `CP-TC-POOL-004`; `CC-TC-POOL-001` bis `CC-TC-POOL-004` |
-| Reservierung | `CP-TC-ALLOC-001` bis `CP-TC-ALLOC-008`; `CC-TC-ALLOC-001` bis `CC-TC-ALLOC-005`; erst nach `W2L-BLK-CODEC` |
+| Reservierung | `CP-TC-ALLOC-001` bis `CP-TC-ALLOC-008`; lokale Fake-Codec-Reservierung in `apps/tag-control-plane/tests/Feature/TagManagementFlowTest.php`; TCC-Fachoberfläche und Internal-/Staging-Codec folgen |
 | Lifecycle | `CP-TC-LIFECYCLE-001` bis `CP-TC-LIFECYCLE-003`; `CC-TC-LIFECYCLE-001` bis `CC-TC-LIFECYCLE-002` |
 | Pflichtnachweise | MySQL-Integration, Parallelitäts-/Retry-/Negativtests, Audit-/Leak-Tests, TCC-Contract-Tests, Build und lokale Compose-Smoke-Tests |
 | Nicht in W2L | Cloudflare-Publish, echte Staging-TAGs, öffentliche APIs, Claiming, Druckexport, Feistel-Secrets oder Browserzugriff auf Codec |
 
 ## 8. Umsetzungsgate
 
-Dieser Vertrag ist absichtlich `blocked-contract`. Vor der ersten W2L-Implementierung müssen `W2L-BLK-AUTHZ` und für den jeweiligen Umfang `W2L-BLK-CODEC` entschieden werden.
+Dieser Vertrag ist während CP-I02 `in-progress`. Die W2L-Baseline für AuthZ und den lokalen Fake-Codec ist entschieden und lokal umgesetzt; verbleibende Teilcommands bleiben gezielt gesperrt.
 
-- Ohne `W2L-BLK-AUTHZ`: keine schreibenden Range-, Pool- oder Lifecycle-Endpunkte und keine TCC-Fachformulare.
-- Ohne `W2L-BLK-CODEC`: Range-/Pool-/Lifecycle-Domäne ist nach freigegebener AuthZ-Matrix möglich; Reservierung und jede Persistenz einer öffentlichen `tagId` sind verboten.
+- Ohne Range-/Pool-Validatoren: keine Range- oder Pool-Mutationsendpunkte und keine TCC-Fachformulare dafür.
+- Ohne echten Internal-HTTP-Codec: keine Staging-/Produktionsreservierung; TCP darf weiterhin kein Feistel-Secret besitzen.
 - Ohne Produkt-/Pooldefaults: keine reale Ausgabepolicy und keine Staging-/Produktionswirkung.
 
 Lokale Nachweise begründen nach einer späteren Implementierung höchstens `implemented`; `verified` benötigt weiterhin die dokumentierten Staging-Gates.

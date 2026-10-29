@@ -19,6 +19,7 @@ final class AuthenticationService
 {
     private const PENDING_USER_SESSION_KEY = 'tcp.pending_mfa_user_id';
     private const PENDING_CHALLENGE_SESSION_KEY = 'tcp.pending_mfa_challenge_id';
+    private const TAG_MANAGEMENT_REAUTH_SESSION_KEY = 'tcp.tag_management.reauthenticated_at';
 
     public function __construct(
         private readonly AuditService $auditService,
@@ -128,6 +129,47 @@ final class AuthenticationService
         });
 
         $this->clearPendingChallenge($request);
+    }
+
+    public function reauthenticateForTagManagement(Request $request, string $password): void
+    {
+        $user = Auth::guard('web')->user();
+
+        if (! $user instanceof User || ! Hash::check($password, $user->password)) {
+            if ($user instanceof User) {
+                $this->auditService->record(
+                    correlationId: $this->correlationId($request),
+                    actorType: 'user',
+                    actorId: $user->id,
+                    objectType: 'tag_management',
+                    objectId: $user->id,
+                    action: 'tag_management.reauthentication.rejected',
+                );
+            }
+
+            throw new RuntimeException('Invalid re-authentication.');
+        }
+
+        $request->session()->put(self::TAG_MANAGEMENT_REAUTH_SESSION_KEY, CarbonImmutable::now('UTC')->getTimestamp());
+
+        $this->auditService->record(
+            correlationId: $this->correlationId($request),
+            actorType: 'user',
+            actorId: $user->id,
+            objectType: 'tag_management',
+            objectId: $user->id,
+            action: 'tag_management.reauthentication.completed',
+        );
+    }
+
+    public function hasRecentTagManagementReauthentication(Request $request): bool
+    {
+        $reauthenticatedAt = $request->session()->get(self::TAG_MANAGEMENT_REAUTH_SESSION_KEY);
+
+        return is_int($reauthenticatedAt)
+            && $reauthenticatedAt >= CarbonImmutable::now('UTC')
+                ->subSeconds(config('security.tag_management.reauth_ttl_seconds'))
+                ->getTimestamp();
     }
 
     public function logout(Request $request): void

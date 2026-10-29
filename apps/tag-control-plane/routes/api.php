@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\ApiAuthenticationController;
+use App\Http\Controllers\TagManagementController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -12,7 +13,14 @@ Route::middleware(['web'])->prefix('v1/auth')->group(function (): void {
     Route::get('/session', [ApiAuthenticationController::class, 'status']);
     Route::post('/login', [ApiAuthenticationController::class, 'login'])->middleware('throttle:5,1');
     Route::post('/mfa/verify', [ApiAuthenticationController::class, 'verifyMfa'])->middleware('throttle:10,1');
+    Route::post('/tag-management/reauthenticate', [ApiAuthenticationController::class, 'reauthenticateTagManagement'])
+        ->middleware('throttle:5,1');
     Route::post('/logout', [ApiAuthenticationController::class, 'logout']);
+});
+
+Route::middleware(['web'])->prefix('v1/admin/tag-management')->group(function (): void {
+    Route::get('/pools', [TagManagementController::class, 'pools']);
+    Route::post('/pools/{poolId}/reservations', [TagManagementController::class, 'reserve']);
 });
 
 Route::prefix('v1')->group(function (): void {
