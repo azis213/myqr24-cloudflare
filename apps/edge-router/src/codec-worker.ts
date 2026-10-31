@@ -23,12 +23,19 @@ interface EncodeRequest {
   value: string;
 }
 
+interface EncodeBatchRequest {
+  length: TagLength;
+  values: string[];
+}
+
 interface DecodeRequest {
   tagId: string;
 }
 
 const API_PREFIX = "/api/v1/tag-codec/";
-const MAX_BODY_BYTES = 1_024;
+const MAX_BODY_BYTES = 262_144;
+const MAX_BATCH_VALUES = 1_000;
+const CODEC_VERSION = "S01";
 const JSON_CONTENT_TYPE = "application/json";
 
 function apiResponse(
@@ -110,6 +117,23 @@ function isEncodeRequest(value: unknown): value is EncodeRequest {
   return isTagLength(candidate.length) && parseDecimal(candidate.value) !== null;
 }
 
+function isEncodeBatchRequest(value: unknown): value is EncodeBatchRequest {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<EncodeBatchRequest>;
+
+  return (
+    isTagLength(candidate.length) &&
+    Array.isArray(candidate.values) &&
+    candidate.values.length > 0 &&
+    candidate.values.length <= MAX_BATCH_VALUES &&
+    candidate.values.every((entry) => parseDecimal(entry) !== null) &&
+    new Set(candidate.values).size === candidate.values.length
+  );
+}
+
 function isDecodeRequest(value: unknown): value is DecodeRequest {
   if (!value || typeof value !== "object") {
     return false;
@@ -175,8 +199,46 @@ async function handleEncode(
           length: body.length,
           value: encoded.decodedValue.toString(),
         },
+        codecVersion: CODEC_VERSION,
       })
     : apiError(500, "codec_unavailable");
+}
+
+async function handleEncodeBatch(
+  request: Request,
+  env: CodecEnv,
+): Promise<Response> {
+  const body = await readJsonBody(request);
+
+  if (!isEncodeBatchRequest(body)) {
+    return invalidRequest();
+  }
+
+  const values = body.values.map((entry) => parseDecimal(entry)!);
+
+  if (!values.every((value) => isCanonicalValue(value, body.length))) {
+    return invalidRequest();
+  }
+
+  const tags = await Promise.all(
+    values.map(async (value) => {
+      const encoded = await encodeTagId(value, body.length, env);
+
+      if (!encoded) {
+        throw new Error("codec unavailable");
+      }
+
+      return {
+        id: encoded.tagId,
+        length: body.length,
+        value: encoded.decodedValue.toString(),
+      };
+    }),
+  ).catch(() => null);
+
+  return tags === null
+    ? apiError(500, "codec_unavailable")
+    : apiResponse({ tags, codecVersion: CODEC_VERSION });
 }
 
 async function handleDecode(
@@ -203,6 +265,7 @@ async function handleDecode(
           length: tagId.length,
           value: decodedValue.toString(),
         },
+        codecVersion: CODEC_VERSION,
       });
 }
 
@@ -212,7 +275,11 @@ export const handleCodecRequest: ExportedHandlerFetchHandler<CodecEnv> = async (
 ): Promise<Response> => {
   const pathname = new URL(request.url).pathname;
 
-  if (pathname !== `${API_PREFIX}encode` && pathname !== `${API_PREFIX}decode`) {
+  if (
+    pathname !== `${API_PREFIX}encode` &&
+    pathname !== `${API_PREFIX}encode-batch` &&
+    pathname !== `${API_PREFIX}decode`
+  ) {
     return apiError(404, "not_found");
   }
 
@@ -224,8 +291,12 @@ export const handleCodecRequest: ExportedHandlerFetchHandler<CodecEnv> = async (
     return unauthorized();
   }
 
-  return pathname === `${API_PREFIX}encode`
-    ? handleEncode(request, env)
+  if (pathname === `${API_PREFIX}encode`) {
+    return handleEncode(request, env);
+  }
+
+  return pathname === `${API_PREFIX}encode-batch`
+    ? handleEncodeBatch(request, env)
     : handleDecode(request, env);
 };
 

@@ -1,7 +1,7 @@
 # W2L – Freigabegate: Internal TAG Codec für die Control Plane
 
 **Stand:** 2026-10-31  
-**Status:** `blocked` – externe Betriebsfreigaben und Worker-Contract-Übereinstimmung fehlen  
+**Status:** `blocked` – externe Betriebsfreigaben fehlen
 **Geltungsbereich:** ausschließlich die spätere serverseitige Staging-Bindung von TCP an `codec.s.myqr24.com`; keine KV-, Scan-Worker-, TCC- oder Produktionsänderung.
 
 ## 1. Ausgangspunkt
@@ -20,7 +20,7 @@ Er verlangt einen festen 3-Sekunden-Gesamt-Timeout und normalisiert Transport-, 
 
 ## 2. Aktueller Blocker
 
-Der Vertrag [`tag-codec-internal-v1`](../../../10-Architecture/35-Contracts/tag-codec-internal-v1.md) dokumentiert für den aktuell bereitgestellten Codec-Worker noch Einzelencode/-decode und schließt Batch-Encoding sowie `codecVersion` im Response explizit aus. Die spätere TCP-Adaptererwartung kann daher nicht gegen die bekannte Staging-Route aktiviert werden.
+Der lokale Codec-Worker implementiert und testet jetzt den Batchvertrag. Die bekannte Staging-Route darf trotzdem noch nicht von TCP verwendet werden, weil die erforderlichen serverseitigen Secret-, Route-, WAF-/Rate-Limit-/Access- und Dogado-Betriebsnachweise fehlen.
 
 Zusätzlich fehlen redigierte Betriebsnachweise für:
 
@@ -36,8 +36,8 @@ Bis zur vollständigen Freigabe bleibt `CP-BLK-003` `partially-resolved` und TCP
 
 Alle folgenden Nachweise müssen vor einer Binding-Änderung vorliegen:
 
-- [ ] Codec-Worker implementiert und testet `POST /api/v1/codec/encode-batch` mit maximal 1.000 eindeutigen kanonischen 6-/8-/10-Werten sowie fester `codecVersion` im Response.
-- [ ] Worker liefert für Schema-, Auth-, Größen- und Duplikatfehler neutrale Fehler gemäß `tag-codec-internal-v1`; keine CORS-Freigabe.
+- [x] Codec-Worker implementiert und testet `POST /api/v1/tag-codec/encode-batch` mit maximal 1.000 eindeutigen kanonischen 6-/8-/10-Werten sowie fester `codecVersion` im Response; lokale Wrangler-Simulation erfolgreich.
+- [x] Worker liefert für Schema-, Auth-, Größen- und Duplikatfehler neutrale Fehler gemäß `tag-codec-internal-v1`; keine CORS-Freigabe.
 - [ ] Gemeinsame, nicht geheime Staging-Testvektoren für TCP-Adapter und Codec-Worker sind dokumentiert; Feistel-Secrets bleiben ausschließlich im Worker-Secret-Store.
 - [ ] TCP-Staging besitzt einen geschützten, nicht versionierten Secret-Pfad für `TCP_TAG_CODEC_BASE_URL` und `TCP_TAG_CODEC_API_KEY`; TCC, TAG-App und Browser erhalten keinen Zugriff.
 - [ ] Die API-Key-Kopie ist von Feistel- und Publisher-Secrets getrennt; Staging und Production verwenden getrennte Keyversionen.

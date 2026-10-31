@@ -23,7 +23,7 @@ final class InternalHttpTagCodecClientTest extends TestCase
     {
         Http::preventStrayRequests();
         Http::fake([
-            'https://codec.example.invalid/api/v1/codec/encode-batch' => Http::response([
+            'https://codec.example.invalid/api/v1/tag-codec/encode-batch' => Http::response([
                 'codecVersion' => 'S01',
                 'tags' => [['id' => '20980d', 'length' => 6, 'value' => '60466176']],
             ]),
@@ -33,7 +33,7 @@ final class InternalHttpTagCodecClientTest extends TestCase
 
         self::assertSame([['id' => '20980d', 'length' => 6, 'value' => '60466176', 'codecVersion' => 'S01']], $result);
         Http::assertSent(function (Request $request): bool {
-            return $request->url() === 'https://codec.example.invalid/api/v1/codec/encode-batch'
+            return $request->url() === 'https://codec.example.invalid/api/v1/tag-codec/encode-batch'
                 && $request->method() === 'POST'
                 && $request->hasHeader('Authorization', 'Bearer synthetic-server-only-key')
                 && $request->data() === ['length' => 6, 'values' => ['60466176']];

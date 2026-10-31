@@ -69,6 +69,20 @@ type LifecycleState =
   | { kind: "completed"; tagId: string; status: string }
   | { kind: "error"; tagId: string; message: string };
 
+type ManagedTag = {
+  tagId: string;
+  status: string;
+  length: number;
+  codecVersion: string | null;
+  createdAt: string | null;
+};
+
+type TagListState =
+  | { kind: "idle" }
+  | { kind: "loading"; poolId: string }
+  | { kind: "loaded"; poolId: string; tags: ManagedTag[] }
+  | { kind: "error"; poolId: string; message: string };
+
 const tcpBaseUrl = (import.meta.env.VITE_TCP_BASE_URL ?? "/tcp").replace(/\/$/, "");
 
 const futureModules = [
@@ -192,6 +206,7 @@ export function App() {
   const [reservationIdempotencyKey, setReservationIdempotencyKey] = useState<string | null>(null);
   const [reservation, setReservation] = useState<ReservationState>({ kind: "idle" });
   const [lifecycle, setLifecycle] = useState<LifecycleState>({ kind: "idle" });
+  const [managedTags, setManagedTags] = useState<TagListState>({ kind: "idle" });
 
   useEffect(() => {
     void loadSession();
@@ -449,6 +464,40 @@ export function App() {
       setRanges({ kind: "loaded", ranges: loadedRanges });
     } catch {
       setRanges({ kind: "error", message: `Keine Verbindung zu ${tcpBaseUrl}.` });
+    }
+  }
+
+  async function loadTags(poolId: string) {
+    setManagedTags({ kind: "loading", poolId });
+
+    try {
+      const response = await fetch(`${tcpBaseUrl}/api/v1/admin/tag-management/pools/${encodeURIComponent(poolId)}/tags`, {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const payload = await readJson(response);
+
+      if (!response.ok || !isRecord(payload) || !Array.isArray(payload.tags)) {
+        setManagedTags({ kind: "error", poolId, message: errorMessage(payload, "Die TAG-Liste konnte nicht geladen werden.") });
+        return;
+      }
+
+      const tags = payload.tags.flatMap((value): ManagedTag[] => {
+        if (!isRecord(value) || typeof value.tagId !== "string" || typeof value.status !== "string" || typeof value.length !== "number") {
+          return [];
+        }
+
+        return [{
+          tagId: value.tagId,
+          status: value.status,
+          length: value.length,
+          codecVersion: typeof value.codecVersion === "string" ? value.codecVersion : null,
+          createdAt: typeof value.createdAt === "string" ? value.createdAt : null,
+        }];
+      });
+      setManagedTags({ kind: "loaded", poolId, tags });
+    } catch {
+      setManagedTags({ kind: "error", poolId, message: `Keine Verbindung zu ${tcpBaseUrl}.` });
     }
   }
 
@@ -718,6 +767,7 @@ export function App() {
       setSelectedPoolId(null);
       setReservationIdempotencyKey(null);
       setReservation({ kind: "idle" });
+      setManagedTags({ kind: "idle" });
       setLifecycle({ kind: "idle" });
       setAuth({ kind: "signed_out" });
     }
@@ -1014,6 +1064,9 @@ export function App() {
                     >
                       Reservierung vorbereiten
                     </button>
+                    <button type="button" className="secondary-action" onClick={() => void loadTags(pool.poolId)}>
+                      Persistierte TAGs laden
+                    </button>
                     {reservation.kind !== "idle" && reservation.poolId === pool.poolId ? (
                       <p className={reservation.kind === "error" ? "error-message" : "success-message"}>
                         {reservation.kind === "submitting"
@@ -1044,6 +1097,21 @@ export function App() {
               <p className="success-message">
                 {reservation.tags.length} TAG(s) reserviert. Job: {reservation.jobId}
               </p>
+            ) : null}
+            {managedTags.kind === "error" ? <p className="error-message" role="alert">{managedTags.message}</p> : null}
+            {managedTags.kind === "loaded" ? (
+              <div className="module-grid" aria-label="Persistierte TAGs des Pools">
+                {managedTags.tags.length === 0 ? <p>Dieser Pool enthält noch keine persistierten TAGs.</p> : managedTags.tags.map((tag) => (
+                  <article className="module-card" key={tag.tagId}>
+                    <h3>TAG <code>{tag.tagId}</code></h3>
+                    <p>Status: <code>{lifecycle.kind === "completed" && lifecycle.tagId === tag.tagId ? lifecycle.status : tag.status}</code></p>
+                    <p>Länge: <code>{tag.length}</code>{tag.codecVersion === null ? "" : <> · Codec: <code>{tag.codecVersion}</code></>}</p>
+                    {tag.status === "draft" ? <button type="button" className="secondary-action" onClick={() => void transitionTag(tag.tagId, "pending-review")}>Zur Prüfung einreichen</button> : null}
+                    {tag.status === "pending-review" ? <button type="button" className="secondary-action" disabled={reauthentication.kind !== "ready"} onClick={() => void transitionTag(tag.tagId, "ready-to-publish")}>Für Veröffentlichung freigeben</button> : null}
+                    {lifecycle.kind === "error" && lifecycle.tagId === tag.tagId ? <p className="error-message" role="alert">{lifecycle.message}</p> : null}
+                  </article>
+                ))}
+              </div>
             ) : null}
             {reservation.kind === "completed" ? (
               <div className="module-grid" aria-label="Lokale Lifecycle-Übergänge">

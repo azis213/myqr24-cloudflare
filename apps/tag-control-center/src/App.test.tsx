@@ -299,6 +299,26 @@ describe("TAG Control Center admin auth contract", () => {
     expect(await screen.findByText("Kritische Aktion freigeben")).toBeVisible();
   });
 
+  it("loads persisted tags only for the selected TCP-confirmed pool and offers the server-confirmed lifecycle command", async () => {
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse(true))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { pools: [{ poolId: "demo-pool", length: 6, active: true, rangeIds: ["range-001"] }], correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { tags: [{ tagId: "abcdef", status: "draft", length: 6, codecVersion: "TEST-S01", createdAt: "2026-10-31T00:00:00.000000Z" }], correlation_id: correlationId } }));
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("admin@example.test");
+    await user.click(screen.getByRole("button", { name: "Sichtbare Pools laden" }));
+    await user.click(await screen.findByRole("button", { name: "Persistierte TAGs laden" }));
+
+    expect(await screen.findByText("abcdef")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Zur Prüfung einreichen" })).toBeVisible();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/tcp/api/v1/admin/tag-management/pools/demo-pool/tags",
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+
   it("submits range configuration only through the CSRF-protected TCP command", async () => {
     fetchMock
       .mockResolvedValueOnce(sessionResponse(true))

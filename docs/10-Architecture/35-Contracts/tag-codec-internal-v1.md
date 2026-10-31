@@ -5,7 +5,7 @@
 **Owner:** Cloudflare TAG Codec Worker  
 **Implementierende Komponenten:** Cloudflare TAG Codec Worker (`apps/edge-router/src/codec-worker.ts`); spätere serverseitige TAG Control Plane  
 **Stand:** 2026-10-29  
-**Nächste spezifizierte Welle:** Internal-API-Umzug und Batch-Encoding; noch nicht implementiert oder deployt.
+**Nächste spezifizierte Welle:** serverseitige TCP-Staging-Bindung nach separatem Betriebsfreigabegate; kein Browserzugriff.
 
 ## 1. Zweck und fachliche Grenze
 
@@ -25,7 +25,7 @@ Der Codec-Worker ist keine fachliche Autorität und reserviert, veröffentlicht,
 
 ## 2. Implementierter Staging-Slice und Ausschlüsse
 
-Der implementierte Slice umfasst einzelne Encode- und Decode-Operationen. Er bietet ausdrücklich nicht:
+Der lokal getestete Worker-Slice umfasst einzelne Encode-/Decode-Operationen sowie Batch-Encoding. Er bietet ausdrücklich nicht:
 
 - keinen öffentlichen, Browser-, TAG-App-, Control-Center- oder TAG-Lab-Endpunkt;
 - keine Range-Reservierung, Datenbankmutation oder KV-Projektion;
@@ -33,7 +33,6 @@ Der implementierte Slice umfasst einzelne Encode- und Decode-Operationen. Er bie
 - keine CORS-Freigabe;
 - keine Ausgabe von Feistel-, Redirect- oder Publisher-Secrets;
 - keine Worker-seitige Idempotenzspeicherung oder fachliche Batch-Reservierung;
-- noch kein implementiertes Batch-Encoding und noch kein `codecVersion`-Responsefeld;
 - kein im Worker implementiertes Rate Limit, IP-Allowlisting oder Cloudflare Access.
 
 Diese aufgeschobenen Betriebs- und Batch-Funktionen bleiben Teil von `CP-BLK-005` und sind vor einer produktiven oder breiter erreichbaren Route verbindlich zu ergänzen. Die Cloudflare-Routenbindung, WAF-/Rate-Limit-Regeln und optionale Access-/IP-Regeln sind daher absichtlich nicht in `wrangler.codec.toml` hinterlegt.
@@ -131,10 +130,10 @@ Erfolgsantwort:
 
 `tag.id` ist lowercase Base36 und exakt `length` Zeichen lang. `tag.value` entspricht für jede Länge unverändert dem vollständigen kanonischen Eingabewert.
 
-### 5.2 Batch-Encode (nächste Welle)
+### 5.2 Batch-Encode
 
 ```http
-POST /api/v1/codec/encode-batch
+POST /api/v1/tag-codec/encode-batch
 ```
 
 ```json

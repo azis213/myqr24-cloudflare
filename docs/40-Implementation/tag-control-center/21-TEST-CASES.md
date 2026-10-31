@@ -44,6 +44,7 @@
 | `CC-TC-ALLOC-006` | CC-US-011 | sichtbare Poolliste im angemeldeten TCC | TCC lädt ausschließlich den TCP-Response; keine lokale Pool-, Range- oder Organisationsautorität und keine fremden Objektinformationen | UI/Contract, lokal automatisiert |
 | `CC-TC-ALLOC-007` | CC-US-011 | Reservierung aus aktivem ausgewählten Pool | TCC verlangt frische Passwort-Re-Authentisierung, CSRF und Idempotency-Key; Browser sendet ausschließlich Menge und erhält nur serverbestätigte Job-/Mengeninformation | UI/Contract, lokal automatisiert |
 | `CC-TC-ALLOC-008` | CC-US-011 | Re-Auth-/Reservierungsfehler | TCP-Ablehnung bleibt neutral sichtbar; Passwort wird nach Request aus TCC-Zustand entfernt, Browser besitzt keinen Codec-Service-Key oder Feistel-Secret | UI/Security, lokal automatisiert |
+| `CC-TC-ALLOC-009` | CC-US-011 / CC-US-010 | Persistierte TAGs eines TCP-sichtbaren Pools laden | TCC zeigt nur TCP-bestätigte TAG-ID, Status, Länge und Codec-Version; fremde Pools bleiben serverseitig verborgen; Lifecycle-Command bleibt TCP-autorisiert | UI/Contract und MySQL-Integration, lokal automatisiert |
 | `CC-TC-LIFECYCLE-001` | CC-US-010 / CC-US-013 | Erlaubter Ablauf `draft → pending-review → ready-to-publish` | Statuswechsel ist mit korrekter Rolle möglich und auditiert | Integration |
 | `CC-TC-LIFECYCLE-002` | CC-US-013 | Ungültiger Statussprung, etwa `draft → active` | Statuswechsel wird verweigert | Unit |
 | `CC-TC-PRINT-001` | CC-US-014 | Staging-QR-Daten erzeugen | kanonische Staging-URL ohne Secrets, klar als Staging markiert | Unit |

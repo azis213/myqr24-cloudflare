@@ -12,7 +12,7 @@ const env: CodecEnv = {
 };
 
 function request(
-  endpoint: "encode" | "decode",
+  endpoint: "encode" | "encode-batch" | "decode",
   body: unknown,
   init: RequestInit = {},
 ): Request {
@@ -120,6 +120,23 @@ describe("private TAG codec API", () => {
     });
   });
 
+  it("TC-CODEC-005 encodes ordered canonical batches with a fixed codec version", async () => {
+    for (const length of [6, 8, 10] as const) {
+      const first = base36LowerBound(length);
+      const values = [first.toString(), (first + 1n).toString()];
+      const response = await call(request("encode-batch", { length, values }));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        codecVersion: "S01",
+        tags: [
+          { length, value: values[0] },
+          { length, value: values[1] },
+        ],
+      });
+    }
+  });
+
   it("TC-CODEC-004 fails closed for unknown paths, methods and missing credentials", async () => {
     const unknown = await call(
       new Request("https://codec.s.myqr24.com/api/v1/tag-codec/unknown"),
@@ -163,6 +180,20 @@ describe("private TAG codec API", () => {
       await expect(response.json()).resolves.toEqual({
         error: { code: "invalid_request" },
       });
+    }
+  });
+
+  it("TC-CODEC-006 rejects duplicate, empty and noncanonical batches without a partial result", async () => {
+    const first = base36LowerBound(6).toString();
+    const responses = await Promise.all([
+      call(request("encode-batch", { length: 6, values: [] })),
+      call(request("encode-batch", { length: 6, values: [first, first] })),
+      call(request("encode-batch", { length: 6, values: [first, "1"] })),
+    ]);
+
+    for (const response of responses) {
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: { code: "invalid_request" } });
     }
   });
 });

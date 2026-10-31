@@ -130,6 +130,33 @@ final class TagManagementController extends Controller
         ]);
     }
 
+    public function tags(Request $request, string $poolId, TagManagementAuthorizer $authorizer): JsonResponse
+    {
+        $user = $this->user();
+        $pool = AllocationPool::query()->where('pool_id', $poolId)->first();
+
+        if ($pool === null || ! $authorizer->canReadPool($user, $pool)) {
+            return $this->forbidden($request);
+        }
+
+        return response()->json([
+            'tags' => TagAllocation::query()
+                ->where('pool_id', $pool->id)
+                ->whereNotNull('tag_id')
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(static fn (TagAllocation $allocation): array => [
+                    'tagId' => $allocation->tag_id,
+                    'status' => $allocation->status,
+                    'length' => $allocation->length,
+                    'codecVersion' => $allocation->codec_version,
+                    'createdAt' => $allocation->created_at?->toISOString(),
+                ])
+                ->values(),
+            'correlation_id' => $request->attributes->get('correlation_id'),
+        ]);
+    }
+
     public function createPool(
         Request $request,
         TagManagementAuthorizer $authorizer,

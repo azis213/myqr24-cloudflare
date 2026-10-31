@@ -127,6 +127,13 @@ final class TagManagementFlowTest extends TestCase
         ], [
             'Idempotency-Key' => '00000000-0000-4000-8000-000000000004',
         ])->assertCreated();
+
+        $this->getJson('/api/v1/admin/tag-management/pools/assigned-pool/tags')
+            ->assertOk()
+            ->assertJsonPath('tags.0.status', 'draft')
+            ->assertJsonMissing(['decodedValue' => '60466176']);
+        $this->getJson("/api/v1/admin/tag-management/pools/{$otherPool->pool_id}/tags")
+            ->assertForbidden();
     }
 
     public function test_codec_failure_keeps_the_job_reserved_and_the_same_idempotency_request_resumes_without_duplicate_allocations(): void
