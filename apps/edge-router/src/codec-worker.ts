@@ -32,8 +32,9 @@ interface DecodeRequest {
   tagId: string;
 }
 
-const API_PREFIX = "/api/v1/tag-codec/";
-const MAX_BODY_BYTES = 262_144;
+const API_PREFIX = "/api/v1/codec/";
+const MAX_SINGLE_BODY_BYTES = 1_024;
+const MAX_BATCH_BODY_BYTES = 262_144;
 const MAX_BATCH_VALUES = 1_000;
 const CODEC_VERSION = "S01";
 const JSON_CONTENT_TYPE = "application/json";
@@ -147,7 +148,10 @@ function isDecodeRequest(value: unknown): value is DecodeRequest {
   );
 }
 
-async function readJsonBody(request: Request): Promise<unknown | null> {
+async function readJsonBody(
+  request: Request,
+  maxBodyBytes: number,
+): Promise<unknown | null> {
   const contentLength = request.headers.get("content-length");
 
   if (
@@ -156,14 +160,14 @@ async function readJsonBody(request: Request): Promise<unknown | null> {
       ?.toLowerCase()
       .startsWith(JSON_CONTENT_TYPE) ||
     (contentLength !== null &&
-      (!/^\d+$/.test(contentLength) || Number(contentLength) > MAX_BODY_BYTES))
+      (!/^\d+$/.test(contentLength) || Number(contentLength) > maxBodyBytes))
   ) {
     return null;
   }
 
   const body = await request.text();
 
-  if (new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES) {
+  if (new TextEncoder().encode(body).byteLength > maxBodyBytes) {
     return null;
   }
 
@@ -178,7 +182,7 @@ async function handleEncode(
   request: Request,
   env: CodecEnv,
 ): Promise<Response> {
-  const body = await readJsonBody(request);
+  const body = await readJsonBody(request, MAX_SINGLE_BODY_BYTES);
 
   if (!isEncodeRequest(body)) {
     return invalidRequest();
@@ -208,7 +212,7 @@ async function handleEncodeBatch(
   request: Request,
   env: CodecEnv,
 ): Promise<Response> {
-  const body = await readJsonBody(request);
+  const body = await readJsonBody(request, MAX_BATCH_BODY_BYTES);
 
   if (!isEncodeBatchRequest(body)) {
     return invalidRequest();
@@ -245,7 +249,7 @@ async function handleDecode(
   request: Request,
   env: CodecEnv,
 ): Promise<Response> {
-  const body = await readJsonBody(request);
+  const body = await readJsonBody(request, MAX_SINGLE_BODY_BYTES);
 
   if (!isDecodeRequest(body)) {
     return invalidRequest();

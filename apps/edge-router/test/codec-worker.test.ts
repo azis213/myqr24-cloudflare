@@ -17,7 +17,7 @@ function request(
   init: RequestInit = {},
 ): Request {
   return new Request(
-    `https://codec.s.myqr24.com/api/v1/tag-codec/${endpoint}`,
+    `http://127.0.0.1:8788/api/v1/codec/${endpoint}`,
     {
       body: JSON.stringify(body),
       headers: {
@@ -139,10 +139,10 @@ describe("private TAG codec API", () => {
 
   it("TC-CODEC-004 fails closed for unknown paths, methods and missing credentials", async () => {
     const unknown = await call(
-      new Request("https://codec.s.myqr24.com/api/v1/tag-codec/unknown"),
+      new Request("http://127.0.0.1:8788/api/v1/codec/unknown"),
     );
     const get = await call(
-      new Request("https://codec.s.myqr24.com/api/v1/tag-codec/encode"),
+      new Request("http://127.0.0.1:8788/api/v1/codec/encode"),
     );
     const unauthorizedRequest = request(
       "encode",
@@ -195,5 +195,25 @@ describe("private TAG codec API", () => {
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toEqual({ error: { code: "invalid_request" } });
     }
+  });
+
+  it("TC-CODEC-006 enforces separate single and batch body limits", async () => {
+    const oversizedSingle = await call(
+      request("encode", {
+        length: 6,
+        value: base36LowerBound(6).toString(),
+        padding: "x".repeat(1_024),
+      }),
+    );
+    const batchWithinLimit = await call(
+      request("encode-batch", {
+        length: 6,
+        values: [base36LowerBound(6).toString()],
+        padding: "x".repeat(2_000),
+      }),
+    );
+
+    expect(oversizedSingle.status).toBe(400);
+    expect(batchWithinLimit.status).toBe(200);
   });
 });

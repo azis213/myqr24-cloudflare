@@ -46,7 +46,7 @@ Der implementierte lokale Slice umfasst `GET /ranges`, `POST /ranges`, `GET /poo
 
 Eine vollständige Reservierung benötigt den authentisierten Encode-Aufruf gemäß [`tag-codec-internal-v1`](tag-codec-internal-v1.md). TCP besitzt kein Feistel-Secret.
 
-Der lokale W2L-Slice verwendet ausschließlich den injizierten `TagCodecClient` mit `FakeTagCodecClient`. Der Fake enthält kein Feistel-Secret, führt keine Netzwerkaufrufe aus und liefert deterministische lowercase-Test-IDs mit `codecVersion: TEST-S01`. Er erlaubt nur 6, 8 und 10 Stellen sowie maximal 1.000 eindeutige Werte.
+Der lokale W2L-Slice verwendet einen injizierten `TagCodecClient`. Der `FakeTagCodecClient` bleibt der deterministische Standard ohne Feistel-Secret und ohne Netzwerkaufruf; er liefert lowercase-Test-IDs mit `codecVersion: TEST-S01`. Für die lokale End-to-End-Integration darf TCP explizit `TCP_TAG_CODEC_DRIVER=http` setzen und ausschließlich den auf `127.0.0.1` gebundenen Wrangler-Private-Worker mit synthetischen ignorierten Werten ansprechen. Beide Adapter erlauben nur 6, 8 und 10 Stellen sowie maximal 1.000 eindeutige Werte. TCC erhält weder Codec-URL noch Service-Key.
 
 Die synthetischen, nicht geheimen Contract-Vektoren des lokalen Fakes sind festgelegt:
 
@@ -68,7 +68,7 @@ Die lokale Retry-Grenze ist:
 
 Der lokale Resume-Nachweis verwendet einen kontrolliert einmal fehlschlagenden, injizierten Testadapter: Nach dem ersten Fehler verbleiben Job und Werte in `codec_failed` bzw. `codec-pending`; derselbe idempotente Request verwendet denselben Job und dieselben Werte, persistiert anschließend genau ein Mapping und ein Completion-Audit. Eine weitere Wiederholung liefert die gespeicherte Antwort ohne einen zusätzlichen Codec-Aufruf oder ein weiteres Completion-Audit.
 
-`InternalHttpTagCodecClient` ist lokal als nicht gebundener Serveradapter vorbereitet: Er verwendet ausschließlich `TCP_TAG_CODEC_BASE_URL` und `TCP_TAG_CODEC_API_KEY` aus serverseitiger Konfiguration, genau einen HTTP-Request mit festem 3-Sekunden-Gesamt-Timeout sowie den Bearer-Header. Transport-, 429-, 5xx- und Schemafehler werden zu `Codec unavailable.` normalisiert und damit durch TCP neutral als `503` dargestellt; es gibt keinen synchronen HTTP-Retry. Der Service Provider bindet weiterhin ausschließlich den Fake. Echte Internal-HTTP-Anbindung und kompatible 6-/8-/10-Feistel-Vektoren bleiben bis zum getrennten Staging-Gate offen.
+`InternalHttpTagCodecClient` ist ein expliziter lokaler Serveradapter: Er verwendet ausschließlich `TCP_TAG_CODEC_BASE_URL` und `TCP_TAG_CODEC_API_KEY` aus serverseitiger Konfiguration, genau einen HTTP-Request mit festem 3-Sekunden-Gesamt-Timeout sowie den Bearer-Header. Transport-, 429-, 5xx- und Schemafehler werden zu `Codec unavailable.` normalisiert und damit durch TCP neutral als `503` dargestellt; es gibt keinen synchronen HTTP-Retry. Ohne `TCP_TAG_CODEC_DRIVER=http` bindet der Service Provider weiterhin den Fake. Die lokale HTTP-Bindung verwendet nie Staging-Secrets, -Hosts oder -Routen; die externe Internal-HTTP-Bindung bleibt bis zu einer separaten Staging-Entscheidung gesperrt.
 
 Range-, Pool- und Lifecycle-Domäne können nach Auflösung der jeweiligen AuthZ-/Validator-Gates schrittweise implementiert werden. Die lokale synthetische Reservierung ist implementiert; echte Internal-HTTP-Codec- und Staging-Reservierungen bleiben bis zu den beschriebenen Nachweisen gesperrt.
 

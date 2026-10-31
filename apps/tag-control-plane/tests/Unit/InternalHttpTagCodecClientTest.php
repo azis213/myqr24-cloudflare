@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
+use App\Services\FakeTagCodecClient;
 use App\Services\InternalHttpTagCodecClient;
+use App\Services\TagCodecClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -23,7 +25,7 @@ final class InternalHttpTagCodecClientTest extends TestCase
     {
         Http::preventStrayRequests();
         Http::fake([
-            'https://codec.example.invalid/api/v1/tag-codec/encode-batch' => Http::response([
+            'http://127.0.0.1:8788/api/v1/codec/encode-batch' => Http::response([
                 'codecVersion' => 'S01',
                 'tags' => [['id' => '20980d', 'length' => 6, 'value' => '60466176']],
             ]),
@@ -33,7 +35,7 @@ final class InternalHttpTagCodecClientTest extends TestCase
 
         self::assertSame([['id' => '20980d', 'length' => 6, 'value' => '60466176', 'codecVersion' => 'S01']], $result);
         Http::assertSent(function (Request $request): bool {
-            return $request->url() === 'https://codec.example.invalid/api/v1/tag-codec/encode-batch'
+            return $request->url() === 'http://127.0.0.1:8788/api/v1/codec/encode-batch'
                 && $request->method() === 'POST'
                 && $request->hasHeader('Authorization', 'Bearer synthetic-server-only-key')
                 && $request->data() === ['length' => 6, 'values' => ['60466176']];
@@ -70,10 +72,23 @@ final class InternalHttpTagCodecClientTest extends TestCase
         $client->encode(6, '60466176');
     }
 
+    public function test_the_http_driver_requires_explicit_server_side_selection(): void
+    {
+        self::assertInstanceOf(FakeTagCodecClient::class, $this->app->make(TagCodecClient::class));
+
+        config()->set('security.tag_codec.driver', 'http');
+        config()->set('security.tag_codec.base_url', 'http://127.0.0.1:8788');
+        config()->set('security.tag_codec.api_key', 'synthetic-server-only-key');
+        config()->set('security.tag_codec.timeout_seconds', 3);
+        $this->app->forgetInstance(TagCodecClient::class);
+
+        self::assertInstanceOf(InternalHttpTagCodecClient::class, $this->app->make(TagCodecClient::class));
+    }
+
     private function client(): InternalHttpTagCodecClient
     {
         return new InternalHttpTagCodecClient([
-            'base_url' => 'https://codec.example.invalid',
+            'base_url' => 'http://127.0.0.1:8788',
             'api_key' => 'synthetic-server-only-key',
             'timeout_seconds' => 3,
         ]);

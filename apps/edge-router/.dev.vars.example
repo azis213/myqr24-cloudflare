@@ -1,0 +1,4 @@
+# Local-only synthetic values for `npm run dev:codec`.
+# Copy this file to `.dev.vars`; never reuse Staging or Production values.
+FEISTEL_SECRET_S01=replace-with-at-least-32-random-local-bytes
+TAG_CODEC_API_KEY_S01=replace-with-a-random-local-service-key

@@ -10,6 +10,7 @@
     "build:production": "wrangler deploy --dry-run --env production",
     "build:codec": "wrangler deploy --dry-run --config wrangler.codec.toml --env staging",
     "build:codec:production": "wrangler deploy --dry-run --config wrangler.codec.toml --env production",
+    "dev:codec": "wrangler dev --local --config wrangler.codec.toml --ip 127.0.0.1 --port 8788",
     "test": "vitest run",
     "test:watch": "vitest",
     "deploy": "wrangler deploy",

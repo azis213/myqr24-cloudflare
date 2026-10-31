@@ -3,9 +3,9 @@
 **Orchestrierungsanweisung:** [`README.md`](README.md)  
 **Stand:** 2026-10-31
 **Gesamtstatus:** `in-progress`  
-**Aktive Welle:** `W2L – lokaler Verwaltungs-Slice in progress`
-**Nächster zulässiger Arbeitsschritt:** Das dokumentierte [`W2L Internal-Codec-Staging-Gate`](W2L-INTERNAL-CODEC-STAGING-GATE.md) durch externe Betriebsfreigaben erfüllen. Der lokale Worker-Batchvertrag einschließlich `codecVersion`, 6-/8-/10-Tests und Wrangler-Simulation ist erfüllt; blockiert bleiben TCP-Staging-Secret-Speicher, Private-Route, WAF-/Rate-Limit-/Access-Grenzen sowie Dogado-Stagingweg. Der lokale `InternalHttpTagCodecClient` bleibt daher ungebunden; der Fake bleibt aktiv. Dogado-Deployment, echte Internal-Codec-Anbindung, Staging-Read-API und echter KV-Publish bleiben gesperrt.
-**Regel:** `apps/tag-control-plane` und `apps/tag-control-center` sind im lokalen W1L-Umfang vorhanden. Persistenz-, Migrations-, Transaktions-, Outbox- und Rollbacktests laufen gegen die vorhandene isolierte Compose-MySQL-Topologie; Cloudflare, Dogado und Mail bleiben lokale Fakes. Reale Dogado-Verbindungen, echte Cloudflare-Tokens und manuelle oder automatisierte KV-Fachänderungen bleiben vor dem Deployment-Gate verboten. `docs/00-Refinement/` ist bei regulären Wiederanläufen und Umsetzungsarbeiten ausdrücklich ausgeschlossen; Ideen daraus werden erst nach einer dokumentierten Architektur-, Contract-, Story-, Test-, Traceability- und Statusübernahme verbindlich.
+**Aktive Welle:** `W2L – Local-first Verwaltungs- und Private-Codec-Slice in progress`
+**Nächster zulässiger Arbeitsschritt:** Den lokalen Private-Codec-Worker mit `wrangler dev --local` ausschließlich auf `127.0.0.1` starten und die lokale TCP-Reservierung über `InternalHttpTagCodecClient` mit synthetischen ignorierten Secrets für 6, 8 und 10 Stellen integrieren und testen. Danach den verbleibenden W2L-Umfang (Range-/Pool-Updates, Referenzvalidatoren, Organisationspools und TCC-Contracttests) ausschließlich lokal fortsetzen. Staging wird nach jeder abgeschlossenen lokalen Welle separat entschieden.
+**Regel:** `apps/tag-control-plane` und `apps/tag-control-center` werden fachlich local-first weiterentwickelt. Persistenz-, Migrations-, Transaktions-, Outbox- und Rollbacktests laufen gegen die vorhandene isolierte Compose-MySQL-Topologie. Der Private-Codec darf ausschließlich lokal über den auf Loopback gebundenen Wrangler-Worker, synthetische ignorierte Secrets und den serverseitigen TCP-Adapter integriert werden; TCC, TAG-App und Browser bleiben ausgeschlossen. Cloudflare-Publishing, Dogado und Mail bleiben lokale Fakes. Reale Dogado-Verbindungen, echte Cloudflare-Tokens und manuelle oder automatisierte KV-Fachänderungen bleiben bis zu einer je Welle explizit entschiedenen Deployment-Freigabe verboten. `docs/00-Refinement/` ist bei regulären Wiederanläufen und Umsetzungsarbeiten ausdrücklich ausgeschlossen.
 
 ---
 
@@ -13,7 +13,7 @@
 
 | Bereich | Stand | Nachweis / Hinweis |
 | --- | --- | --- |
-| Edge Router | Staging-Scan-Worker `myqr24-edge-routing-staging` ist deployt; `https://s.myqr24.com/` antwortet mit `302` auf `https://www.myqr24.com/`. Der getrennte private Codec-Worker ist über `codec.s.myqr24.com/api/v1/*` live verifiziert. | Scan-Worker-Version `9db270fb-567d-4845-b1f0-67e6ecbef3f3`; Codec-Evidenz in `../evidence/README.md` |
+| Edge Router | Staging-Scan-Worker ist historisch deployt; der getrennte Private-Codec wird local-first unter `/api/v1/codec/*` konsolidiert und kann lokal per Wrangler auf Loopback laufen. | Externe Route `codec.s.myqr24.com/api/v1/*` ist ein abzulösender historischer Slice; keine neue Staging-Nutzung ohne separate Wellenentscheidung |
 | Plattform-Homepage | KV-freier Worker `myqr24-platform-home` ist für `www.myqr24.com/*` bereitgestellt. | Deployment-Version `b3372d68-ac0a-431e-a902-8fba9f2fb201`; öffentliche Seite wurde anschließend als sichtbar bestätigt |
 | TAG-App | Bestehende React/Vite-PWA in `apps/tag-app`; öffentliche View-Darstellung ist fixturebasiert. | siehe `docs/40-Implementation/tag-app/STATUS.md` |
 | Control Plane | Laravel-13-/MySQL-Fundament unter `apps/tag-control-plane` mit Audit, Korrelation, Bootstrap-Admin, Web-Session und Übergangs-E-Mail-MFA. | keine fachliche Domäne, keine Public-Read-API, kein Publisher und keine Produktionsdaten |

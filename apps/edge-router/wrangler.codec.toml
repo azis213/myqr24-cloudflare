@@ -8,13 +8,16 @@ name = "myqr24-tag-codec"
 main = "src/codec-worker.ts"
 compatibility_date = "2026-09-30"
 
-# Required Staging secrets:
+# Required local-only values belong in the ignored `.dev.vars` file:
+#   FEISTEL_SECRET_S01=<synthetic local test secret>
+#   TAG_CODEC_API_KEY_S01=<synthetic local service key>
+#
+# Required Staging secrets are set only through Cloudflare's secret store:
 #   npx wrangler secret put FEISTEL_SECRET_S01 --config wrangler.codec.toml --env staging
-#   npx wrangler secret put TAG_HMAC_SECRET_S01 --config wrangler.codec.toml --env staging
 #   npx wrangler secret put TAG_CODEC_API_KEY_S01 --config wrangler.codec.toml --env staging
 #
-# Configure only the approved private API route in Cloudflare:
-#   codec.s.myqr24.com/api/v1/* -> myqr24-tag-codec-staging
+# A later, separately approved Edge deployment binds only:
+#   internal.s.myqr24.com/api/v1/codec/* -> myqr24-tag-codec-staging
 #
 # Apply strict, route-specific WAF/rate-limit controls and optional Cloudflare
 # Access/IP allowlisting to codec.*. API authentication remains mandatory.

@@ -17,7 +17,7 @@ final class InternalHttpTagCodecClient implements TagCodecClient
 
     public function encode(int $length, string $value): array
     {
-        $response = $this->post('/api/v1/tag-codec/encode', ['length' => $length, 'value' => $value]);
+        $response = $this->post('/api/v1/codec/encode', ['length' => $length, 'value' => $value]);
         $tag = $response['tag'] ?? null;
 
         if (! is_array($tag) || ! is_string($response['codecVersion'] ?? null)) {
@@ -29,7 +29,7 @@ final class InternalHttpTagCodecClient implements TagCodecClient
 
     public function encodeBatch(int $length, array $values): array
     {
-        $response = $this->post('/api/v1/tag-codec/encode-batch', ['length' => $length, 'values' => $values]);
+        $response = $this->post('/api/v1/codec/encode-batch', ['length' => $length, 'values' => $values]);
         $tags = $response['tags'] ?? null;
         $codecVersion = $response['codecVersion'] ?? null;
 

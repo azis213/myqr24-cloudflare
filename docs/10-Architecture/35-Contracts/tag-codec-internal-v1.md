@@ -1,11 +1,11 @@
 # `tag-codec-internal-v1`
 
-**Status:** `implemented-staging-slice`  
+**Status:** `implemented-local`
 **Version:** `v1`  
 **Owner:** Cloudflare TAG Codec Worker  
 **Implementierende Komponenten:** Cloudflare TAG Codec Worker (`apps/edge-router/src/codec-worker.ts`); spätere serverseitige TAG Control Plane  
 **Stand:** 2026-10-29  
-**Nächste spezifizierte Welle:** serverseitige TCP-Staging-Bindung nach separatem Betriebsfreigabegate; kein Browserzugriff.
+**Nächste spezifizierte Welle:** lokale TCP-Bindung an den Loopback-Worker mit ausschließlich synthetischen, ignorierten Secrets; kein Browserzugriff.
 
 ## 1. Zweck und fachliche Grenze
 
@@ -70,7 +70,7 @@ Der Internal-Host ist die allgemeine private technische Grenze und kein Browser-
 | Staging | `https://internal.s.myqr24.com` | `https://s.myqr24.com` |
 | Produktion | `https://internal.p.myqr24.com` | `https://p.myqr24.com` |
 
-Die bisher aktive Staging-Route `codec.s.myqr24.com/api/v1/*` ist ein abzulösender Slice. Ihr Umzug auf `internal.s.myqr24.com/api/v1/codec/*` erfolgt erst in der nächsten kontrollierten Edge-Deployment-Welle. Der öffentliche Scan-Worker decodiert unverändert lokal und ruft den Internal-Worker nie über das Netzwerk auf.
+Die bisher aktive Staging-Route `codec.s.myqr24.com/api/v1/*` ist ein abzulösender Slice. Der lokale Worker und alle lokalen TCP-Adapter verwenden bereits ausschließlich `/api/v1/codec/*`; der spätere Umzug der externen Route auf `internal.s.myqr24.com/api/v1/codec/*` erfolgt erst nach einer getrennten Wellenentscheidung. Der öffentliche Scan-Worker decodiert unverändert lokal und ruft den Internal-Worker nie über das Netzwerk auf.
 
 ### 4.2 Pflicht-Request-Header
 
@@ -133,7 +133,7 @@ Erfolgsantwort:
 ### 5.2 Batch-Encode
 
 ```http
-POST /api/v1/tag-codec/encode-batch
+POST /api/v1/codec/encode-batch
 ```
 
 ```json

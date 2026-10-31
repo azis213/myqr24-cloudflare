@@ -15,10 +15,10 @@
 
 | Vertrag | Owner | Status | Zweck |
 | --- | --- | --- | --- |
-| [`tag-codec-internal-v1.md`](tag-codec-internal-v1.md) | Cloudflare TAG Codec Worker | `implemented-staging-slice` | Bestehender authentisierter Einzel-Codec für 6, 8 und 10 Stellen; nächste spezifizierte Welle migriert auf `internal.[s|p].myqr24.com/api/v1/codec/*`, ergänzt `codecVersion` sowie Batch-Encoding mit maximal 1.000 Werten |
+| [`tag-codec-internal-v1.md`](tag-codec-internal-v1.md) | Cloudflare TAG Codec Worker | `implemented-local` | Authentisierter lokaler Private-Codec für 6, 8 und 10 Stellen mit `codecVersion` und Batch-Encoding bis 1.000 Werte; TCP darf ihn ausschließlich lokal auf Loopback mit synthetischen ignorierten Secrets ansprechen. Der externe Internal-Host bleibt eine spätere Wellenentscheidung. |
 | [`tag-routing-projection-v1.md`](tag-routing-projection-v1.md) | TAG Control Plane | `implemented-contract` | Minimale, nicht personenbezogene Control-Plane-zu-Edge-Router-KV-Projektion; lokale Erzeugung und Fake-Publisher folgen in W3L |
 | [`control-plane-admin-api-v1.md`](control-plane-admin-api-v1.md) | TAG Control Plane | `implemented-local` | W1L-Session-, CSRF-, Passwortlogin-, E-Mail-MFA- und Logout-Contract für das Control Center; fachliche Admin-Queries/-Commands und RBAC folgen in späteren Wellen |
-| [`control-plane-tag-management-api-v1.md`](control-plane-tag-management-api-v1.md) | TAG Control Plane | `blocked-contract` | W2L-Range-, Pool-, Reservierungs- und Lifecycle-Contract; schreibende Fachendpunkte bleiben bis zur serverseitigen AuthZ-Matrix gesperrt, Reservierungen zusätzlich bis zum sicheren Codec-Adapter-/Testvektor-Gate |
+| [`control-plane-tag-management-api-v1.md`](control-plane-tag-management-api-v1.md) | TAG Control Plane | `in-progress-local-slice` | W2L-Range-, Pool-, Reservierungs- und Lifecycle-Contract; lokale Facharbeit nutzt serverseitige AuthZ und wahlweise Fake oder den Loopback-Private-Codec. Externe Staging-Bindung bleibt separat gesperrt. |
 | `public-tag-view-v1` | TAG Control Plane | `planned` | Öffentliche, datensparsame TAG-App-Read-API |
 | `public-tag-claim-v1` | TAG Control Plane | `planned` | Neutralisierter öffentlicher Claim-Command |
 | `tag-runtime-projection-v1` | TAG Control Plane | `planned` | Öffentliche Runtime-Projektion |

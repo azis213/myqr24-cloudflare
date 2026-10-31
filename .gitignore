@@ -3,6 +3,7 @@ node_modules/
 
 # Wrangler local state and generated files
 .wrangler/
+apps/edge-router/.dev.vars
 
 # Local Tag Lab registry (may contain non-public test tag IDs)
 .tag-lab/
@@ -24,6 +25,7 @@ apps/tag-control-plane/config/tcp-config.local.json
 apps/tag-control-plane/config/tcp-config.*.local.json
 apps/tag-control-plane/config/tcp-secrets.local.json
 apps/tag-control-plane/config/tcp-secrets.*.local.json
+apps/tag-control-plane/.env.local
 
 .vscode/
 .DS_Store

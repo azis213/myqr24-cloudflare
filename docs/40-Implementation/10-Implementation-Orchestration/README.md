@@ -187,6 +187,7 @@ Für spätere App-Integration gelten zusätzlich:
 2. Persistenz-, Constraint-, Migrations-, Parallelitäts-, Locking-, Outbox- und Rollback-Nachweise laufen gegen Compose-MySQL. SQLite- und In-Memory-Doubles sind dafür unzulässig.
 3. Integrationstests nutzen nur synthetische Daten sowie eine getrennte Testdatenbank oder einen kontrollierten Schema-Reset; sie bereinigen ihren Zustand.
 4. Externe Ports, insbesondere Cloudflare-Publishing, Dogado und Mail, werden lokal gefakt. Reale externe Tokens, Hosts und APIs sind in lokalen Tests verboten.
+- Der Private-Codec-Worker ist hiervon ausgenommen, sofern er mit `wrangler dev --local` ausschließlich an `127.0.0.1` läuft und nur synthetische, ignorierte lokale Werte nutzt. TCP darf ihn in diesem expliziten lokalen Integrationsmodus serverseitig ansprechen; TCC, TAG-App und jeder Browser bleiben ausgeschlossen.
 5. Die künftige Anwendung wird als lokaler Mount eingebunden; sie wird nicht in das generische W0-Testimage kopiert.
 6. Ein lokaler Erfolg kann `implemented` stützen, ersetzt aber niemals Dogado-Kompatibilität, Staging-Evidenz oder den Status `verified`.
 

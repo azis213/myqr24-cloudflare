@@ -49,4 +49,21 @@ return [
     'tag_management' => [
         'reauth_ttl_seconds' => (int) env('TCP_TAG_MANAGEMENT_REAUTH_TTL_SECONDS', 900),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Internal Edge codec
+    |--------------------------------------------------------------------------
+    |
+    | The fake is the default. The HTTP driver is an explicit local integration
+    | mode for a loopback Wrangler worker and synthetic ignored credentials.
+    | Browser clients never receive these settings or the service key.
+    |
+    */
+    'tag_codec' => [
+        'driver' => env('TCP_TAG_CODEC_DRIVER', 'fake'),
+        'base_url' => env('TCP_TAG_CODEC_BASE_URL'),
+        'api_key' => env('TCP_TAG_CODEC_API_KEY'),
+        'timeout_seconds' => (int) env('TCP_TAG_CODEC_TIMEOUT_SECONDS', 3),
+    ],
 ];
