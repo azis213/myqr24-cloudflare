@@ -49,8 +49,8 @@
 | `CP-TC-ALLOC-009` | CP-US-011 | lokale Reservierung mit `FakeTagCodecClient` | deterministische lowercase-ID mit `TEST-S01`; kein Feistel-Secret und keine Netzwerkoperation im TCP | Integration/Security |
 | `CP-TC-ALLOC-010` | CP-US-011 | gleicher bzw. abweichender Idempotency-Key-Request | gleicher Request liefert denselben Job ohne zweites Mapping; abweichender Request liefert `409` | Integration |
 | `CP-TC-ALLOC-011` | CP-US-011 | Codec-Fehler nach `codec-pending`-Jobreservierung | kein fertiges Mapping oder Browser-Erfolg; Werte bleiben jobgebunden reserviert und gegen Doppelvergabe geschützt | Integration/Retry |
-| `CP-TC-LIFECYCLE-001` | CP-US-012 | zulässiger Statuswechsel bis `ready-to-publish` | Wechsel wird geprüft und auditiert | Integration |
-| `CP-TC-LIFECYCLE-002` | CP-US-012 | Aktivierung eines physischen TAGs ohne QA/Übergabe | Wechsel wird verweigert | Integration |
+| `CP-TC-LIFECYCLE-001` | CP-US-012 | zulässiger Statuswechsel `draft → pending-review → ready-to-publish` | Wechsel wird transaktional geprüft, idempotent ausgeführt und genau einmal auditiert | Integration, lokal automatisiert |
+| `CP-TC-LIFECYCLE-002` | CP-US-012 | `ready-to-publish` ohne Re-Auth oder Aktivierung ohne QA/Übergabe | Wechsel wird serverseitig verweigert | Integration, lokal automatisiert |
 | `CP-TC-LIFECYCLE-003` | CP-US-012 | Sperrung/Archivierung eines aktiven TAGs | sichere Unpublish-/Neutralisierungsaktion wird geplant | Integration |
 
 ## CP-I03 – Herstellung, Claiming, Druck und Qualität

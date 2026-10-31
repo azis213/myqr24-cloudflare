@@ -42,7 +42,7 @@ Für Beispielhosts sind `.invalid`-Domains zu verwenden. Ein bestätigter öffen
 | überlappende Test-Range | Negativfall | Speicherung/Projektion abgelehnt |
 | gültige lineare 8-stellige Test-Range | positiver Range-Fall | kanonisch, aktiv, nicht überlappend und ohne Slotgrenzen zulässig |
 | gültige lineare 10-stellige Test-Range | positiver Range-Fall | kanonisch, aktiv, nicht überlappend und ohne Slotgrenzen zulässig |
-| 8- oder 10-stellige Range außerhalb ihres kanonischen Raums | Negativfall | Speicherung/Projektion abgelehnt |
+| Range außerhalb des kanonischen Raums `I(L) = [36^(L-2), 36^L)` | Negativfall | Speicherung/Projektion abgelehnt |
 | parallele Reservierungen | DB-Parallelität | einzigartige TAGs ohne Doppelvergabe |
 | Wiederholung mit gleicher Korrelation | Idempotenz | keine zweite Reservierung |
 

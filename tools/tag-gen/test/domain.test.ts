@@ -49,7 +49,7 @@ describe("TAG-Generator-Domäne", () => {
     const result = resolveRangeValues(6, "offset", "0", "23");
     expect(result).toEqual({
       ok: true,
-      value: { start: "60466176", end: "60466199" },
+      value: { start: "1679616", end: "1679639" },
     });
   });
 
@@ -57,7 +57,7 @@ describe("TAG-Generator-Domäne", () => {
     const result = resolveRangeValues(8, "offset", "0", "2");
     expect(result).toEqual({
       ok: true,
-      value: { start: "78364164096", end: "78364164098" },
+      value: { start: "2176782336", end: "2176782338" },
     });
     expect(resolveRangeValues(8, "offset", "0", (maximumOffset(8) + 1n).toString()).ok).toBe(false);
   });

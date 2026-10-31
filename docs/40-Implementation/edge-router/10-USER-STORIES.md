@@ -33,7 +33,8 @@
 
 ### Akzeptanzkriterien
 
-- Die Feistel-Decodierung cycle-walkt in den exakten Raum `I(L) = [36^(L-1), 36^L)`.
+- Die Feistel-Decodierung cycle-walkt für gerade Längen in den exakten Raum `I(L) = [36^(L-2), 36^L)`.
+- Öffentliche IDs werden exakt L Zeichen lang ausgegeben; führende Nullen sind zulässig.
 - Sechsstellige Tags verwenden ausschließlich `I(6)`.
 - Achtstellige Tags verwenden ausschließlich `I(8)`.
 - Zehnstellige Tags verwenden ausschließlich `I(10)`.

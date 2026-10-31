@@ -40,10 +40,10 @@ Die Datei enthält nicht geheime Test-Secrets sowie wiederverwendbare KV-Feature
 
 | Kennung | Bedeutung | Regel |
 | --- | --- | --- |
-| `canonicalValue6` | Vollständiger Feistel-decodierter 6-stelliger Range-Key | Muss in `I(6) = [36^5, 36^6)` liegen |
-| `canonicalValue8` | Vollständiger Feistel-decodierter 8-stelliger Range-Key | Muss in `I(8) = [36^7, 36^8)` liegen |
-| `canonicalValue10` | Vollständiger Feistel-decodierter 10-stelliger Range-Key | Muss in `I(10) = [36^9, 36^10)` liegen |
-| `publicTagId` | Öffentliche 6-, 8- oder 10-stellige Base36-ID | Wird durch den testbaren Feistel-Encoder aus dem kanonischen Wert erzeugt |
+| `canonicalValue6` | Vollständiger Feistel-decodierter 6-stelliger Range-Key | Muss in `I(6) = [36^4, 36^6)` liegen |
+| `canonicalValue8` | Vollständiger Feistel-decodierter 8-stelliger Range-Key | Muss in `I(8) = [36^6, 36^8)` liegen |
+| `canonicalValue10` | Vollständiger Feistel-decodierter 10-stelliger Range-Key | Muss in `I(10) = [36^8, 36^10)` liegen |
+| `publicTagId` | Öffentliche 6-, 8- oder 10-stellige Base36-ID | Wird durch den testbaren Feistel-Encoder erzeugt und bei Bedarf links mit Nullen aufgefüllt |
 
 Die konkreten Werte werden von Tests berechnet, damit Fixtures keine unkontrolliert manuell berechneten kryptografischen Ableitungen enthalten.
 

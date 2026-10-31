@@ -60,8 +60,14 @@ type ReauthenticationState =
 type ReservationState =
   | { kind: "idle" }
   | { kind: "submitting"; poolId: string }
-  | { kind: "completed"; poolId: string; jobId: string; tagCount: number }
+  | { kind: "completed"; poolId: string; jobId: string; tags: { id: string; status: string }[] }
   | { kind: "error"; poolId: string; message: string };
+
+type LifecycleState =
+  | { kind: "idle" }
+  | { kind: "submitting"; tagId: string }
+  | { kind: "completed"; tagId: string; status: string }
+  | { kind: "error"; tagId: string; message: string };
 
 const tcpBaseUrl = (import.meta.env.VITE_TCP_BASE_URL ?? "/tcp").replace(/\/$/, "");
 
@@ -185,6 +191,7 @@ export function App() {
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
   const [reservationIdempotencyKey, setReservationIdempotencyKey] = useState<string | null>(null);
   const [reservation, setReservation] = useState<ReservationState>({ kind: "idle" });
+  const [lifecycle, setLifecycle] = useState<LifecycleState>({ kind: "idle" });
 
   useEffect(() => {
     void loadSession();
@@ -650,7 +657,7 @@ export function App() {
         kind: "completed",
         poolId,
         jobId: payload.job_id,
-        tagCount: payload.tags.length,
+        tags: payload.tags.filter(isRecord).flatMap((tag) => typeof tag.id === "string" ? [{ id: tag.id, status: "draft" }] : []),
       };
 
       setReauthentication({ kind: "idle" });
@@ -662,6 +669,27 @@ export function App() {
         poolId,
         message: error instanceof Error ? error.message : "Die Reservierung ist fehlgeschlagen.",
       });
+    }
+  }
+
+  async function transitionTag(tagId: string, targetStatus: "pending-review" | "ready-to-publish") {
+    setLifecycle({ kind: "submitting", tagId });
+    try {
+      const token = await csrfToken();
+      const response = await fetch(`${tcpBaseUrl}/api/v1/admin/tag-management/tags/${encodeURIComponent(tagId)}/transitions`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", "Content-Type": "application/json", "X-CSRF-TOKEN": token, "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({ targetStatus, reason: targetStatus === "pending-review" ? "initial-review" : "review-approved" }),
+      });
+      const payload = await readJson(response);
+      if (!response.ok || !isRecord(payload) || !isRecord(payload.tag) || typeof payload.tag.status !== "string") {
+        setLifecycle({ kind: "error", tagId, message: errorMessage(payload, "Der Lifecycle-Wechsel wurde abgelehnt.") });
+        return;
+      }
+      setLifecycle({ kind: "completed", tagId, status: payload.tag.status });
+    } catch (error) {
+      setLifecycle({ kind: "error", tagId, message: error instanceof Error ? error.message : "Der Lifecycle-Wechsel ist fehlgeschlagen." });
     }
   }
 
@@ -690,6 +718,7 @@ export function App() {
       setSelectedPoolId(null);
       setReservationIdempotencyKey(null);
       setReservation({ kind: "idle" });
+      setLifecycle({ kind: "idle" });
       setAuth({ kind: "signed_out" });
     }
   }
@@ -990,7 +1019,7 @@ export function App() {
                         {reservation.kind === "submitting"
                           ? "Reservierung wird serverseitig verarbeitet …"
                           : reservation.kind === "completed"
-                            ? `${reservation.tagCount} TAG(s) reserviert. Job: ${reservation.jobId}`
+                            ? `${reservation.tags.length} TAG(s) reserviert. Job: ${reservation.jobId}`
                             : reservation.message}
                       </p>
                     ) : null}
@@ -1013,8 +1042,33 @@ export function App() {
 
             {reservation.kind === "completed" ? (
               <p className="success-message">
-                {reservation.tagCount} TAG(s) reserviert. Job: {reservation.jobId}
+                {reservation.tags.length} TAG(s) reserviert. Job: {reservation.jobId}
               </p>
+            ) : null}
+            {reservation.kind === "completed" ? (
+              <div className="module-grid" aria-label="Lokale Lifecycle-Übergänge">
+                {reservation.tags.map((tag) => (
+                  <article className="module-card" key={tag.id}>
+                    <h3>TAG <code>{tag.id}</code></h3>
+                    <p>Status: <code>{lifecycle.kind === "completed" && lifecycle.tagId === tag.id ? lifecycle.status : tag.status}</code></p>
+                    <button type="button" className="secondary-action" onClick={() => void transitionTag(tag.id, "pending-review")}>Zur Prüfung einreichen</button>
+                    {lifecycle.kind === "completed" && lifecycle.tagId === tag.id && lifecycle.status === "pending-review" ? (
+                      <button
+                        type="button"
+                        className="secondary-action"
+                        disabled={reauthentication.kind !== "ready"}
+                        onClick={() => void transitionTag(tag.id, "ready-to-publish")}
+                      >
+                        Für Veröffentlichung freigeben
+                      </button>
+                    ) : null}
+                    {lifecycle.kind === "completed" && lifecycle.tagId === tag.id && lifecycle.status === "pending-review" && reauthentication.kind !== "ready" ? (
+                      <p>TCP verlangt vor der Freigabe eine erneute Authentisierung.</p>
+                    ) : null}
+                    {lifecycle.kind === "error" && lifecycle.tagId === tag.id ? <p className="error-message" role="alert">{lifecycle.message}</p> : null}
+                  </article>
+                ))}
+              </div>
             ) : null}
 
             {(selectedPoolId !== null || auth.role === "platform-admin") ? (

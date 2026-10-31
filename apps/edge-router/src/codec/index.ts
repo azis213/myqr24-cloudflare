@@ -54,7 +54,7 @@ export function base36UpperBound(length: TagLength): bigint {
 }
 
 export function base36LowerBound(length: TagLength): bigint {
-  return 36n ** BigInt(length - 1);
+  return 36n ** BigInt(length - 2);
 }
 
 export function isCanonicalValue(value: bigint, length: TagLength): boolean {
@@ -97,7 +97,7 @@ export function formatBase36(value: bigint, length: TagLength): string | null {
 
   const encoded = value.toString(36);
 
-  return encoded.length === length ? encoded : null;
+  return encoded.padStart(length, "0");
 }
 
 function toFixedWidthBytes(value: bigint, byteLength: number): Uint8Array {

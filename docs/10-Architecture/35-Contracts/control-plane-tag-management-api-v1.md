@@ -40,7 +40,7 @@ Die W2L-Baseline ist verbindlich entschieden und für Pool-Read sowie Reservieru
 
 Re-Authentisierung ist eine serverseitige, an dieselbe Web-Session gebundene Passwortprüfung mit einem konfigurierten 15-Minuten-Fenster (`TCP_TAG_MANAGEMENT_REAUTH_TTL_SECONDS`, Default `900`). Fehlende, abgelaufene oder fremde Re-Authentisierung wird neutral als `403` behandelt und auditiert. Eine UI-Ausblendung oder die sichtbare Sessionrolle ersetzt diese Prüfung nie.
 
-Der implementierte lokale Slice umfasst `GET /ranges`, `POST /ranges`, `GET /pools`, `POST /pools`, `POST /pools/{poolId}/reservations` sowie `POST /api/v1/auth/tag-management/reauthenticate`. Range- und Poolmutationen verwenden die serverseitige Rollen-/Organisationsgrenze und frische Re-Authentisierung; Lifecycle-HTTP-Commands bleiben bis zu ihren Tests fail-closed.
+Der implementierte lokale Slice umfasst `GET /ranges`, `POST /ranges`, `GET /pools`, `POST /pools`, `POST /pools/{poolId}/reservations`, `POST /tags/{tagId}/transitions` sowie `POST /api/v1/auth/tag-management/reauthenticate`. Range-/Pool- und Lifecyclemutationen verwenden die serverseitige Rollen-/Organisationsgrenze; `ready-to-publish` erfordert frische Re-Authentisierung. Nicht erlaubte Lifecycle-Status bleiben fail-closed.
 
 ### 2.2 `W2L-BLK-CODEC` – öffentliche TAG-ID bei Reservierung
 
@@ -68,7 +68,8 @@ Range-, Pool- und Lifecycle-Domäne können nach Auflösung der jeweiligen AuthZ
 | --- | --- |
 | `length` | ausschließlich JSON-Integer `6`, `8` oder `10` |
 | `decodedValue`, `startValue`, `endValue` | kanonischer nicht negativer Dezimalstring ohne Vorzeichen und ohne führende Nullen außer `"0"` |
-| kanonischer Raum | `I(L) = [36^(L-1), 36^L)`; `startValue` inklusiv, `endValue` inklusiv |
+| kanonischer Raum | Für gerade `L`: `I(L) = [36^(L-2), 36^L)`; `startValue` inklusiv, `endValue` inklusiv |
+| öffentliche `tagId` | exakt `length` Base36-Zeichen; führende Nullen sind zulässig |
 | `rangeId`, `groupId`, `poolId` | `[A-Za-z0-9][A-Za-z0-9_-]{0,127}` |
 | `tagId` | lowercase Base36, exakt 6/8/10 Stellen; ausschließlich Codec-Response, nie Browserinput zur Reservierung |
 | `codecVersion` | nicht leere Codec-/Secret-Version aus der authentisierten Internal-Codec-Antwort, etwa `S01` oder `P01`; wird zusammen mit jeder reservierten TAG-Zeile persistiert |
@@ -250,6 +251,8 @@ draft -> pending-review -> ready-to-publish
 
 `active` benötigt zusätzlich die späteren QA-, Übergabe-, Produkt- und Publish-Gates und wird in W2L serverseitig verweigert. `suspended`, `expired` und `archived` benötigen spätestens ab einer vorhandenen öffentlichen Wirkung eine Outbox zur Neutralisierung; diese Outbox ist W3L-Arbeit und darf in W2L nicht durch einen Browser ersetzt werden.
 
+Die lokale Erfolgsantwort enthält ausschließlich die gespeicherte `tagId`, den bestätigten Zielstatus, `audit_reference` und die Korrelation. `reason` wird validiert, dient der fachlichen Command-Idempotenz, erscheint aber nicht als Auditrohwert oder in einer öffentlichen Antwort.
+
 ## 6. Idempotenz, Audit und Datenminimierung
 
 - Ein `Idempotency-Key` darf nur einmal für denselben authentisierten Akteur, Commandtyp und semantisch identischen kanonischen Request verwendet werden.
@@ -274,7 +277,7 @@ draft -> pending-review -> ready-to-publish
 
 Dieser Vertrag ist während CP-I02 `in-progress`. Die W2L-Baseline für AuthZ und den lokalen Fake-Codec ist entschieden und lokal umgesetzt; verbleibende Teilcommands bleiben gezielt gesperrt.
 
-- Lifecycle-Commands bleiben deaktiviert, bis Statusautomat und Negativtests vorhanden sind.
+- Die lokalen Basistransitionen `draft → pending-review → ready-to-publish` sind implementiert und gegen die Compose-MySQL-Topologie getestet; weitergehende Status bleiben weiterhin gesperrt.
 - Ohne echten Internal-HTTP-Codec: keine Staging-/Produktionsreservierung; TCP darf weiterhin kein Feistel-Secret besitzen.
 - Ohne Produkt-/Pooldefaults: keine reale Ausgabepolicy und keine Staging-/Produktionswirkung.
 

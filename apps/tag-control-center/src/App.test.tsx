@@ -607,6 +607,47 @@ describe("TAG Control Center admin auth contract", () => {
     );
   });
 
+  it("submits a TCP-confirmed reserved tag for review only through the CSRF- and idempotency-protected lifecycle command", async () => {
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse(true))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { pools: [{ poolId: "demo-pool", length: 6, active: true, rangeIds: ["range-001"] }], correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { csrf_token: "reauth-csrf", correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { status: "reauthenticated", correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { csrf_token: "reservation-csrf", correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 201, body: { job_id: "00000000-0000-4000-8000-000000000010", tags: [{ id: "abcdef", length: 6, value: "100000", codecVersion: "TEST-S01" }], correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { pools: [], correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { csrf_token: "transition-csrf", correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { tag: { tagId: "abcdef", status: "pending-review" }, correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { csrf_token: "ready-reauth-csrf", correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { status: "reauthenticated", correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { csrf_token: "ready-transition-csrf", correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { tag: { tagId: "abcdef", status: "ready-to-publish" }, correlation_id: correlationId } }));
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("admin@example.test");
+    await user.click(screen.getByRole("button", { name: "Sichtbare Pools laden" }));
+    await user.click(await screen.findByRole("button", { name: "Reservierung vorbereiten" }));
+    await user.type(screen.getByLabelText("Passwort zur erneuten Authentisierung"), "browser-only-password");
+    await user.click(screen.getByRole("button", { name: "Reservierung freigeben" }));
+    await user.click(await screen.findByRole("button", { name: "Jetzt reservieren" }));
+    await user.click(await screen.findByRole("button", { name: "Zur Prüfung einreichen" }));
+
+    expect(fetchMock).toHaveBeenNthCalledWith(9, "/tcp/api/v1/admin/tag-management/tags/abcdef/transitions", expect.objectContaining({
+      method: "POST",
+      headers: expect.objectContaining({ "X-CSRF-TOKEN": "transition-csrf", "Idempotency-Key": "00000000-0000-4000-8000-000000000099" }),
+      body: JSON.stringify({ targetStatus: "pending-review", reason: "initial-review" }),
+    }));
+    await user.type(screen.getByLabelText("Passwort zur erneuten Authentisierung"), "browser-only-password");
+    await user.click(screen.getByRole("button", { name: "Reservierung freigeben" }));
+    await user.click(await screen.findByRole("button", { name: "Für Veröffentlichung freigeben" }));
+    expect(fetchMock).toHaveBeenNthCalledWith(13, "/tcp/api/v1/admin/tag-management/tags/abcdef/transitions", expect.objectContaining({
+      method: "POST",
+      headers: expect.objectContaining({ "X-CSRF-TOKEN": "ready-transition-csrf", "Idempotency-Key": "00000000-0000-4000-8000-000000000099" }),
+      body: JSON.stringify({ targetStatus: "ready-to-publish", reason: "review-approved" }),
+    }));
+  });
+
   it("renders the TCP readiness correlation without creating a session or credential request", async () => {
     fetchMock
       .mockResolvedValueOnce(sessionResponse())

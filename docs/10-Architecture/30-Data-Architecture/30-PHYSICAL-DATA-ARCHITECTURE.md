@@ -172,7 +172,7 @@ Die Keyteile werden ausschließlich durch TCP generiert und gegen das dokumentie
 | `start`, `end` | kanonische, nichtnegative Dezimalstrings; niemals JSON Number |
 | `length` | `6`, `8` oder `10` |
 | Reihenfolge | je Länge streng aufsteigend nach `start`; keine Überlappung |
-| Grenzen | `start` und `end` liegen im kanonischen Raum der angegebenen Länge; `start <= end`; keine Slot-Ausrichtung |
+| Grenzen | `start` und `end` liegen im kanonischen Raum `I(length)` der angegebenen Länge; `start <= end`; keine Slot-Ausrichtung |
 | Leselogik | Worker parst zu `BigInt` und verwirft einen ungültigen gesamten Index fail-closed |
 
 #### Regel- und Feature-Dokumente

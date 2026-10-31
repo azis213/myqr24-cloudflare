@@ -94,15 +94,15 @@ async function publicTag(
 }
 
 async function sixTag(): Promise<{ id: string; value: bigint }> {
-  return publicTag(36n ** 5n + 12345n, 6);
+  return publicTag(36n ** 4n + 12345n, 6);
 }
 
 async function eightTag(): Promise<{ id: string; value: bigint }> {
-  return publicTag(36n ** 7n + 65n, 8);
+  return publicTag(36n ** 6n + 65n, 8);
 }
 
 async function tenTag(): Promise<{ id: string; value: bigint }> {
-  return publicTag(36n ** 9n + 1_000_000_000_000_000n, 10);
+  return publicTag(36n ** 8n + 1_000_000_000_000_000n, 10);
 }
 
 function requestFor(
@@ -307,8 +307,21 @@ describe("canonical ID primitives", () => {
     const request = extractTagRequest(new URL(`https://p.qr4.uk/t/${tag.id}`));
 
     await expect(decodeTagId(request!, secrets)).resolves.toBe(tag.value);
-    expect(tag.value).toBeGreaterThanOrEqual(36n ** 5n);
+    expect(tag.value).toBeGreaterThanOrEqual(36n ** 4n);
     expect(tag.value).toBeLessThan(36n ** 6n);
+  });
+
+  it("pads canonical values with leading zeroes to the public tag length", () => {
+    expect(formatBase36(36n ** 4n, 6)).toBe("010000");
+    expect(formatBase36(36n ** 6n, 8)).toBe("01000000");
+  });
+
+  it("accepts a fixed-width public ID with a leading zero", async () => {
+    const tagId = formatBase36(36n ** 4n, 6)!;
+    const request = extractTagRequest(new URL(`https://p.qr4.uk/t/${tagId}`));
+
+    expect(request).toEqual({ id: tagId, length: 6 });
+    await expect(decodeTagId(request!, secrets)).resolves.not.toBeNull();
   });
 
   it("TC-CRYPTO-002 decodes a non-16-aligned eight-character integer", async () => {
@@ -317,7 +330,7 @@ describe("canonical ID primitives", () => {
 
     await expect(decodeTagId(request!, secrets)).resolves.toBe(tag.value);
     expect(tag.value % 16n).not.toBe(0n);
-    expect(tag.value).toBeGreaterThanOrEqual(36n ** 7n);
+    expect(tag.value).toBeGreaterThanOrEqual(36n ** 6n);
     expect(tag.value).toBeLessThan(36n ** 8n);
   });
 
@@ -326,7 +339,7 @@ describe("canonical ID primitives", () => {
     const request = extractTagRequest(new URL(`https://p.qr4.uk/t/${tag.id}`));
 
     await expect(decodeTagId(request!, secrets)).resolves.toBe(tag.value);
-    expect(tag.value).toBeGreaterThan(36n ** 9n);
+    expect(tag.value).toBeGreaterThanOrEqual(36n ** 8n);
     expect(tag.value).toBeLessThan(36n ** 10n);
   });
 });
@@ -347,7 +360,7 @@ describe("range validation", () => {
   });
 
   it("TC-RANGE-004 rejects overlapping or malformed global indexes", () => {
-    const lower = 36n ** 5n;
+    const lower = 36n ** 4n;
 
     expect(
       isValidRangeIndex([
@@ -369,6 +382,25 @@ describe("range validation", () => {
         },
       ]),
     ).toBe(false);
+  });
+
+  it("accepts adjacent, non-overlapping ranges at supported-length boundaries", () => {
+    expect(
+      isValidRangeIndex([
+        {
+          ...range("six-digit-space", 36n ** 4n, 6),
+          end: (36n ** 6n - 1n).toString(),
+        },
+        {
+          ...range("eight-digit-space", 36n ** 6n, 8),
+          end: (36n ** 8n - 1n).toString(),
+        },
+        {
+          ...range("ten-digit-space", 36n ** 8n, 10),
+          end: (36n ** 10n - 1n).toString(),
+        },
+      ]),
+    ).toBe(true);
   });
 
   it("TC-RANGE-005 accepts non-aligned eight-character range boundaries", async () => {

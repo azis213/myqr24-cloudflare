@@ -26,6 +26,7 @@ Route::middleware(['web'])->prefix('v1/admin/tag-management')->group(function ()
     Route::post('/pools', [TagManagementController::class, 'createPool']);
     Route::patch('/pools/{poolId}', [TagManagementController::class, 'updatePool']);
     Route::post('/pools/{poolId}/reservations', [TagManagementController::class, 'reserve']);
+    Route::post('/tags/{tagId}/transitions', [TagManagementController::class, 'transition']);
 });
 
 Route::prefix('v1')->group(function (): void {

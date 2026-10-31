@@ -66,7 +66,7 @@ if (!feistelSecret) {
 }
 
 function lowerBound(length) {
-  return 36n ** BigInt(length - 1);
+  return 36n ** BigInt(length - 2);
 }
 
 function upperBound(length) {
@@ -290,9 +290,9 @@ async function createTag(length) {
       continue;
     }
 
-    const id = encodedValue.toString(36);
+    const id = encodedValue.toString(36).padStart(length, "0");
 
-    if (id.length !== length || store.tags.some((tag) => tag.id === id)) {
+    if (store.tags.some((tag) => tag.id === id)) {
       continue;
     }
 

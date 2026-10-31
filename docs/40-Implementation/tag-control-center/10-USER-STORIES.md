@@ -92,7 +92,7 @@
 
 1. Die UI stößt ausschließlich einen autorisierten Control-Plane-Befehl an; die atomare Vergabe läuft serverseitig in einer Datenbanktransaktion.
 2. Es bestehen eindeutige Constraints auf öffentlicher `tagId` sowie auf `(length, decodedValue)`.
-3. Die zulässigen Längen sind ausschließlich 6, 8 und 10; jede ID stammt aus dem kanonischen Raum `I(6)`, `I(8)` oder `I(10)`.
+3. Die zulässigen Längen sind ausschließlich die geraden Werte 6, 8 und 10; jede ID stammt aus `I(L) = [36^(L-2), 36^L)` der jeweiligen Länge. Die öffentliche ID hat exakt L Zeichen; führende Nullen sind zulässig.
 4. Die Control Plane reserviert innerhalb einer aktiven Range den nächsten freien linearen `decodedValue` und lässt ihn vom privaten Codec in die öffentliche `tagId` überführen.
 5. Der vollständige kanonische `decodedValue` wird unverändert gespeichert und dient als Range-Key.
 6. Die Vergabe kann weder durch Parallelaufrufe noch durch Wiederholung eines fehlgeschlagenen Requests eine doppelte ID erzeugen.
@@ -106,7 +106,7 @@
 
 **Akzeptanzkriterien**
 
-1. Ranges sind global nach Startwert sortiert, nicht überlappend und einer gültigen Länge zugeordnet.
+1. Ranges sind global nach Startwert sortiert, längenübergreifend nicht überlappend und einer gültigen geraden Länge zugeordnet.
 2. Start und Ende liegen im kanonischen Raum der jeweiligen Länge.
 3. Ranges sind je Länge lineare, aufeinanderfolgende Integer-Intervalle ohne Slotgrenzen oder Prüfnibbles.
 4. Range-ID, Gruppen-ID und Feature-ID erfüllen die dokumentierten Identifier-Regeln.

@@ -73,7 +73,7 @@ Andere Schlüssel dürfen durch diesen Vertrag nicht geschrieben werden. `decode
 | `length` | exakt `6`, `8` oder `10` |
 | `active` | Boolean; nur `true` darf aufgelöst werden |
 
-Alle Ranges sind auch längenübergreifend nicht überlappend und streng aufsteigend. Anfang und Ende liegen im kanonischen Raum `I(length) = [36^(length-1), 36^length)`. Slotgrenzen, HMAC-Nibbles, Bitmasken und verdeckte Zwischenräume sind unzulässig.
+Alle Ranges sind auch längenübergreifend nicht überlappend und streng aufsteigend. Anfang und Ende liegen im kanonischen Raum `I(length) = [36^(length-2), 36^length)` für eine gerade Länge `length ∈ {6, 8, 10}`. Öffentliche TAG-IDs haben exakt die konfigurierte Länge und dürfen führende Nullen enthalten. Slotgrenzen, HMAC-Nibbles, Bitmasken und verdeckte Zwischenräume sind unzulässig.
 
 Der Edge Router validiert das vollständige Dokument vor dem binären Lookup. Ungültige oder unsortierte Indexdaten neutralisieren die gesamte Routing-Auflösung (`404`).
 

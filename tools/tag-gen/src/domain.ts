@@ -241,7 +241,7 @@ export function formatInteger(value: bigint | string): string {
 }
 
 export function lowerBound(length: TagLength): bigint {
-  return 36n ** BigInt(length - 1);
+  return 36n ** BigInt(length - 2);
 }
 
 export function upperBound(length: TagLength): bigint {

@@ -96,8 +96,7 @@ Die TAG Control Plane (TCP) ist das künftige autoritative Laravel-/MySQL-Backen
 
 ## Nächster zulässiger Implementierungsschritt
 
-1. Lifecycle-Commands für `draft → pending-review → ready-to-publish` mit Idempotenz, Audit und W2L-Sperre für `active` implementieren. `npm run local:test` war am 2026-10-31 mit 19 Tests/123 Assertions gegen die lokale MySQL-8.4-Compose-Topologie erfolgreich.
-3. Fake-Codec um explizite 6/8/10-Contract-Vektoren und Fehler-/Resume-Tests erweitern; anschließend den echten `InternalHttpTagCodecClient` erst mit geschützter serverseitiger Konfiguration und Staging-Nachweisen anbinden.
+1. Fake-Codec um explizite 6/8/10-Contract-Vektoren und Fehler-/Resume-Tests erweitern; anschließend den echten `InternalHttpTagCodecClient` erst mit geschützter serverseitiger Konfiguration und Staging-Nachweisen anbinden. Die lokalen Lifecycle-Commands bis `ready-to-publish` mit Idempotenz, Audit und W2L-Sperre für `active` sind durch `npm run local:test` am 2026-10-31 mit 23 Tests/141 Assertions nachgewiesen.
 4. CP-WP-02 bleibt bis zum Restore-/Dogado-Nachweis `in-progress`; CP-I02 wird ausschließlich mit synthetischen lokalen Daten fortgesetzt.
 
 ## Aktualisierungsregel

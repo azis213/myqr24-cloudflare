@@ -119,9 +119,10 @@ Eine eigenständige algorithmische Neuimplementierung von Feistel, HMAC oder Cyc
 - Kanonischer Wertebereich für Länge `L`:
 
   ```text
-  [36^(L - 1), 36^L)
+  [36^(L - 2), 36^L)
   ```
 
+- TAG-Längen müssen gerade sein; öffentliche IDs bleiben exakt L Zeichen lang und dürfen links mit Nullen aufgefüllt sein.
 - Alle Grenzen und Berechnungen verwenden `bigint`.
 - Bei Länge 6 wird der kanonische Eingabewert direkt kodiert.
 - Bei Länge 8 ist der Eingabewert eine 16-ausgerichtete Basis:
@@ -688,7 +689,7 @@ Noch nicht Teil dieses MVP sind Suche/Filter/Virtualisierung, Drag-/Resize-Handl
 | `test/TEST-CASES.md` | Nachvollziehbare automatisierte und manuelle Testfälle |
 | `test/EVIDENCE.md` | Ergebnisse der Test- und Buildläufe |
 
-Die 8-stelligen Testwerte beginnen korrekt bei `36^7 = 78.364.164.096`; sie sind als Basiswerte durch 16 teilbar.
+Die 8-stelligen Testwerte beginnen im kanonischen Raum bei `36^6 = 2.176.782.336`; sie sind als Basiswerte durch 16 teilbar.
 
 ### 15.3 Ausführungsbefehle
 
@@ -708,15 +709,15 @@ Ein Bereich besitzt zusätzlich die Eingabeart `absolute` oder `offset`. Die Spe
 Für die gewählte TAG-Länge `L` gilt:
 
 ```text
-untergrenze = 36^(L - 1)
+untergrenze = 36^(L - 2)
 obergrenze  = 36^L - 1
-zahlenraum  = 36^L - 36^(L - 1)
+zahlenraum  = 36^L - 36^(L - 2)
 ```
 
 | TAG-Länge | Untergrenze | Obergrenze | verfügbare Werte / Slots |
 | --- | --- | --- | --- |
-| 6 | `36^5` | `36^6 - 1` | `36^6 - 36^5` Werte |
-| 8 | `36^7` | `36^8 - 1` | `(36^8 - 36^7) / 16` 16-ausgerichtete Basiswert-Slots |
+| 6 | `36^4` | `36^6 - 1` | `36^6 - 36^4` Werte |
+| 8 | `36^6` | `36^8 - 1` | `(36^8 - 36^6) / 16` 16-ausgerichtete Basiswert-Slots |
 
 Bei der Eingabeart `offset` gilt:
 

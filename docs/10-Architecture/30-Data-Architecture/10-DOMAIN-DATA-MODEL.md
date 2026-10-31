@@ -91,11 +91,20 @@ Die Darstellung abstrahiert optionale Features wie Lost & Found, Chat, Guestbook
 
 1. `tagId` ist eine kanonische, kleingeschriebene Base36-ID mit exakt 6, 8 oder 10 Stellen.
 2. `(length, decodedValue)` und `tagId` sind jeweils global eindeutig.
-3. `decodedValue` ist immer der vollständige lineare Feistel-decodierte kanonische Integer im Raum `I(length) = [36^(length-1), 36^length)`.
-4. Eine TAG-Range ist je Länge global sortiert und nicht überlappend; ihre Grenzen sind beliebige aufeinanderfolgende kanonische Integer, ohne Slot-Ausrichtung.
-5. Ein TAG gehört durch seinen vollständigen kanonischen Wert höchstens zu einer aktiven Range und damit genau einem Gruppen-Kontext.
-6. Edge-Regelpriorität lautet: direkte TAG-Zuweisung vor Range-Zuweisung vor Gruppen-Zuweisung.
-7. Feistel-Schlüssel, Codec-API-Schlüssel und Redirect-Signing-Schlüssel sind keine Domänendaten und werden niemals an TAG-, Range-, Feature- oder Projektionsobjekte angehängt.
+3. `decodedValue` ist immer der vollständige lineare Feistel-decodierte kanonische Integer im Raum `I(length) = [36^(length-2), 36^length)`; unterstützt werden ausschließlich die geraden Längen 6, 8 und 10.
+4. Eine TAG-Range ist je Länge global sortiert und nicht überlappend; ihre Grenzen sind beliebige aufeinanderfolgende kanonische Integer, ohne Slot-Ausrichtung. Die Längenräume selbst sind disjunkt.
+5. Öffentliche Base36-IDs haben exakt `length` Zeichen; kürzere Darstellungen werden links mit Nullen aufgefüllt.
+6. Ein TAG gehört durch seinen vollständigen kanonischen Wert höchstens zu einer aktiven Range und damit genau einem Gruppen-Kontext.
+7. Edge-Regelpriorität lautet: direkte TAG-Zuweisung vor Range-Zuweisung vor Gruppen-Zuweisung.
+8. Feistel-Schlüssel, Codec-API-Schlüssel und Redirect-Signing-Schlüssel sind keine Domänendaten und werden niemals an TAG-, Range-, Feature- oder Projektionsobjekte angehängt.
+
+Die unterstützten Zahlenräume sind:
+
+| Länge `L` | Inklusive Untergrenze | Exklusive Obergrenze |
+| --- | --- | --- |
+| 6 | `36^4` | `36^6` |
+| 8 | `36^6` | `36^8` |
+| 10 | `36^8` | `36^10` |
 
 ### 3.2 Produkt, Lifecycle, Besitz und Mandant
 

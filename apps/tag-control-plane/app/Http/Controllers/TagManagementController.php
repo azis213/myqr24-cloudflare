@@ -7,11 +7,13 @@ namespace App\Http\Controllers;
 use App\Models\AllocationPool;
 use App\Models\IdempotencyRecord;
 use App\Models\TagRange;
+use App\Models\TagAllocation;
 use App\Models\User;
 use App\Services\AllocationPoolService;
 use App\Services\AuditService;
 use App\Services\TagAllocationService;
 use App\Services\TagManagementAuthorizer;
+use App\Services\TagLifecycleService;
 use App\Services\TagRangeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -280,6 +282,55 @@ final class TagManagementController extends Controller
             'audit_reference' => $result['job_id'],
             'correlation_id' => $request->attributes->get('correlation_id'),
         ], 201);
+    }
+
+    public function transition(
+        Request $request,
+        string $tagId,
+        TagManagementAuthorizer $authorizer,
+        TagLifecycleService $lifecycle,
+        AuditService $audit,
+    ): JsonResponse {
+        $user = $this->user();
+        $allocation = TagAllocation::query()->with('pool')->where('tag_id', $tagId)->first();
+
+        if ($allocation === null || $allocation->pool === null) {
+            return $this->forbidden($request);
+        }
+
+        $input = $request->validate([
+            'targetStatus' => ['required', 'string', 'in:pending-review,ready-to-publish,active'],
+            'reason' => ['required', 'string', 'max:191'],
+        ]);
+
+        try {
+            $authorizer->requireLifecycleTransition($request, $user, $allocation->pool, $input['targetStatus']);
+        } catch (RuntimeException) {
+            return $this->forbidden($request);
+        }
+
+        return $this->updateMutation($request, $user, 'tag.transition', [
+            'tagId' => $tagId,
+            ...$input,
+        ], function () use ($allocation, $input, $lifecycle, $audit, $request, $user): array {
+            $lockedAllocation = TagAllocation::query()->with('pool')->lockForUpdate()->findOrFail($allocation->id);
+            AllocationPool::query()->lockForUpdate()->findOrFail($lockedAllocation->pool_id);
+            $transition = $lifecycle->transition($lockedAllocation, $input['targetStatus'], $input['reason']);
+            $event = $audit->record(
+                (string) $request->attributes->get('correlation_id'),
+                'user',
+                $user->id,
+                'tag_allocation',
+                $transition['allocation']->id,
+                'tag.lifecycle.transitioned',
+                ['from_status' => $transition['previousStatus'], 'to_status' => $transition['allocation']->status],
+            );
+
+            return [
+                'tag' => ['tagId' => $transition['allocation']->tag_id, 'status' => $transition['allocation']->status],
+                'audit_reference' => $event->id,
+            ];
+        });
     }
 
     private function idempotencyKey(Request $request): string

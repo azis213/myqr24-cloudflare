@@ -68,13 +68,11 @@ Secrets niemals in Git, `wrangler.toml`, Dokumentation, Testfixtures, Tickets od
 
 ## Tag- und KV-Regeln
 
-- Unterstützte Tag-ID-Längen: **6** und **8** Base36-Zeichen.
+- Unterstützte Tag-ID-Längen: **6, 8 und 10** Base36-Zeichen; Längen müssen gerade sein.
 - Alle Tag-Werte, Grenzen und Dekodierungen verwenden `BigInt`; nie JavaScript-`number`.
-- Der kanonische Zahlenraum lautet: `I(L) = [36^(L-1), 36^L)`.
-- Achtstellige IDs verwenden einen HMAC-Nibble in den unteren 4 Bit.
-- 8-stellige Ranges müssen vollständige 16er-Slots abdecken:
-  - `start % 16 === 0`
-  - `end % 16 === 15`
+- Der kanonische Zahlenraum lautet: `I(L) = [36^(L-2), 36^L)` für gerade Längen.
+- Öffentliche IDs haben exakt L Zeichen; führende Nullen sind zulässig.
+- Die Räume der unterstützten Längen 6, 8 und 10 sind disjunkt.
 - Der globale `tag-range-index` muss aufsteigend sortiert und nicht überlappend sein.
 - Feature-Priorität:
 

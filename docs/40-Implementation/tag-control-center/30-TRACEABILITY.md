@@ -1,7 +1,7 @@
 # Rückverfolgbarkeit: TAG Control Center
 
 **Letzte Aktualisierung:** 2026-10-29  
-**Status:** In Arbeit. Die TCC-Shell implementiert Login, serverseitigen Session-Status, E-Mail-MFA, Logout sowie den lokalen W2L-Slice für sichtbare Pools, explizite Re-Authentisierung, TCP-bestätigte synthetische Reservierung und Range-/Pool-Patch-Formulare. `npm run test:tcc` (11 Tests) und `npm run build:tcc` sind am 2026-10-31 erfolgreich. Die TCP-MySQL-Integration muss nach Wiederherstellung von Docker Desktop Linux erneut laufen. Lifecycle, echter Internal-Codec und produktive Staging-Nachweise bleiben geplant.
+**Status:** In Arbeit. Die TCC-Shell implementiert Login, serverseitigen Session-Status, E-Mail-MFA, Logout sowie den lokalen W2L-Slice für sichtbare Pools, explizite Re-Authentisierung, TCP-bestätigte synthetische Reservierung, Range-/Pool-Patch-Formulare und die lokalen Lifecycle-Übergänge bis `ready-to-publish`. `npm run test:tcc` (12 Tests), `npm run build:tcc` sowie TCP `npm run local:test` (23 Tests/141 Assertions) sind am 2026-10-31 erfolgreich. Echter Internal-Codec und produktive Staging-Nachweise bleiben geplant.
 
 ## 1. Verweisregeln
 

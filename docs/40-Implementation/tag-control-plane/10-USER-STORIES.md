@@ -43,7 +43,7 @@
 
 **Akzeptanzkriterien**
 
-1. Länge, kanonischer Raum, Reihenfolge und Nichtüberlappung werden geprüft.
+1. Ausschließlich gerade Längen 6, 8 und 10 sowie der jeweils kanonische Raum `I(L) = [36^(L-2), 36^L)` werden geprüft; die Längenräume und alle Ranges sind global nicht überlappend.
 2. Ranges sind je Länge lineare, aufeinanderfolgende Integer-Intervalle ohne Slotgrenzen.
 3. Inaktive oder erschöpfte Ranges vergeben keine neuen TAGs.
 4. Fehlende Gruppen-/Feature-Referenzen verhindern Veröffentlichung.
@@ -58,7 +58,7 @@
 
 1. Ein Pool besitzt mindestens Name, Zielgruppe/Ausgabekanal, Länge, eine oder mehrere gültige Ranges, Status, Kapazitätskennzahlen und Produkt-/Claim-Policy.
 2. Pool-Ranges werden im kanonischen `decodedValue`-Raum verwaltet; öffentliche Feistel-`tagId`-Strings sind keine Poolgrenzen.
-3. Pool-Ranges sind je Länge global nicht überlappend und umfassen lineare aufeinanderfolgende Integer ohne Slotgrenzen.
+3. Pool-Ranges sind global nicht überlappend und umfassen lineare aufeinanderfolgende Integer ohne Slotgrenzen.
 4. Ein Pool kann optional an eine Organisation oder einen Partner gebunden werden.
 5. Nur aktive Pools dürfen TAGs reservieren; Warnschwellen und Erschöpfung sind autoritativ berechenbar.
 6. Poolname, Kundensegment, Bestellung und Owner-Zuordnung gehören nie in KV oder öffentliche Antworten.
@@ -72,7 +72,7 @@
 **Akzeptanzkriterien**
 
 1. `tagId` sowie `(length, decodedValue)` sind eindeutig constrained.
-2. Werte stammen ausschließlich aus dem kanonischen Raum `I(6)`, `I(8)` oder `I(10)` der angeforderten Länge.
+2. Werte stammen ausschließlich aus `I(L) = [36^(L-2), 36^L)` für die angeforderte gerade Länge `L ∈ {6, 8, 10}`; die öffentliche ID hat exakt L Zeichen und darf führende Nullen enthalten.
 3. Die Vergabe reserviert den nächsten freien linearen Integer der gewählten aktiven Range.
 4. Der vollständige kanonische `decodedValue` sowie die vom Codec zurückgelieferte öffentliche `tagId` werden gespeichert.
 5. Retry/Idempotenz erzeugt keine ungewollte zweite Reservierung oder zweite Codec-Wirkung.

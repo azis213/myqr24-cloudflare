@@ -31,21 +31,21 @@ Die Staging-Hosts dürfen ausschließlich vom Staging-Worker und die Production-
 
 ### Kanonische, längendisjunkte ID-Räume
 
-Für jede Base36-Länge `L ≥ 1` ist ausschließlich das folgende Intervall zulässig:
+Für jede unterstützte gerade Base36-Länge `L ∈ {6, 8, 10}` ist ausschließlich das folgende Intervall zulässig:
 
 ```text
-I(L) = [36^(L-1), 36^L)
+I(L) = [36^(L-2), 36^L)
 ```
 
 Die Untergrenze ist inklusive, die Obergrenze exklusiv. Damit sind alle Längenräume paarweise disjunkt:
 
 ```text
-I(6) = [36^5, 36^6)
-I(8) = [36^7, 36^8)
-I(10) = [36^9, 36^10)
+I(6) = [36^4, 36^6)
+I(8) = [36^6, 36^8)
+I(10) = [36^8, 36^10)
 ```
 
-Jede unterstützte ID beginnt folglich bei der Untergrenze ihres eigenen kanonischen Raums. Führende Nullen und numerische Überschneidungen zwischen ID-Längen sind verboten.
+Die öffentlichen IDs bleiben exakt L Zeichen lang. Der Feistel-Encoder füllt kürzere Base36-Darstellungen links mit Nullen auf; führende Nullen sind zulässig. Da jede unterstützte Länge gerade ist und die Intervalle an `36^6` beziehungsweise `36^8` aneinandergrenzen, sind sie disjunkt.
 
 Der Feistel-Decoder muss nach seiner Entschlüsselung per Cycle-Walking so lange erneut angewendet werden, bis der Wert im kanonischen Raum `I(L)` der ursprünglichen Tag-Länge liegt. Wird dieser Zustand innerhalb des definierten Limits nicht erreicht, ist der Tag ungültig und liefert `404`.
 
@@ -53,9 +53,9 @@ Der Feistel-Decoder muss nach seiner Entschlüsselung per Cycle-Walking so lange
 
 | Länge | Feistel-Domäne | Kanonischer Raum |
 | --- | --- | --- |
-| 6 | 32 Bit, zwei 16-Bit-Hälften | `I(6) = [36^5, 36^6)` |
-| 8 | 42 Bit, zwei 21-Bit-Hälften | `I(8) = [36^7, 36^8)` |
-| 10 | 52 Bit, zwei 26-Bit-Hälften | `I(10) = [36^9, 36^10)` |
+| 6 | 32 Bit, zwei 16-Bit-Hälften | `I(6) = [36^4, 36^6)` |
+| 8 | 42 Bit, zwei 21-Bit-Hälften | `I(8) = [36^6, 36^8)` |
+| 10 | 52 Bit, zwei 26-Bit-Hälften | `I(10) = [36^8, 36^10)` |
 
 Für jede unterstützte Länge gilt:
 
@@ -388,5 +388,5 @@ AXX-Formate, Validierung und Mandanten-/Produktzuordnungen sind noch fachlich fe
 - Redirect-Templates stammen nur aus geprüfter serverseitiger Konfiguration und dürfen ausschließlich die dokumentierten Platzhalter verwenden.
 - Signierte Redirects verwenden `REDIRECT_SIGNING_SECRET`, eine auf 10 bis 300 Sekunden begrenzte TTL und binden Ziel, Feature und vollständigen Tag-Kontext per HMAC-SHA-256.
 - Ein HMAC mit Ablaufzeit verhindert keine Wiederholung innerhalb seines Gültigkeitsfensters; echte Einmalverwendung liegt in der Verantwortung eines atomar arbeitenden Ziel-Backends.
-- Die kanonischen Räume `[36^(L-1), 36^L)` sind global disjunkt; ein Tag darf daher in höchstens genau einer Range und einer Gruppe liegen.
+- Die kanonischen Räume `I(L) = [36^(L-2), 36^L)` für die unterstützten geraden Längen sind global disjunkt; ein Tag darf daher in höchstens genau einer Range und einer Gruppe liegen.
 - Änderungen am kryptographischen Format benötigen eine explizite Migrationsstrategie, weil alte ausgegebene Tags weiterhin decodierbar bleiben müssen.

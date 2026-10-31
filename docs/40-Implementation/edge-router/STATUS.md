@@ -28,7 +28,7 @@
 | Range-Regeln | `range-rule:{rangeId}` wird nach direkter Tag-Zuweisung und vor Gruppen-Features ausgewertet |
 | Range-Metadaten | Jede Range enthält stabile `id`, `active` und kanonische `length` |
 | Feature-Dokumente | Wiederverwendbare KV-Dokumente unter `feature:{featureId}` |
-| Cycle-Walk | Erzwingt vollständig `36^(L-1) ≤ value < 36^L` |
+| Cycle-Walk | Erzwingt für gerade Längen vollständig `36^(L-2) ≤ value < 36^L`; Public IDs werden auf L Zeichen aufgefüllt |
 | ID- und Range-Keys | Vollständige kanonische Werte für 6, 8 und 10 Stellen; keine HMAC-Prüfung, Slot-Ausrichtung oder Bitmaskierung |
 | Redirects | Ausschließlich `url` xor `urlTemplate`; Server-Placeholder-Allowlist und HTTP(S)-Prüfung |
 | Testdaten | Versionierte nicht geheime JSON-Fixture unter `test/fixtures/` plus dynamisch berechnete Testwerte |

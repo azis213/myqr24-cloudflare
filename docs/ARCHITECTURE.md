@@ -28,7 +28,7 @@ Die gewählte Scan-Domain ist eine Ausgabe- bzw. Präsentationsentscheidung für
    - acht Base36-Stellen werden auf einem 42-Bit-Block decodiert;
    - zehn Base36-Stellen werden auf einem 52-Bit-Block decodiert;
    - alle Varianten verwenden getrennte Domänenbezeichner und dadurch getrennte Feistel-Round-Funktionen;
-   - ein Cycle-Walk beschränkt die entschlüsselte Ausgabe auf den **kanonischen Zahlenraum der jeweiligen Länge**. Für eine Länge `L` gilt exakt `36^(L-1) ≤ n < 36^L`;
+   - ein Cycle-Walk beschränkt die entschlüsselte Ausgabe auf den **kanonischen Zahlenraum der jeweiligen geraden Länge**. Für eine Länge `L` gilt exakt `36^(L-2) ≤ n < 36^L`;
    - dadurch ist kein numerischer Tag-Wert mehr als einer Base36-Länge zugeordnet.
 4. **Range- und Regelauflösung:** Der vollständige kanonische Feistel-Wert wird gegen den globalen Range-Index geprüft. Ohne passende aktive Range endet die Auflösung mit `404`. Innerhalb der bestätigten Range prüft der Worker anschließend eine direkte Tag-Regel, danach eine optionale Range-Regel und schließlich die referenzierte Gruppe mit ihrer Gruppen-Regel bzw. ihren Features.
 5. **Feature-Ausführung:** Eine aufgelöste Redirect-Regel erzeugt einen HTTP-Redirect; andere oder mehrere Features werden als JSON-Aktionsdokument ausgeliefert. Redirect-Templates können ausschließlich serverseitig bereitgestellte Platzhalter verwenden.
@@ -45,7 +45,7 @@ Die Parameter sind im Code fest definiert und dürfen nicht pro Request oder üb
 | Feistel-Block für 6 Zeichen | 32 Bit, zwei 16-Bit-Hälften |
 | Feistel-Block für 8 Zeichen | 42 Bit, zwei 21-Bit-Hälften |
 | Feistel-Block für 10 Zeichen | 52 Bit, zwei 26-Bit-Hälften |
-| Domain-Restriktion | Cycle-Walking auf den kanonischen Intervallraum `[36^(L-1), 36^L)`, maximal 128 Iterationen |
+| Domain-Restriktion | Cycle-Walking auf den kanonischen Intervallraum `[36^(L-2), 36^L)`, maximal 128 Iterationen |
 | Feistel-Secret | Cloudflare Secret `FEISTEL_SECRET` |
 | Vergabe | vollständige lineare, aufeinanderfolgende Integer je Range |
 
@@ -53,25 +53,25 @@ Die Feistel-Round-Funktion leitet pro Variante und Runde per SHA-256 aus Secret,
 
 ### Kanonische Base36-Räume
 
-Für jede unterstützte Base36-Länge `L ≥ 1` ist der zulässige decodierte Zahlenraum:
+Für jede unterstützte gerade Base36-Länge `L ∈ {6, 8, 10}` ist der zulässige decodierte Zahlenraum:
 
 ```text
-I(L) = [36^(L-1), 36^L)
+I(L) = [36^(L-2), 36^L)
 ```
 
-Die Untergrenze ist inklusive, die Obergrenze exklusiv. `I(L)` und `I(M)` sind für `L ≠ M` disjunkt und ihre Vereinigung bildet einen lückenlosen positiven Zahlenraum. Ein Wert wird daher stets mit seiner kürzesten möglichen Base36-Darstellung verarbeitet; führende Nullen und Längenüberschneidungen existieren nicht.
+Die Untergrenze ist inklusive, die Obergrenze exklusiv. Für die unterstützten geraden Längen sind die Räume paarweise disjunkt und lückenlos aneinandergrenzend. Öffentliche IDs werden stets auf exakt L Base36-Zeichen formatiert; kürzere Werte erhalten führende Nullen.
 
 Konkret:
 
 | Länge | Untergrenze inklusive | Obergrenze exklusiv |
 | ------ | --------------------- | ------------------- |
-| 6 | `36^5` | `36^6` |
-| 8 | `36^7` | `36^8` |
-| 10 | `36^9` | `36^10` |
+| 6 | `36^4` | `36^6` |
+| 8 | `36^6` | `36^8` |
+| 10 | `36^8` | `36^10` |
 
-Damit beginnt eine achtstellige Tag-ID zwingend bei `36^7`, also exakt am ersten Wert, der sieben Base36-Stellen nicht mehr genügt. Ein nach Feistel-Decodierung außerhalb von `I(L)` liegender Wert wird per Cycle-Walking erneut decodiert, bis er in `I(L)` liegt; andernfalls wird der Tag fail-closed abgelehnt.
+Damit beginnen 8-stellige Werte bei `36^6`, direkt nach dem 6-stelligen Raum; 10-stellige Werte beginnen bei `36^8`, direkt nach dem 8-stelligen Raum. Ein nach Feistel-Decodierung außerhalb von `I(L)` liegender Wert wird per Cycle-Walking erneut decodiert, bis er in `I(L)` liegt; andernfalls wird der Tag fail-closed abgelehnt.
 
-> **Implementierungsfolgeregel:** Die Cycle-Walk-Grenzen müssen in `src/index.ts` auf `[36^(L-1), 36^L)` umgesetzt werden. Die vorherige Begrenzung auf `[0, 36^L)` ist für diese Anforderung nicht ausreichend und darf nicht als finales Produktionsformat betrachtet werden.
+> **Implementierungsfolgeregel:** Die Cycle-Walk-Grenzen müssen auf `[36^(L-2), 36^L)` umgesetzt werden. Öffentliche Base36-IDs werden links auf exakt L Zeichen aufgefüllt.
 
 ## Cloudflare Bindings
 
@@ -372,7 +372,7 @@ Ohne auflösbares Redirect-Feature liefert der Worker die aufgelösten Features 
 - Redirect-Ziele stammen ausschließlich aus KV-Konfiguration; externe Nutzereingaben werden nicht als Ziel verwendet.
 - Secrets werden ausschließlich über Cloudflare Secrets bereitgestellt.
 - `BigInt` wird für alle Tag-Identitäten, Grenzen und Decodierungswerte verwendet.
-- Alle kanonischen ID-Räume folgen der Invariante `[36^(L-1), 36^L)` und sind dadurch längendisjunkt.
+- Alle kanonischen ID-Räume folgen für gerade Längen der Invariante `[36^(L-2), 36^L)` und sind dadurch für die unterstützten Längen 6, 8 und 10 disjunkt.
 - Der Range-Index ist global sortiert und nicht überlappend; daher kann ein Tag höchstens einer Gruppe zugeordnet werden.
 - Der vollständige Feistel-decodierte Wert bleibt unabhängig von der Länge der Range-Key; jede Range ist linear und enthält keine Slotlücken.
 - Signierte Redirects verwenden `REDIRECT_SIGNING_SECRET` und eine auf 10 bis 300 Sekunden begrenzte TTL; der Empfänger muss HMAC und Ablauf serverseitig prüfen.

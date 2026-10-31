@@ -66,8 +66,7 @@
 
 ## Nächster zulässiger Implementierungsschritt
 
-1. Lifecycle-Commands für `draft → pending-review → ready-to-publish` mit Idempotenz, Audit und W2L-Sperre für `active` ergänzen. TCC-Tests (11), Produktionsbuild sowie TCP `npm run local:test` (19 Tests/123 Assertions) waren am 2026-10-31 erfolgreich.
-3. Fake-Codec um 6-/8-/10-Contract-Vektoren und Fehler-/Resume-Nachweise erweitern; echten Internal-HTTP-Codec erst mit geschützter Konfiguration und Staging-Evidenz anbinden.
+1. Fake-Codec um 6-/8-/10-Contract-Vektoren und Fehler-/Resume-Nachweise erweitern; echten Internal-HTTP-Codec erst mit geschützter Konfiguration und Staging-Evidenz anbinden. Die lokalen Lifecycle-Commands bis `ready-to-publish` mit Audit, Idempotenz und W2L-Sperre für `active` sind implementiert; TCC-Tests (12), Produktionsbuild sowie TCP `npm run local:test` (23 Tests/141 Assertions) waren am 2026-10-31 erfolgreich.
 
 ## Aktualisierungsregel
 

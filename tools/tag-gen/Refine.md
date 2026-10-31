@@ -49,7 +49,7 @@ Ich möchte nun eine TAG-APP im Ordner tools\tag-gen erstellen, die als Tool fü
 ## Zusatz – Offsetbereiche, lesbare TAG-ID und Feinbedienung
 
 1. Ein Bereich kann alternativ zu absoluten kanonischen Werten als **Offsetbereich** definiert werden. `Von-Offset` und `Bis-Offset` werden relativ zur Untergrenze des gewählten Base36-Zahlenraums angegeben.
-2. Die Untergrenze lautet bei 6 Stellen `36^5` (größter fünfstelliger Base36-Wert plus eins) und bei 8 Stellen `36^7` (größter siebenstelliger Base36-Wert plus eins). Der tatsächliche Wert wird als `Untergrenze + Offset` berechnet.
+2. Die Untergrenze lautet gemäß `I(L) = [36^(L-2), 36^L)` bei 6 Stellen `36^4` und bei 8 Stellen `36^6`. Der tatsächliche Wert wird als `Untergrenze + Offset` berechnet.
 3. Bei 8-stelligen TAGs repräsentiert jeder Offset einen 16-ausgerichteten Basiswert. Daher werden die Offsets als Slots geführt und zur Berechnung mit 16 multipliziert: `Untergrenze + Offset × 16`.
 4. Bei Auswahl der TAG-Länge zeigt die Oberfläche die Untergrenze, die maximale zulässige Zahl und die Größe des verfügbaren Zahlenraums an. Bei Offseteingabe zeigt sie zusätzlich die berechneten absoluten Von-/Bis-Werte an.
 5. Die Etikettenvorlage enthält neben dem bestehenden freien Bereichstext ein zweites, fest definiertes Textfeld für die gut lesbare öffentliche TAG-ID. Dieses Feld ist unabhängig positionier- und skalierbar und wird auf der Druckvorschau mit der jeweiligen öffentlichen TAG-ID befüllt.

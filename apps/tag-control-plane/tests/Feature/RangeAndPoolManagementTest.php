@@ -33,8 +33,8 @@ final class RangeAndPoolManagementTest extends TestCase
             'rangeId' => 'range-6-001',
             'groupId' => 'group-001',
             'length' => 6,
-            'startValue' => '60466176',
-            'endValue' => '60466275',
+            'startValue' => '1679616',
+            'endValue' => '1679715',
             'active' => true,
         ];
 
@@ -48,13 +48,13 @@ final class RangeAndPoolManagementTest extends TestCase
         $this->postJson('/api/v1/admin/tag-management/ranges', $range, $headers)
             ->assertCreated()
             ->assertJsonPath('range.rangeId', 'range-6-001')
-            ->assertJsonPath('range.startValue', '60466176');
+            ->assertJsonPath('range.startValue', '1679616');
 
         $this->assertDatabaseHas('tag_ranges', [
             'range_id' => 'range-6-001',
             'length' => 6,
-            'start_value' => '60466176',
-            'end_value' => '60466275',
+            'start_value' => '1679616',
+            'end_value' => '1679715',
         ]);
 
         $this->postJson('/api/v1/admin/tag-management/ranges', $range, $headers)
@@ -96,6 +96,15 @@ final class RangeAndPoolManagementTest extends TestCase
             'endValue' => '99',
             'active' => true,
         ], ['Idempotency-Key' => '00000000-0000-4000-8000-000000000104'])->assertUnprocessable();
+
+        $this->postJson('/api/v1/admin/tag-management/ranges', [
+            'rangeId' => 'range-6-below-lower-bound',
+            'groupId' => 'group-001',
+            'length' => 6,
+            'startValue' => '1679615',
+            'endValue' => '1679615',
+            'active' => true,
+        ], ['Idempotency-Key' => '00000000-0000-4000-8000-000000000108'])->assertUnprocessable();
 
         $this->assertDatabaseCount('tag_ranges', 1);
     }

@@ -75,7 +75,7 @@ final class TagRangeService
             throw new RuntimeException('Invalid range input.');
         }
 
-        $lowerBound = $this->powerOf36($input['length'] - 1);
+        $lowerBound = $this->powerOf36($input['length'] - 2);
         $upperBound = $this->powerOf36($input['length']);
 
         if (
