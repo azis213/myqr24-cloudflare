@@ -1,6 +1,6 @@
 # Implementierungsstatus: TAG Control Plane
 
-**Letzte Aktualisierung:** 2026-10-29  
+**Letzte Aktualisierung:** 2026-10-31
 **Statusregeln:** [README.md](README.md)  
 **Fachliche Stories:** [10-USER-STORIES.md](10-USER-STORIES.md)  
 
@@ -11,7 +11,7 @@ Die TAG Control Plane (TCP) ist das künftige autoritative Laravel-/MySQL-Backen
 | Iteration | Ziel | Wesentliche Ergebnisse | Abhängigkeiten | Status |
 | --- | --- | --- | --- | --- |
 | `CP-I01` | Plattformfundament | Laravel-13-Anwendung, MySQL-/UTC-Defaults, Audit-Basis, requestweite Korrelation, Health-/Readiness-Endpunkte, lokale MySQL-8.4-Tests sowie TCC-Contract-UI-Nachweis für den W1L-Browservertrag | Dogado PHP/MySQL/Composer/Cron, Auth-Entscheidung | implemented |
-| `CP-I02` | Pools, Ranges und TAG-Lebenszyklus | W2L-Baseline für AuthZ, Organisationsgrenze, Re-Authentisierung, Pool-Read und secret-freie lokale Reservierung mit Idempotenz/Allocation-Job; Range-/Pool-Mutationen und Lifecycle folgen | Produkt-/Pooldefaults, vollständige Validatoren, Internal-HTTP-Codec und Staging-Nachweise | in-progress |
+| `CP-I02` | Pools, Ranges und TAG-Lebenszyklus | W2L-Baseline für AuthZ, Organisationsgrenze, Re-Authentisierung, Pool-Read, Range-/Pool-Anlage und idempotente `PATCH`-Updates mit Audit sowie secret-freie lokale Reservierung mit Allocation-Job; Lifecycle folgt | Produkt-/Pooldefaults, Internal-HTTP-Codec und Staging-Nachweise | in-progress |
 | `CP-I03` | Claiming und kontrollierter JSON-Export | Claim-Gruppen und -Credentials, verschlüsselte Claim-PIN-Persistenz, Owner-Vorabzuweisung, persistente JSON-Exportaufträge für logische TAG-Ranges, unveränderliche Snapshots mit `exportOrderId` sowie externe QA-/Ausschuss-/Nachdruck-/Übergabereferenzen | Exportcontract, Claim- und Qualitätsprozess | planned |
 | `CP-I04` | Routing-Projektion und Publishing | Feature-Validator, Projektion, Outbox, idempotenter KV-Publisher, Publish/Unpublish und Rollback | Staging-KV, least-privilege Cloudflare-Token, Edge-Vertrag | planned |
 | `CP-I05` | Öffentliche Basisdaten | veröffentlichter Basis-Vault, Public Read API, CORS/Cache/Rate Limits und TAG-App-Contract | Staging-API-Origin und PWA-Integration | planned |
@@ -96,8 +96,7 @@ Die TAG Control Plane (TCP) ist das künftige autoritative Laravel-/MySQL-Backen
 
 ## Nächster zulässiger Implementierungsschritt
 
-1. `PATCH`-Range-/Pool-Commands mit Update-Invarianten, Idempotenz und Audit ergänzen; Organisationpool-Anlage und Gruppen-/Feature-Referenzvalidatoren vervollständigen.
-2. Lifecycle-Commands für `draft → pending-review → ready-to-publish` mit Idempotenz, Audit und W2L-Sperre für `active` implementieren.
+1. Lifecycle-Commands für `draft → pending-review → ready-to-publish` mit Idempotenz, Audit und W2L-Sperre für `active` implementieren. `npm run local:test` war am 2026-10-31 mit 19 Tests/123 Assertions gegen die lokale MySQL-8.4-Compose-Topologie erfolgreich.
 3. Fake-Codec um explizite 6/8/10-Contract-Vektoren und Fehler-/Resume-Tests erweitern; anschließend den echten `InternalHttpTagCodecClient` erst mit geschützter serverseitiger Konfiguration und Staging-Nachweisen anbinden.
 4. CP-WP-02 bleibt bis zum Restore-/Dogado-Nachweis `in-progress`; CP-I02 wird ausschließlich mit synthetischen lokalen Daten fortgesetzt.
 

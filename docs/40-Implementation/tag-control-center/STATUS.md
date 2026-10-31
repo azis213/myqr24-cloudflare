@@ -1,6 +1,6 @@
 # Implementierungsstatus: TAG Control Center
 
-**Letzte Aktualisierung:** 2026-10-29  
+**Letzte Aktualisierung:** 2026-10-31
 **Statusregeln:** [README.md](README.md)  
 **Fachliche Stories:** [10-USER-STORIES.md](10-USER-STORIES.md)  
 **Wichtig:** Eine separate React-/Vite-TCC-Shell existiert unter `apps/tag-control-center/`. Sie implementiert den lokalen Admin- und W2L-Slice: serverseitig abgesicherten Login, E-Mail-MFA, Sessionstatus, Logout, sichtbare Allocation Pools, explizite Re-Authentisierung und lokale synthetische Reservierung. Sie enthält weder Secrets noch fachliche Browserautorität.
@@ -10,7 +10,7 @@
 | Iteration | Ziel | Wesentliche Ergebnisse | Abhängigkeiten | Status |
 | --- | --- | --- | --- | --- |
 | `CC-I01` | Fundament und Sicherheitsbasis | ADR-002, separates React-/Vite-Projektgrundgerüst, TCP-Readiness-Check, versionierter W1L-Contract für serverseitigen Passwort-/Session-/E-Mail-MFA-/Logout-Flow und Bootstrap-Admin; lokale TCC-Contract-UI-Suite (6 Tests), TCP-MySQL-Suite (11 Tests/65 Assertions), TCC-Build und Dependency-Audit ohne bekannte Vulnerabilities; Rollen, Recovery und Ziel-MFA verbleiben offen | Dogado-Laufzeit, Staging-Mailtransport, Rollen-/Recovery-/Ziel-MFA-Entscheidung | implemented |
-| `CC-I02` | Pools, TAG-Stammdaten und sichere Vergabe | Plattformweite Range-/Pool-Anlage nach TCP-Re-Auth, sichtbare Pools und TCP-bestätigte lokale Fake-Codec-Reservierung mit Jobnachweis; Updates, Lifecycle, Claim-/Vorabzuweisung und QR-/Druckvorbereitung folgen | Update-/Gruppen-/Feature-Validatoren, Produkt-/Pool-/Claim-Defaults, Internal-HTTP-Codec und Staging-Nachweise | in-progress |
+| `CC-I02` | Pools, TAG-Stammdaten und sichere Vergabe | Plattformweite Range-/Pool-Anlage und Range-/Pool-Bearbeitung nach TCP-Re-Auth, sichtbare Pools und TCP-bestätigte lokale Fake-Codec-Reservierung mit Jobnachweis; Lifecycle, Claim-/Vorabzuweisung und QR-/Druckvorbereitung folgen | Gruppen-/Feature-Validatoren, Produkt-/Pool-/Claim-Defaults, Internal-HTTP-Codec und Staging-Nachweise | in-progress |
 | `CC-I03` | Routing-Projektion und Publishing | Feature-Schemas, Projektion, Outbox, idempotenter Publisher, Publish-Diff, Retry, Unpublish | Cloudflare-Token, Staging-KV-Namespace, Edge-Router-Vertrag | planned |
 | `CC-I04` | Öffentlicher Basis-Vault | veröffentlichte Basisinhalte, öffentliche Read-API, CORS/Cache/Rate-Limits, TAG-App-Adaptervertrag | API-Origin, TAG-App-Integration, Staging-Deployment | planned |
 | `CC-I05` | Produktklassen, Organisationen und POI | Produktpolicies, Organisationsrollen, POI-Onboarding, Nachweise, Review, Meldungen und Moderationsdefaults | verbindliche Produkt-, Retention- und POI-Entscheidungen | planned |
@@ -66,8 +66,7 @@
 
 ## Nächster zulässiger Implementierungsschritt
 
-1. `PATCH`-Range-/Pool-Commands mit Update-Invarianten, Audit und denselben serverseitigen Re-Auth-/Organisationsguards ergänzen.
-2. Lifecycle-Commands für `draft → pending-review → ready-to-publish` mit Idempotenz, Audit und W2L-Sperre für `active` ergänzen.
+1. Lifecycle-Commands für `draft → pending-review → ready-to-publish` mit Idempotenz, Audit und W2L-Sperre für `active` ergänzen. TCC-Tests (11), Produktionsbuild sowie TCP `npm run local:test` (19 Tests/123 Assertions) waren am 2026-10-31 erfolgreich.
 3. Fake-Codec um 6-/8-/10-Contract-Vektoren und Fehler-/Resume-Nachweise erweitern; echten Internal-HTTP-Codec erst mit geschützter Konfiguration und Staging-Evidenz anbinden.
 
 ## Aktualisierungsregel

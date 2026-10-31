@@ -385,6 +385,28 @@ describe("TAG Control Center admin auth contract", () => {
     );
   });
 
+  it("updates a TCP-confirmed range only through the CSRF- and idempotency-protected PATCH command", async () => {
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse(true))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { ranges: [{ rangeId: "range-6-001", groupId: "group-001", length: 6, startValue: "60466176", endValue: "60466275", active: true }], correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { csrf_token: "reauth-csrf", correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { status: "reauthenticated", correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { csrf_token: "range-patch-csrf", correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { range: { rangeId: "range-6-001" }, correlation_id: correlationId } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, status: 200, body: { ranges: [], correlation_id: correlationId } }));
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("admin@example.test");
+    await user.click(screen.getByRole("button", { name: "Ranges laden" }));
+    await user.click(await screen.findByRole("button", { name: "Range bearbeiten" }));
+    await user.type(screen.getByLabelText("Passwort zur erneuten Authentisierung"), "browser-only-password");
+    await user.click(screen.getByRole("button", { name: "Reservierung freigeben" }));
+    await user.click(screen.getByRole("button", { name: "Range serverseitig aktualisieren" }));
+
+    expect(fetchMock).toHaveBeenNthCalledWith(6, "/tcp/api/v1/admin/tag-management/ranges/range-6-001", expect.objectContaining({ method: "PATCH", headers: expect.objectContaining({ "X-CSRF-TOKEN": "range-patch-csrf", "Idempotency-Key": "00000000-0000-4000-8000-000000000099" }) }));
+  });
+
   it("creates a pool from TCP-confirmed ranges only after reauthentication", async () => {
     fetchMock
       .mockResolvedValueOnce(sessionResponse(true))

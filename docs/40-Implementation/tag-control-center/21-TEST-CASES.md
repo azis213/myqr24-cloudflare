@@ -1,7 +1,7 @@
 # Testfälle: TAG Control Center
 
 **Letzte Aktualisierung:** 2026-10-28  
-**Status:** Der lokale W1L-Auth-/Session-Schnitt und der lokale W2L-Pool-/Reservierungs-Slice sind nachgewiesen: TCP-MySQL-Integration (**14 Tests, 88 Assertions**), TCC-Contract-UI-Suite (**8 Tests**) und TCC-Build sind am 2026-10-29 erfolgreich. Range-/Pool-Mutationen, Lifecycle, echter Internal-Codec, Recovery und Staging bleiben offen.
+**Status:** Der lokale W1L-Auth-/Session-Schnitt sowie W2L-Range-/Pool-Anlage, Reservierung und Range-Update sind im Code und TCC-Contracttest vorhanden. `npm run test:tcc` lief am 2026-10-31 mit **11 Tests** und `npm run build:tcc` erfolgreich. Die TCP-MySQL-Ausführung ist lokal erneut auszuführen, sobald Docker Desktop Linux verfügbar ist. Lifecycle, echter Internal-Codec, Recovery und Staging bleiben offen.
 
 ## CC-I01 – Fundament, Authentisierung und Audit
 

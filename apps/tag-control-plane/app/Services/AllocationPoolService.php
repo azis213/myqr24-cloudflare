@@ -48,6 +48,36 @@ final class AllocationPoolService
     }
 
     /** @param array $input */
+    public function update(AllocationPool $pool, array $input): AllocationPool
+    {
+        if ($pool->pool_id !== $input['poolId'] || $pool->organization_id !== $input['organizationId'] || $pool->length !== $input['length']) {
+            throw new RuntimeException('Pool identity is immutable.');
+        }
+
+        $this->validateInput($input);
+
+        return DB::transaction(function () use ($pool, $input): AllocationPool {
+            $lockedPool = AllocationPool::query()->lockForUpdate()->findOrFail($pool->id);
+            $ranges = TagRange::query()->whereIn('range_id', $input['rangeIds'])->lockForUpdate()->get();
+
+            if ($ranges->count() !== count($input['rangeIds']) || $ranges->contains(fn (TagRange $range): bool => ! $range->is_active || $range->length !== $input['length'])) {
+                throw new RuntimeException('Pool references invalid ranges.');
+            }
+
+            $lockedPool->update([
+                'display_name' => $input['displayName'],
+                'channel' => $input['channel'],
+                'policy_ref' => $input['policyRef'],
+                'capacity_warning_threshold' => $input['capacityWarningThreshold'],
+                'is_active' => $input['active'],
+            ]);
+            $lockedPool->ranges()->sync($ranges->pluck('id')->all());
+
+            return $lockedPool->load('ranges');
+        });
+    }
+
+    /** @param array $input */
     private function validateInput(array $input): void
     {
         if (

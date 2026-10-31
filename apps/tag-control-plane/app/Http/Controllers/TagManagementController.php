@@ -9,6 +9,7 @@ use App\Models\IdempotencyRecord;
 use App\Models\TagRange;
 use App\Models\User;
 use App\Services\AllocationPoolService;
+use App\Services\AuditService;
 use App\Services\TagAllocationService;
 use App\Services\TagManagementAuthorizer;
 use App\Services\TagRangeService;
@@ -118,12 +119,7 @@ final class TagManagementController extends Controller
             ->orderBy('pool_id')
             ->get()
             ->filter(fn (AllocationPool $pool): bool => $authorizer->canReadPool($user, $pool))
-            ->map(static fn (AllocationPool $pool): array => [
-                'poolId' => $pool->pool_id,
-                'length' => $pool->length,
-                'active' => $pool->is_active,
-                'rangeIds' => $pool->ranges->pluck('range_id')->values(),
-            ])
+            ->map(fn (AllocationPool $pool): array => $this->poolPayload($pool))
             ->values();
 
         return response()->json([
@@ -194,6 +190,34 @@ final class TagManagementController extends Controller
             ...$response,
             'correlation_id' => $request->attributes->get('correlation_id'),
         ], 201);
+    }
+
+    public function updateRange(Request $request, string $rangeId, TagManagementAuthorizer $authorizer, TagRangeService $ranges, AuditService $audit): JsonResponse
+    {
+        $user = $this->user();
+        try { $authorizer->requireRangeMutation($request, $user); } catch (RuntimeException) { return $this->forbidden($request); }
+        $range = TagRange::query()->where('range_id', $rangeId)->first();
+        if ($range === null) { return $this->forbidden($request); }
+        $input = $request->validate(['rangeId' => ['required', 'string', 'max:128'], 'groupId' => ['required', 'string', 'max:128'], 'length' => ['required', 'integer'], 'startValue' => ['required', 'string', 'max:32'], 'endValue' => ['required', 'string', 'max:32'], 'active' => ['required', 'boolean']]);
+        return $this->updateMutation($request, $user, 'range.update', $input, function () use ($ranges, $range, $input, $audit, $request, $user): array {
+            $updated = $ranges->update($range, $input);
+            $event = $audit->record((string) $request->attributes->get('correlation_id'), 'user', $user->id, 'tag_range', $updated->id, 'tag_range.updated');
+            return ['range' => $this->rangePayload($updated), 'audit_reference' => $event->id];
+        });
+    }
+
+    public function updatePool(Request $request, string $poolId, TagManagementAuthorizer $authorizer, AllocationPoolService $pools, AuditService $audit): JsonResponse
+    {
+        $user = $this->user();
+        $pool = AllocationPool::query()->with('ranges')->where('pool_id', $poolId)->first();
+        if ($pool === null) { return $this->forbidden($request); }
+        try { $authorizer->requirePoolMutation($request, $user, $pool->organization_id); } catch (RuntimeException) { return $this->forbidden($request); }
+        $input = $request->validate(['poolId' => ['required', 'string', 'max:128'], 'organizationId' => ['nullable', 'uuid'], 'displayName' => ['required', 'string', 'max:191'], 'channel' => ['required', 'string', 'max:64'], 'length' => ['required', 'integer'], 'rangeIds' => ['required', 'array', 'min:1'], 'rangeIds.*' => ['string', 'max:128'], 'policyRef' => ['required', 'string', 'max:191'], 'capacityWarningThreshold' => ['required', 'integer', 'min:0'], 'active' => ['required', 'boolean']]);
+        return $this->updateMutation($request, $user, 'pool.update', $input, function () use ($pools, $pool, $input, $audit, $request, $user): array {
+            $updated = $pools->update($pool, $input);
+            $event = $audit->record((string) $request->attributes->get('correlation_id'), 'user', $user->id, 'allocation_pool', $updated->id, 'allocation_pool.updated');
+            return ['pool' => $this->poolPayload($updated), 'audit_reference' => $event->id];
+        });
     }
 
     public function reserve(
@@ -270,6 +294,28 @@ final class TagManagementController extends Controller
 
         return strtolower($key);
     }
+
+    private function updateMutation(Request $request, User $user, string $command, array $input, callable $mutation): JsonResponse
+    {
+        $key = $this->idempotencyKey($request);
+        try {
+            $response = DB::transaction(function () use ($user, $command, $key, $input, $mutation): array {
+                $existing = $this->existingIdempotencyResponse($user, $command, $key, $input);
+                if ($existing !== null) { return $existing; }
+                $response = $mutation();
+                $this->storeIdempotencyResponse($user, $command, $key, $input, $response);
+                return $response;
+            });
+        } catch (RuntimeException $exception) {
+            if ($exception->getMessage() === 'Idempotency request mismatch.') { return response()->json($this->errorPayload($request), 409); }
+            throw ValidationException::withMessages(['request' => ['Die angeforderte Verwaltungsaktion ist nicht zulässig.']]);
+        }
+        return response()->json([...$response, 'correlation_id' => $request->attributes->get('correlation_id')]);
+    }
+
+    private function rangePayload(TagRange $range): array { return ['rangeId' => $range->range_id, 'groupId' => $range->group_id, 'length' => $range->length, 'startValue' => $range->start_value, 'endValue' => $range->end_value, 'active' => $range->is_active]; }
+
+    private function poolPayload(AllocationPool $pool): array { return ['poolId' => $pool->pool_id, 'organizationId' => $pool->organization_id, 'displayName' => $pool->display_name, 'channel' => $pool->channel, 'length' => $pool->length, 'policyRef' => $pool->policy_ref, 'capacityWarningThreshold' => $pool->capacity_warning_threshold, 'active' => $pool->is_active, 'rangeIds' => $pool->ranges->pluck('range_id')->values()->all()]; }
 
     private function existingIdempotencyResponse(
         User $user,

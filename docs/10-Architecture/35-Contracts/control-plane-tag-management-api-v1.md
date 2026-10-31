@@ -120,7 +120,7 @@ Poolname, Kundensegment, Owner- und Bestellreferenzen bleiben private Control-Pl
 
 ## 5. Geplante Contract-Operationen
 
-Die folgenden Pfade sind lokale Contract-Endpunkte. `GET`/`POST` für Ranges und Pools sowie die Reservierung sind mit synthetischen Daten implementiert; `PATCH`- und Lifecycle-Pfade bleiben bis zu ihren jeweiligen Validatoren bzw. Statusautomatentests deaktiviert.
+Die folgenden Pfade sind lokale Contract-Endpunkte. `GET`/`POST`/`PATCH` für Ranges und Pools sowie die Reservierung sind mit synthetischen Daten implementiert; Lifecycle-Pfade bleiben bis zu ihren Statusautomatentests deaktiviert.
 
 ### 5.1 Ranges
 
@@ -154,6 +154,8 @@ TCP prüft vor Persistenz:
 
 Erfolgsantworten enthalten ausschließlich die kanonische Range, technische Kapazität und `audit_reference`.
 
+Im lokalen Slice sind `rangeId` und `length` nach Anlage unveränderlich. Ein Update prüft die vollständige Range-Invariante erneut und darf eine Range nicht deaktivieren, solange sie von einem aktiven Pool referenziert wird.
+
 ### 5.2 Allocation Pools
 
 ```http
@@ -178,6 +180,8 @@ Beispiel:
 ```
 
 `displayName`, `channel` und `policyRef` sind interne Verwaltungsdaten. TCP prüft, dass alle Ranges existieren, dieselbe Länge verwenden, aktivierbar sind und keine fremde Organisationsbindung umgehen. Poolkapazität wird serverseitig aus kanonischen Rangegrenzen und reservierten Werten abgeleitet; TCC darf sie nicht lokal berechnen oder erzwingen.
+
+Im lokalen Slice sind `poolId`, `organizationId` und `length` nach Anlage unveränderlich. Poolupdates benötigen dieselbe serverseitige Organisations-/Re-Auth-Grenze, einen Idempotency-Key und erzeugen Audit; die private Poolquery liefert TCC die für ein serverbestätigtes Editformular erforderlichen Poolfelder.
 
 ### 5.3 Reservierung
 
@@ -270,7 +274,7 @@ draft -> pending-review -> ready-to-publish
 
 Dieser Vertrag ist während CP-I02 `in-progress`. Die W2L-Baseline für AuthZ und den lokalen Fake-Codec ist entschieden und lokal umgesetzt; verbleibende Teilcommands bleiben gezielt gesperrt.
 
-- `PATCH`-Range/-Pool- und Lifecycle-Commands bleiben deaktiviert, bis Update-Invarianten, Statusautomat und Negativtests vorhanden sind.
+- Lifecycle-Commands bleiben deaktiviert, bis Statusautomat und Negativtests vorhanden sind.
 - Ohne echten Internal-HTTP-Codec: keine Staging-/Produktionsreservierung; TCP darf weiterhin kein Feistel-Secret besitzen.
 - Ohne Produkt-/Pooldefaults: keine reale Ausgabepolicy und keine Staging-/Produktionswirkung.
 

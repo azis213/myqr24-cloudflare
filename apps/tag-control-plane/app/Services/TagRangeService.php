@@ -34,6 +34,34 @@ final class TagRangeService
     }
 
     /** @param array $input */
+    public function update(TagRange $range, array $input): TagRange
+    {
+        if ($range->range_id !== $input['rangeId'] || $range->length !== $input['length']) {
+            throw new RuntimeException('Range identity is immutable.');
+        }
+
+        $this->validateInput($input);
+
+        return DB::transaction(function () use ($range, $input): TagRange {
+            $lockedRange = TagRange::query()->lockForUpdate()->findOrFail($range->id);
+            $this->assertNoOverlap($input['length'], $input['startValue'], $input['endValue'], $lockedRange->id);
+
+            if ($lockedRange->is_active && ! $input['active'] && $lockedRange->pools()->where('is_active', true)->exists()) {
+                throw new RuntimeException('Active pools reference this range.');
+            }
+
+            $lockedRange->update([
+                'group_id' => $input['groupId'],
+                'start_value' => $input['startValue'],
+                'end_value' => $input['endValue'],
+                'is_active' => $input['active'],
+            ]);
+
+            return $lockedRange->refresh();
+        });
+    }
+
+    /** @param array $input */
     private function validateInput(array $input): void
     {
         if (
@@ -58,10 +86,11 @@ final class TagRangeService
         }
     }
 
-    private function assertNoOverlap(int $length, string $startValue, string $endValue): void
+    private function assertNoOverlap(int $length, string $startValue, string $endValue, ?string $excludedId = null): void
     {
         $ranges = TagRange::query()
             ->where('length', $length)
+            ->when($excludedId !== null, fn ($query) => $query->where('id', '!=', $excludedId))
             ->lockForUpdate()
             ->get(['start_value', 'end_value']);
 

@@ -1,10 +1,10 @@
 # Operativer Orchestrierungsstatus: TAG-Plattform
 
 **Orchestrierungsanweisung:** [`README.md`](README.md)  
-**Stand:** 2026-10-29  
+**Stand:** 2026-10-31
 **Gesamtstatus:** `in-progress`  
 **Aktive Welle:** `W2L – lokaler Verwaltungs-Slice in progress`
-**Nächster zulässiger Arbeitsschritt:** Range- und Pool-Mutationscommands mit kanonischem 6-/8-/10-stelligem Range-Validator, globaler Nichtüberlappung, Organisationsguard und Re-Authentisierung implementieren. Danach folgen lokale Lifecycle-Commands für `draft → pending-review → ready-to-publish`. Der vorhandene lokale Pool-/Reservierungs-Slice bleibt auf synthetische Daten und `FakeTagCodecClient` begrenzt; Dogado-Deployment, echte Internal-Codec-Anbindung, Staging-Read-API und echter KV-Publish bleiben gesperrt.
+**Nächster zulässiger Arbeitsschritt:** Lokale Lifecycle-Commands für `draft → pending-review → ready-to-publish` mit Idempotenz und Audit implementieren. Range-/Pool-`PATCH`-Mutationen mit kanonischem 6-/8-/10-stelligem Range-Validator, globaler Nichtüberlappung, Organisationsguard, Re-Authentisierung und Audit sind lokal implementiert und durch `npm run local:test` am 2026-10-31 (19 Tests/123 Assertions) nachgewiesen. Der Pool-/Reservierungs-Slice bleibt auf synthetische Daten und `FakeTagCodecClient` begrenzt; Dogado-Deployment, echte Internal-Codec-Anbindung, Staging-Read-API und echter KV-Publish bleiben gesperrt.
 **Regel:** `apps/tag-control-plane` und `apps/tag-control-center` sind im lokalen W1L-Umfang vorhanden. Persistenz-, Migrations-, Transaktions-, Outbox- und Rollbacktests laufen gegen die vorhandene isolierte Compose-MySQL-Topologie; Cloudflare, Dogado und Mail bleiben lokale Fakes. Reale Dogado-Verbindungen, echte Cloudflare-Tokens und manuelle oder automatisierte KV-Fachänderungen bleiben vor dem Deployment-Gate verboten. `docs/00-Refinement/` ist bei regulären Wiederanläufen und Umsetzungsarbeiten ausdrücklich ausgeschlossen; Ideen daraus werden erst nach einer dokumentierten Architektur-, Contract-, Story-, Test-, Traceability- und Statusübernahme verbindlich.
 
 ---

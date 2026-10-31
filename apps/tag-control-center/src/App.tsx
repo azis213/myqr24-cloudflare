@@ -20,7 +20,12 @@ type JsonRecord = Record<string, unknown>;
 
 type Pool = {
   poolId: string;
+  organizationId: string | null;
+  displayName: string;
+  channel: string;
   length: number;
+  policyRef: string;
+  capacityWarningThreshold: number;
   active: boolean;
   rangeIds: string[];
 };
@@ -161,6 +166,7 @@ export function App() {
   });
   const [rangeMessage, setRangeMessage] = useState<string | null>(null);
   const [rangeIdempotencyKey, setRangeIdempotencyKey] = useState<string | null>(null);
+  const [editingRangeId, setEditingRangeId] = useState<string | null>(null);
   const [poolForm, setPoolForm] = useState({
     poolId: "",
     displayName: "",
@@ -172,6 +178,7 @@ export function App() {
   });
   const [poolMessage, setPoolMessage] = useState<string | null>(null);
   const [poolIdempotencyKey, setPoolIdempotencyKey] = useState<string | null>(null);
+  const [editingPoolId, setEditingPoolId] = useState<string | null>(null);
   const [reauthentication, setReauthentication] = useState<ReauthenticationState>({ kind: "idle" });
   const [reauthenticationPassword, setReauthenticationPassword] = useState("");
   const [reservationQuantity, setReservationQuantity] = useState("1");
@@ -374,7 +381,12 @@ export function App() {
 
         return [{
           poolId: value.poolId,
+          organizationId: typeof value.organizationId === "string" ? value.organizationId : null,
+          displayName: typeof value.displayName === "string" ? value.displayName : "",
+          channel: typeof value.channel === "string" ? value.channel : "",
           length: value.length,
+          policyRef: typeof value.policyRef === "string" ? value.policyRef : "",
+          capacityWarningThreshold: typeof value.capacityWarningThreshold === "number" ? value.capacityWarningThreshold : 0,
           active: value.active,
           rangeIds: value.rangeIds,
         }];
@@ -446,8 +458,8 @@ export function App() {
       const token = await csrfToken();
       const idempotencyKey = rangeIdempotencyKey ?? crypto.randomUUID();
       setRangeIdempotencyKey(idempotencyKey);
-      const response = await fetch(`${tcpBaseUrl}/api/v1/admin/tag-management/ranges`, {
-        method: "POST",
+      const response = await fetch(`${tcpBaseUrl}/api/v1/admin/tag-management/ranges${editingRangeId === null ? "" : `/${encodeURIComponent(editingRangeId)}`}`, {
+        method: editingRangeId === null ? "POST" : "PATCH",
         credentials: "include",
         headers: {
           Accept: "application/json",
@@ -471,8 +483,9 @@ export function App() {
         return;
       }
 
-      setRangeMessage("Range wurde serverseitig angelegt.");
+      setRangeMessage(editingRangeId === null ? "Range wurde serverseitig angelegt." : "Range wurde serverseitig aktualisiert.");
       setRangeIdempotencyKey(null);
+      setEditingRangeId(null);
       setRangeForm({
         rangeId: "",
         groupId: "",
@@ -499,8 +512,8 @@ export function App() {
       const token = await csrfToken();
       const idempotencyKey = poolIdempotencyKey ?? crypto.randomUUID();
       setPoolIdempotencyKey(idempotencyKey);
-      const response = await fetch(`${tcpBaseUrl}/api/v1/admin/tag-management/pools`, {
-        method: "POST",
+      const response = await fetch(`${tcpBaseUrl}/api/v1/admin/tag-management/pools${editingPoolId === null ? "" : `/${encodeURIComponent(editingPoolId)}`}`, {
+        method: editingPoolId === null ? "POST" : "PATCH",
         credentials: "include",
         headers: {
           Accept: "application/json",
@@ -510,7 +523,7 @@ export function App() {
         },
         body: JSON.stringify({
           poolId: poolForm.poolId,
-          organizationId: null,
+          organizationId: editingPoolId === null ? null : pools.kind === "loaded" ? pools.pools.find((pool) => pool.poolId === editingPoolId)?.organizationId ?? null : null,
           displayName: poolForm.displayName,
           channel: poolForm.channel,
           length: Number(poolForm.length),
@@ -527,8 +540,9 @@ export function App() {
         return;
       }
 
-      setPoolMessage("Pool wurde serverseitig angelegt.");
+      setPoolMessage(editingPoolId === null ? "Pool wurde serverseitig angelegt." : "Pool wurde serverseitig aktualisiert.");
       setPoolIdempotencyKey(null);
+      setEditingPoolId(null);
       setPoolForm({
         poolId: "",
         displayName: "",
@@ -667,8 +681,10 @@ export function App() {
       setRanges({ kind: "idle" });
       setRangeMessage(null);
       setRangeIdempotencyKey(null);
+      setEditingRangeId(null);
       setPoolMessage(null);
       setPoolIdempotencyKey(null);
+      setEditingPoolId(null);
       setReauthentication({ kind: "idle" });
       setReauthenticationPassword("");
       setSelectedPoolId(null);
@@ -808,6 +824,11 @@ export function App() {
                   {ranges.ranges.map((range) => (
                     <li key={range.rangeId}>
                       <code>{range.rangeId}</code>: {range.startValue} – {range.endValue} (Länge {range.length})
+                      <button type="button" className="secondary-action" onClick={() => {
+                        setEditingRangeId(range.rangeId);
+                        setRangeIdempotencyKey(null);
+                        setRangeForm({ rangeId: range.rangeId, groupId: range.groupId, length: String(range.length), startValue: range.startValue, endValue: range.endValue });
+                      }}>Range bearbeiten</button>
                     </li>
                   ))}
                 </ul>
@@ -815,10 +836,10 @@ export function App() {
               {ranges.kind === "error" ? <p className="error-message" role="alert">{ranges.message}</p> : null}
 
               <form className="auth-form" onSubmit={createRange}>
-                <h3>Range anlegen</h3>
+                <h3>{editingRangeId === null ? "Range anlegen" : "Range bearbeiten"}</h3>
                 <label>
                   Range-ID
-                  <input required value={rangeForm.rangeId} onChange={(event) => setRangeForm({ ...rangeForm, rangeId: event.target.value })} />
+                  <input required disabled={editingRangeId !== null} value={rangeForm.rangeId} onChange={(event) => setRangeForm({ ...rangeForm, rangeId: event.target.value })} />
                 </label>
                 <label>
                   Gruppen-ID
@@ -826,7 +847,7 @@ export function App() {
                 </label>
                 <label>
                   Länge
-                  <select value={rangeForm.length} onChange={(event) => setRangeForm({ ...rangeForm, length: event.target.value })}>
+                  <select disabled={editingRangeId !== null} value={rangeForm.length} onChange={(event) => setRangeForm({ ...rangeForm, length: event.target.value })}>
                     <option value="6">6</option>
                     <option value="8">8</option>
                     <option value="10">10</option>
@@ -841,7 +862,7 @@ export function App() {
                   <input inputMode="numeric" required value={rangeForm.endValue} onChange={(event) => setRangeForm({ ...rangeForm, endValue: event.target.value })} />
                 </label>
                 {reauthentication.kind === "ready" ? (
-                  <button type="submit" className="primary-action">Range serverseitig anlegen</button>
+                  <button type="submit" className="primary-action">{editingRangeId === null ? "Range serverseitig anlegen" : "Range serverseitig aktualisieren"}</button>
                 ) : (
                   <p>Für diese Mutation ist die Re-Authentisierung im Bereich „Kritische Aktion freigeben“ erforderlich.</p>
                 )}
@@ -851,11 +872,11 @@ export function App() {
               </form>
 
               <form className="auth-form" onSubmit={createPool}>
-                <h3>Allocation Pool anlegen</h3>
+                <h3>{editingPoolId === null ? "Allocation Pool anlegen" : "Allocation Pool bearbeiten"}</h3>
                 <p>Der Pool referenziert ausschließlich aktive, bereits serverbestätigte Ranges gleicher Länge.</p>
                 <label>
                   Pool-ID
-                  <input required value={poolForm.poolId} onChange={(event) => setPoolForm({ ...poolForm, poolId: event.target.value })} />
+                  <input required disabled={editingPoolId !== null} value={poolForm.poolId} onChange={(event) => setPoolForm({ ...poolForm, poolId: event.target.value })} />
                 </label>
                 <label>
                   Anzeigename
@@ -867,7 +888,7 @@ export function App() {
                 </label>
                 <label>
                   Länge
-                  <select value={poolForm.length} onChange={(event) => setPoolForm({ ...poolForm, length: event.target.value, rangeIds: [] })}>
+                  <select disabled={editingPoolId !== null} value={poolForm.length} onChange={(event) => setPoolForm({ ...poolForm, length: event.target.value, rangeIds: [] })}>
                     <option value="6">6</option>
                     <option value="8">8</option>
                     <option value="10">10</option>
@@ -902,7 +923,7 @@ export function App() {
                     )) : <p>Laden Sie zuerst die Range-Konfiguration.</p>}
                 </fieldset>
                 {reauthentication.kind === "ready" ? (
-                  <button type="submit" className="primary-action">Pool serverseitig anlegen</button>
+                  <button type="submit" className="primary-action">{editingPoolId === null ? "Pool serverseitig anlegen" : "Pool serverseitig aktualisieren"}</button>
                 ) : (
                   <p>Für diese Mutation ist eine frische serverseitige Re-Authentisierung erforderlich.</p>
                 )}
@@ -945,6 +966,12 @@ export function App() {
                     <p className="module-status">{pool.active ? "Aktiv" : "Inaktiv"}</p>
                     <h3>{pool.poolId}</h3>
                     <p>Länge: <code>{pool.length}</code> · Ranges: {pool.rangeIds.join(", ")}</p>
+                    {(auth.role === "platform-admin" || auth.role === "organization-admin") ? <button type="button" className="secondary-action" onClick={() => {
+                      setEditingPoolId(pool.poolId);
+                      setPoolIdempotencyKey(null);
+                      setPoolForm({ poolId: pool.poolId, displayName: pool.displayName, channel: pool.channel, length: String(pool.length), policyRef: pool.policyRef, capacityWarningThreshold: String(pool.capacityWarningThreshold), rangeIds: pool.rangeIds });
+                      setPoolMessage("TCP-validierte Poolwerte wurden zur Bearbeitung übernommen.");
+                    }}>Pool bearbeiten</button> : null}
                     <button
                       type="button"
                       className="secondary-action"
