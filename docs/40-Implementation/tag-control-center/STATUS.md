@@ -66,7 +66,7 @@
 
 ## Nächster zulässiger Implementierungsschritt
 
-1. Fake-Codec um 6-/8-/10-Contract-Vektoren und Fehler-/Resume-Nachweise erweitern; echten Internal-HTTP-Codec erst mit geschützter Konfiguration und Staging-Evidenz anbinden. Die lokalen Lifecycle-Commands bis `ready-to-publish` mit Audit, Idempotenz und W2L-Sperre für `active` sind implementiert; TCC-Tests (12), Produktionsbuild sowie TCP `npm run local:test` (23 Tests/141 Assertions) waren am 2026-10-31 erfolgreich.
+1. Den echten Internal-HTTP-Codec zunächst ausschließlich serverseitig mit geschützter Konfiguration, Timeout-/Fehleradaptertests und ohne Browserzugriff vorbereiten; Staging-Evidenz bleibt eine getrennte Folgeaktion. Der lokale Fake-Codec ist mit 6-/8-/10-Contract-Vektoren und jobgebundenem Resume durch TCP `npm run local:test` (27 Tests/167 Assertions) nachgewiesen.
 
 ## Aktualisierungsregel
 

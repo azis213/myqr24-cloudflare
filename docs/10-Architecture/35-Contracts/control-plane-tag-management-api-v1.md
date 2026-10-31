@@ -48,6 +48,16 @@ Eine vollständige Reservierung benötigt den authentisierten Encode-Aufruf gem�
 
 Der lokale W2L-Slice verwendet ausschließlich den injizierten `TagCodecClient` mit `FakeTagCodecClient`. Der Fake enthält kein Feistel-Secret, führt keine Netzwerkaufrufe aus und liefert deterministische lowercase-Test-IDs mit `codecVersion: TEST-S01`. Er erlaubt nur 6, 8 und 10 Stellen sowie maximal 1.000 eindeutige Werte.
 
+Die synthetischen, nicht geheimen Contract-Vektoren des lokalen Fakes sind festgelegt:
+
+| Länge | kanonischer Dezimalwert | erwartete `tagId` | `codecVersion` |
+| --- | --- | --- | --- |
+| 6 | `60466176` | `20980d` | `TEST-S01` |
+| 8 | `78364164096` | `fab5ee18` | `TEST-S01` |
+| 10 | `101559956668416` | `8ebc9372d8` | `TEST-S01` |
+
+Der Fake akzeptiert nur kanonische Werte innerhalb von `I(6)`, `I(8)` bzw. `I(10)`. Nicht unterstützte Längen, nichtkanonische Werte, leere Batches, Duplikate und Batches über 1.000 Einträge werden fail-closed abgewiesen.
+
 Die lokale Retry-Grenze ist:
 
 1. TCP persistiert erst einen idempotenten Allocation-Job und `codec-pending`-Wertreservierungen mit Unique-Constraint auf `(length, decodedValue)`.
@@ -55,6 +65,8 @@ Die lokale Retry-Grenze ist:
 3. Erfolgreicher Codec-Response, TAG-Mapping, Jobabschluss, Idempotenzantwort und Audit entstehen atomar.
 4. Ein Codec-Fehler hinterlässt keinen fertigen Browser-Erfolg und kein publizierbares Mapping, aber die jobgebundene `codec-pending`-Reservierung bleibt gegen Doppelvergabe erhalten.
 5. Derselbe Akteur, Command und Idempotency-Key mit abweichendem kanonischen Request liefert `409`; mit identischem Request dieselbe fachliche Antwort.
+
+Der lokale Resume-Nachweis verwendet einen kontrolliert einmal fehlschlagenden, injizierten Testadapter: Nach dem ersten Fehler verbleiben Job und Werte in `codec_failed` bzw. `codec-pending`; derselbe idempotente Request verwendet denselben Job und dieselben Werte, persistiert anschließend genau ein Mapping und ein Completion-Audit. Eine weitere Wiederholung liefert die gespeicherte Antwort ohne einen zusätzlichen Codec-Aufruf oder ein weiteres Completion-Audit.
 
 Für den späteren `InternalHttpTagCodecClient` bleiben 3 Sekunden Gesamt-Timeout, kein synchroner automatischer HTTP-Retry, neutrale `503`-Fehler für Timeout/429/5xx/ungültige Antworten und ein ausschließlich fachlicher Retry über denselben Job verbindlich. Echte Internal-HTTP-Anbindung und kompatible 6-/8-/10-Feistel-Vektoren bleiben vor Staging offen.
 
