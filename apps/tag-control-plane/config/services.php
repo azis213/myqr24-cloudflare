@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'tag_codec' => [
+        // The real internal adapter remains disabled until a separately approved
+        // server-side deployment configuration supplies both values.
+        'base_url' => env('TCP_TAG_CODEC_BASE_URL'),
+        'api_key' => env('TCP_TAG_CODEC_API_KEY'),
+        'timeout_seconds' => 3,
+    ],
+
 ];
