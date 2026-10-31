@@ -19,7 +19,10 @@ Route::middleware(['web'])->prefix('v1/auth')->group(function (): void {
 });
 
 Route::middleware(['web'])->prefix('v1/admin/tag-management')->group(function (): void {
+    Route::get('/ranges', [TagManagementController::class, 'ranges']);
+    Route::post('/ranges', [TagManagementController::class, 'createRange']);
     Route::get('/pools', [TagManagementController::class, 'pools']);
+    Route::post('/pools', [TagManagementController::class, 'createPool']);
     Route::post('/pools/{poolId}/reservations', [TagManagementController::class, 'reserve']);
 });
 

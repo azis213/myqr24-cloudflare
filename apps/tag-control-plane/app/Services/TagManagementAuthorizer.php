@@ -22,6 +22,11 @@ final class TagManagementAuthorizer
     ) {
     }
 
+    public function canReadRanges(User $user): bool
+    {
+        return $user->role === self::PLATFORM_ADMIN;
+    }
+
     public function requireRangeMutation(Request $request, User $user): void
     {
         $this->requirePlatformAdmin($request, $user, 'range.mutate');

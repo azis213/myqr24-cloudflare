@@ -40,7 +40,7 @@ Die W2L-Baseline ist verbindlich entschieden und für Pool-Read sowie Reservieru
 
 Re-Authentisierung ist eine serverseitige, an dieselbe Web-Session gebundene Passwortprüfung mit einem konfigurierten 15-Minuten-Fenster (`TCP_TAG_MANAGEMENT_REAUTH_TTL_SECONDS`, Default `900`). Fehlende, abgelaufene oder fremde Re-Authentisierung wird neutral als `403` behandelt und auditiert. Eine UI-Ausblendung oder die sichtbare Sessionrolle ersetzt diese Prüfung nie.
 
-Der bisher implementierte Slice umfasst `GET /pools`, `POST /pools/{poolId}/reservations` sowie `POST /api/v1/auth/tag-management/reauthenticate`. Range-/Pool-Mutationen und Lifecycle-HTTP-Commands bleiben bis zu ihren Validatoren und Tests fail-closed.
+Der implementierte lokale Slice umfasst `GET /ranges`, `POST /ranges`, `GET /pools`, `POST /pools`, `POST /pools/{poolId}/reservations` sowie `POST /api/v1/auth/tag-management/reauthenticate`. Range- und Poolmutationen verwenden die serverseitige Rollen-/Organisationsgrenze und frische Re-Authentisierung; Lifecycle-HTTP-Commands bleiben bis zu ihren Tests fail-closed.
 
 ### 2.2 `W2L-BLK-CODEC` – öffentliche TAG-ID bei Reservierung
 
@@ -120,7 +120,7 @@ Poolname, Kundensegment, Owner- und Bestellreferenzen bleiben private Control-Pl
 
 ## 5. Geplante Contract-Operationen
 
-Die folgenden Pfade sind Contract-Ziele, keine bereits vorhandenen Endpunkte. Sie bleiben bis zur Auflösung der Blocker deaktiviert.
+Die folgenden Pfade sind lokale Contract-Endpunkte. `GET`/`POST` für Ranges und Pools sowie die Reservierung sind mit synthetischen Daten implementiert; `PATCH`- und Lifecycle-Pfade bleiben bis zu ihren jeweiligen Validatoren bzw. Statusautomatentests deaktiviert.
 
 ### 5.1 Ranges
 
@@ -270,7 +270,7 @@ draft -> pending-review -> ready-to-publish
 
 Dieser Vertrag ist während CP-I02 `in-progress`. Die W2L-Baseline für AuthZ und den lokalen Fake-Codec ist entschieden und lokal umgesetzt; verbleibende Teilcommands bleiben gezielt gesperrt.
 
-- Ohne Range-/Pool-Validatoren: keine Range- oder Pool-Mutationsendpunkte und keine TCC-Fachformulare dafür.
+- `PATCH`-Range/-Pool- und Lifecycle-Commands bleiben deaktiviert, bis Update-Invarianten, Statusautomat und Negativtests vorhanden sind.
 - Ohne echten Internal-HTTP-Codec: keine Staging-/Produktionsreservierung; TCP darf weiterhin kein Feistel-Secret besitzen.
 - Ohne Produkt-/Pooldefaults: keine reale Ausgabepolicy und keine Staging-/Produktionswirkung.
 

@@ -18,6 +18,46 @@ type AuthState =
 
 type JsonRecord = Record<string, unknown>;
 
+type Pool = {
+  poolId: string;
+  length: number;
+  active: boolean;
+  rangeIds: string[];
+};
+
+type TagRange = {
+  rangeId: string;
+  groupId: string;
+  length: number;
+  startValue: string;
+  endValue: string;
+  active: boolean;
+};
+
+type RangeState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "loaded"; ranges: TagRange[] }
+  | { kind: "error"; message: string };
+
+type PoolState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "loaded"; pools: Pool[] }
+  | { kind: "error"; message: string };
+
+type ReauthenticationState =
+  | { kind: "idle" }
+  | { kind: "submitting" }
+  | { kind: "ready" }
+  | { kind: "error"; message: string };
+
+type ReservationState =
+  | { kind: "idle" }
+  | { kind: "submitting"; poolId: string }
+  | { kind: "completed"; poolId: string; jobId: string; tagCount: number }
+  | { kind: "error"; poolId: string; message: string };
+
 const tcpBaseUrl = (import.meta.env.VITE_TCP_BASE_URL ?? "/tcp").replace(/\/$/, "");
 
 const futureModules = [
@@ -110,6 +150,34 @@ export function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
+  const [pools, setPools] = useState<PoolState>({ kind: "idle" });
+  const [ranges, setRanges] = useState<RangeState>({ kind: "idle" });
+  const [rangeForm, setRangeForm] = useState({
+    rangeId: "",
+    groupId: "",
+    length: "6",
+    startValue: "",
+    endValue: "",
+  });
+  const [rangeMessage, setRangeMessage] = useState<string | null>(null);
+  const [rangeIdempotencyKey, setRangeIdempotencyKey] = useState<string | null>(null);
+  const [poolForm, setPoolForm] = useState({
+    poolId: "",
+    displayName: "",
+    channel: "test",
+    length: "6",
+    policyRef: "synthetic-policy",
+    capacityWarningThreshold: "10",
+    rangeIds: [] as string[],
+  });
+  const [poolMessage, setPoolMessage] = useState<string | null>(null);
+  const [poolIdempotencyKey, setPoolIdempotencyKey] = useState<string | null>(null);
+  const [reauthentication, setReauthentication] = useState<ReauthenticationState>({ kind: "idle" });
+  const [reauthenticationPassword, setReauthenticationPassword] = useState("");
+  const [reservationQuantity, setReservationQuantity] = useState("1");
+  const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
+  const [reservationIdempotencyKey, setReservationIdempotencyKey] = useState<string | null>(null);
+  const [reservation, setReservation] = useState<ReservationState>({ kind: "idle" });
 
   useEffect(() => {
     void loadSession();
@@ -274,6 +342,315 @@ export function App() {
     }
   }
 
+  async function loadPools() {
+    setPools({ kind: "loading" });
+
+    try {
+      const response = await fetch(`${tcpBaseUrl}/api/v1/admin/tag-management/pools`, {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const payload = await readJson(response);
+
+      if (!response.ok || !isRecord(payload) || !Array.isArray(payload.pools)) {
+        setPools({
+          kind: "error",
+          message: errorMessage(payload, "Die sichtbaren Allocation Pools konnten nicht geladen werden."),
+        });
+        return;
+      }
+
+      const loadedPools = payload.pools.flatMap((value): Pool[] => {
+        if (
+          !isRecord(value) ||
+          typeof value.poolId !== "string" ||
+          typeof value.length !== "number" ||
+          typeof value.active !== "boolean" ||
+          !Array.isArray(value.rangeIds) ||
+          !value.rangeIds.every((rangeId) => typeof rangeId === "string")
+        ) {
+          return [];
+        }
+
+        return [{
+          poolId: value.poolId,
+          length: value.length,
+          active: value.active,
+          rangeIds: value.rangeIds,
+        }];
+      });
+
+      setPools({ kind: "loaded", pools: loadedPools });
+    } catch {
+      setPools({ kind: "error", message: `Keine Verbindung zu ${tcpBaseUrl}.` });
+    }
+  }
+
+  async function loadRanges() {
+    setRanges({ kind: "loading" });
+
+    try {
+      const response = await fetch(`${tcpBaseUrl}/api/v1/admin/tag-management/ranges`, {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const payload = await readJson(response);
+
+      if (!response.ok || !isRecord(payload) || !Array.isArray(payload.ranges)) {
+        setRanges({
+          kind: "error",
+          message: errorMessage(payload, "Die Range-Konfiguration konnte nicht geladen werden."),
+        });
+        return;
+      }
+
+      const loadedRanges = payload.ranges.flatMap((value): TagRange[] => {
+        if (
+          !isRecord(value) ||
+          typeof value.rangeId !== "string" ||
+          typeof value.groupId !== "string" ||
+          typeof value.length !== "number" ||
+          typeof value.startValue !== "string" ||
+          typeof value.endValue !== "string" ||
+          typeof value.active !== "boolean"
+        ) {
+          return [];
+        }
+
+        return [{
+          rangeId: value.rangeId,
+          groupId: value.groupId,
+          length: value.length,
+          startValue: value.startValue,
+          endValue: value.endValue,
+          active: value.active,
+        }];
+      });
+
+      setRanges({ kind: "loaded", ranges: loadedRanges });
+    } catch {
+      setRanges({ kind: "error", message: `Keine Verbindung zu ${tcpBaseUrl}.` });
+    }
+  }
+
+  async function createRange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setRangeMessage(null);
+
+    if (reauthentication.kind !== "ready") {
+      setRangeMessage("Vor der Range-Anlage ist eine frische serverseitige Re-Authentisierung erforderlich.");
+      return;
+    }
+
+    try {
+      const token = await csrfToken();
+      const idempotencyKey = rangeIdempotencyKey ?? crypto.randomUUID();
+      setRangeIdempotencyKey(idempotencyKey);
+      const response = await fetch(`${tcpBaseUrl}/api/v1/admin/tag-management/ranges`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-CSRF-TOKEN": token,
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({
+          rangeId: rangeForm.rangeId,
+          groupId: rangeForm.groupId,
+          length: Number(rangeForm.length),
+          startValue: rangeForm.startValue,
+          endValue: rangeForm.endValue,
+          active: true,
+        }),
+      });
+      const payload = await readJson(response);
+
+      if (!response.ok) {
+        setRangeMessage(errorMessage(payload, "Die Range konnte nicht angelegt werden."));
+        return;
+      }
+
+      setRangeMessage("Range wurde serverseitig angelegt.");
+      setRangeIdempotencyKey(null);
+      setRangeForm({
+        rangeId: "",
+        groupId: "",
+        length: "6",
+        startValue: "",
+        endValue: "",
+      });
+      await loadRanges();
+    } catch (error) {
+      setRangeMessage(error instanceof Error ? error.message : "Die Range konnte nicht angelegt werden.");
+    }
+  }
+
+  async function createPool(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPoolMessage(null);
+
+    if (reauthentication.kind !== "ready") {
+      setPoolMessage("Vor der Pool-Anlage ist eine frische serverseitige Re-Authentisierung erforderlich.");
+      return;
+    }
+
+    try {
+      const token = await csrfToken();
+      const idempotencyKey = poolIdempotencyKey ?? crypto.randomUUID();
+      setPoolIdempotencyKey(idempotencyKey);
+      const response = await fetch(`${tcpBaseUrl}/api/v1/admin/tag-management/pools`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-CSRF-TOKEN": token,
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({
+          poolId: poolForm.poolId,
+          organizationId: null,
+          displayName: poolForm.displayName,
+          channel: poolForm.channel,
+          length: Number(poolForm.length),
+          rangeIds: poolForm.rangeIds,
+          policyRef: poolForm.policyRef,
+          capacityWarningThreshold: Number(poolForm.capacityWarningThreshold),
+          active: true,
+        }),
+      });
+      const payload = await readJson(response);
+
+      if (!response.ok) {
+        setPoolMessage(errorMessage(payload, "Der Pool konnte nicht angelegt werden."));
+        return;
+      }
+
+      setPoolMessage("Pool wurde serverseitig angelegt.");
+      setPoolIdempotencyKey(null);
+      setPoolForm({
+        poolId: "",
+        displayName: "",
+        channel: "test",
+        length: "6",
+        policyRef: "synthetic-policy",
+        capacityWarningThreshold: "10",
+        rangeIds: [],
+      });
+      await loadPools();
+    } catch (error) {
+      setPoolMessage(error instanceof Error ? error.message : "Der Pool konnte nicht angelegt werden.");
+    }
+  }
+
+  async function submitReauthentication(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setReauthentication({ kind: "submitting" });
+
+    try {
+      const token = await csrfToken();
+      const response = await fetch(`${tcpBaseUrl}/api/v1/auth/tag-management/reauthenticate`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-CSRF-TOKEN": token,
+        },
+        body: JSON.stringify({ password: reauthenticationPassword }),
+      });
+      const payload = await readJson(response);
+      setReauthenticationPassword("");
+
+      if (!response.ok || !isRecord(payload) || payload.status !== "reauthenticated") {
+        setReauthentication({
+          kind: "error",
+          message: errorMessage(payload, "Die erneute Authentisierung wurde abgelehnt."),
+        });
+        return;
+      }
+
+      setReauthentication({ kind: "ready" });
+    } catch (error) {
+      setReauthentication({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Die erneute Authentisierung ist fehlgeschlagen.",
+      });
+    }
+  }
+
+  async function reserve(poolId: string) {
+    const quantity = Number(reservationQuantity);
+
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000) {
+      setReservation({
+        kind: "error",
+        poolId,
+        message: "Die Reservierungsmenge muss zwischen 1 und 1.000 liegen.",
+      });
+      return;
+    }
+
+    setReservation({ kind: "submitting", poolId });
+
+    try {
+      const token = await csrfToken();
+      const idempotencyKey = reservationIdempotencyKey;
+
+      if (idempotencyKey === null) {
+        throw new Error("Der Reservierungsvorgang wurde nicht vorbereitet.");
+      }
+
+      const response = await fetch(
+        `${tcpBaseUrl}/api/v1/admin/tag-management/pools/${encodeURIComponent(poolId)}/reservations`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": token,
+            "Idempotency-Key": idempotencyKey,
+          },
+          body: JSON.stringify({ quantity }),
+        },
+      );
+      const payload = await readJson(response);
+
+      if (
+        !response.ok ||
+        !isRecord(payload) ||
+        typeof payload.job_id !== "string" ||
+        !Array.isArray(payload.tags)
+      ) {
+        setReservation({
+          kind: "error",
+          poolId,
+          message: errorMessage(payload, "Die Reservierung konnte nicht verarbeitet werden."),
+        });
+        return;
+      }
+
+      const completedReservation: ReservationState = {
+        kind: "completed",
+        poolId,
+        jobId: payload.job_id,
+        tagCount: payload.tags.length,
+      };
+
+      setReauthentication({ kind: "idle" });
+      await loadPools();
+      setReservation(completedReservation);
+    } catch (error) {
+      setReservation({
+        kind: "error",
+        poolId,
+        message: error instanceof Error ? error.message : "Die Reservierung ist fehlgeschlagen.",
+      });
+    }
+  }
+
   async function logout() {
     try {
       const token = await csrfToken();
@@ -286,6 +663,17 @@ export function App() {
       setEmail("");
       setPassword("");
       setMfaCode("");
+      setPools({ kind: "idle" });
+      setRanges({ kind: "idle" });
+      setRangeMessage(null);
+      setRangeIdempotencyKey(null);
+      setPoolMessage(null);
+      setPoolIdempotencyKey(null);
+      setReauthentication({ kind: "idle" });
+      setReauthenticationPassword("");
+      setSelectedPoolId(null);
+      setReservationIdempotencyKey(null);
+      setReservation({ kind: "idle" });
       setAuth({ kind: "signed_out" });
     }
   }
@@ -381,16 +769,281 @@ export function App() {
           ) : null}
         </section>
       ) : (
-        <section className="content-section authenticated-session" aria-label="Aktive Verwaltungssitzung">
-          <div>
-            <p className="eyebrow">Aktive Verwaltungssitzung</p>
-            <h2>{auth.email}</h2>
-            <p>Rolle: <code>{auth.role}</code></p>
-          </div>
-          <button type="button" className="secondary-action" onClick={logout}>
-            Abmelden
-          </button>
-        </section>
+        <>
+          <section className="content-section authenticated-session" aria-label="Aktive Verwaltungssitzung">
+            <div>
+              <p className="eyebrow">Aktive Verwaltungssitzung</p>
+              <h2>{auth.email}</h2>
+              <p>Rolle: <code>{auth.role}</code></p>
+            </div>
+            <button type="button" className="secondary-action" onClick={logout}>
+              Abmelden
+            </button>
+          </section>
+
+          {auth.role === "platform-admin" ? (
+            <section className="content-section" aria-labelledby="range-heading">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">CP-I02 · plattformweite Konfiguration</p>
+                  <h2 id="range-heading">Kanonische TAG-Ranges</h2>
+                </div>
+                <p>
+                  Grenzen bleiben vollständige lineare Dezimalwerte. TCP prüft Kanonizität,
+                  Base36-Domäne und globale Nichtüberlappung.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="secondary-action"
+                disabled={ranges.kind === "loading"}
+                onClick={() => void loadRanges()}
+              >
+                {ranges.kind === "loading" ? "Ranges werden geladen …" : "Ranges laden"}
+              </button>
+
+              {ranges.kind === "loaded" ? (
+                <ul>
+                  {ranges.ranges.map((range) => (
+                    <li key={range.rangeId}>
+                      <code>{range.rangeId}</code>: {range.startValue} – {range.endValue} (Länge {range.length})
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {ranges.kind === "error" ? <p className="error-message" role="alert">{ranges.message}</p> : null}
+
+              <form className="auth-form" onSubmit={createRange}>
+                <h3>Range anlegen</h3>
+                <label>
+                  Range-ID
+                  <input required value={rangeForm.rangeId} onChange={(event) => setRangeForm({ ...rangeForm, rangeId: event.target.value })} />
+                </label>
+                <label>
+                  Gruppen-ID
+                  <input required value={rangeForm.groupId} onChange={(event) => setRangeForm({ ...rangeForm, groupId: event.target.value })} />
+                </label>
+                <label>
+                  Länge
+                  <select value={rangeForm.length} onChange={(event) => setRangeForm({ ...rangeForm, length: event.target.value })}>
+                    <option value="6">6</option>
+                    <option value="8">8</option>
+                    <option value="10">10</option>
+                  </select>
+                </label>
+                <label>
+                  Startwert
+                  <input inputMode="numeric" required value={rangeForm.startValue} onChange={(event) => setRangeForm({ ...rangeForm, startValue: event.target.value })} />
+                </label>
+                <label>
+                  Endwert
+                  <input inputMode="numeric" required value={rangeForm.endValue} onChange={(event) => setRangeForm({ ...rangeForm, endValue: event.target.value })} />
+                </label>
+                {reauthentication.kind === "ready" ? (
+                  <button type="submit" className="primary-action">Range serverseitig anlegen</button>
+                ) : (
+                  <p>Für diese Mutation ist die Re-Authentisierung im Bereich „Kritische Aktion freigeben“ erforderlich.</p>
+                )}
+                {rangeMessage !== null ? (
+                  <p className={reauthentication.kind === "ready" ? "success-message" : "error-message"}>{rangeMessage}</p>
+                ) : null}
+              </form>
+
+              <form className="auth-form" onSubmit={createPool}>
+                <h3>Allocation Pool anlegen</h3>
+                <p>Der Pool referenziert ausschließlich aktive, bereits serverbestätigte Ranges gleicher Länge.</p>
+                <label>
+                  Pool-ID
+                  <input required value={poolForm.poolId} onChange={(event) => setPoolForm({ ...poolForm, poolId: event.target.value })} />
+                </label>
+                <label>
+                  Anzeigename
+                  <input required value={poolForm.displayName} onChange={(event) => setPoolForm({ ...poolForm, displayName: event.target.value })} />
+                </label>
+                <label>
+                  Kanal
+                  <input required value={poolForm.channel} onChange={(event) => setPoolForm({ ...poolForm, channel: event.target.value })} />
+                </label>
+                <label>
+                  Länge
+                  <select value={poolForm.length} onChange={(event) => setPoolForm({ ...poolForm, length: event.target.value, rangeIds: [] })}>
+                    <option value="6">6</option>
+                    <option value="8">8</option>
+                    <option value="10">10</option>
+                  </select>
+                </label>
+                <label>
+                  Policy-Referenz
+                  <input required value={poolForm.policyRef} onChange={(event) => setPoolForm({ ...poolForm, policyRef: event.target.value })} />
+                </label>
+                <label>
+                  Kapazitätswarnung
+                  <input type="number" min="0" required value={poolForm.capacityWarningThreshold} onChange={(event) => setPoolForm({ ...poolForm, capacityWarningThreshold: event.target.value })} />
+                </label>
+                <fieldset>
+                  <legend>Aktive Ranges derselben Länge</legend>
+                  {ranges.kind === "loaded" ? ranges.ranges
+                    .filter((range) => range.active && range.length === Number(poolForm.length))
+                    .map((range) => (
+                      <label key={range.rangeId}>
+                        <input
+                          type="checkbox"
+                          checked={poolForm.rangeIds.includes(range.rangeId)}
+                          onChange={(event) => setPoolForm({
+                            ...poolForm,
+                            rangeIds: event.target.checked
+                              ? [...poolForm.rangeIds, range.rangeId]
+                              : poolForm.rangeIds.filter((rangeId) => rangeId !== range.rangeId),
+                          })}
+                        />
+                        {range.rangeId}
+                      </label>
+                    )) : <p>Laden Sie zuerst die Range-Konfiguration.</p>}
+                </fieldset>
+                {reauthentication.kind === "ready" ? (
+                  <button type="submit" className="primary-action">Pool serverseitig anlegen</button>
+                ) : (
+                  <p>Für diese Mutation ist eine frische serverseitige Re-Authentisierung erforderlich.</p>
+                )}
+                {poolMessage !== null ? (
+                  <p className={reauthentication.kind === "ready" ? "success-message" : "error-message"}>{poolMessage}</p>
+                ) : null}
+              </form>
+            </section>
+          ) : null}
+
+          <section className="content-section" aria-labelledby="allocation-heading">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">CP-I02 · lokale Verwaltungsfunktion</p>
+                <h2 id="allocation-heading">Allocation Pools und TAG-Reservierung</h2>
+              </div>
+              <p>
+                Pools und Ergebnisse werden ausschließlich vom TCP bestätigt. Die Oberfläche kennt keine
+                Feistel-, Codec- oder Cloudflare-Secrets.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="primary-action"
+              disabled={pools.kind === "loading"}
+              onClick={() => void loadPools()}
+            >
+              {pools.kind === "loading" ? "Pools werden geladen …" : "Sichtbare Pools laden"}
+            </button>
+
+            {pools.kind === "error" ? <p className="error-message" role="alert">{pools.message}</p> : null}
+
+            {pools.kind === "loaded" ? (
+              <div className="module-grid allocation-grid">
+                {pools.pools.length === 0 ? (
+                  <p>Für diese Sitzung sind keine Allocation Pools sichtbar.</p>
+                ) : pools.pools.map((pool) => (
+                  <article className="module-card" key={pool.poolId}>
+                    <p className="module-status">{pool.active ? "Aktiv" : "Inaktiv"}</p>
+                    <h3>{pool.poolId}</h3>
+                    <p>Länge: <code>{pool.length}</code> · Ranges: {pool.rangeIds.join(", ")}</p>
+                    <button
+                      type="button"
+                      className="secondary-action"
+                      disabled={!pool.active}
+                      onClick={() => {
+                        setSelectedPoolId(pool.poolId);
+                        setReservationIdempotencyKey(crypto.randomUUID());
+                        setReservation({ kind: "idle" });
+                        setReauthentication({ kind: "idle" });
+                      }}
+                    >
+                      Reservierung vorbereiten
+                    </button>
+                    {reservation.kind !== "idle" && reservation.poolId === pool.poolId ? (
+                      <p className={reservation.kind === "error" ? "error-message" : "success-message"}>
+                        {reservation.kind === "submitting"
+                          ? "Reservierung wird serverseitig verarbeitet …"
+                          : reservation.kind === "completed"
+                            ? `${reservation.tagCount} TAG(s) reserviert. Job: ${reservation.jobId}`
+                            : reservation.message}
+                      </p>
+                    ) : null}
+                    {reauthentication.kind === "ready" && selectedPoolId === pool.poolId ? (
+                      <button
+                        type="button"
+                        className="primary-action"
+                        disabled={reservation.kind === "submitting"}
+                        onClick={() => void reserve(pool.poolId)}
+                      >
+                        {reservation.kind === "submitting" && reservation.poolId === pool.poolId
+                          ? "Reservierung läuft …"
+                          : "Jetzt reservieren"}
+                      </button>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : null}
+
+            {reservation.kind === "completed" ? (
+              <p className="success-message">
+                {reservation.tagCount} TAG(s) reserviert. Job: {reservation.jobId}
+              </p>
+            ) : null}
+
+            {(selectedPoolId !== null || auth.role === "platform-admin") ? (
+              <form className="auth-form" onSubmit={submitReauthentication}>
+                <h3>Kritische Aktion freigeben</h3>
+                <p>
+                  {selectedPoolId !== null ? (
+                    <>
+                      Vor der Reservierung aus <code>{selectedPoolId}</code> bestätigt TCP Ihr Passwort erneut
+                      für diese Sitzung.
+                    </>
+                  ) : (
+                    <>
+                      Vor einer plattformweiten Range- oder Pool-Mutation bestätigt TCP Ihr Passwort erneut
+                      für diese Sitzung.
+                    </>
+                  )}
+                </p>
+                <label>
+                  Anzahl TAGs
+                  <input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    required
+                    value={reservationQuantity}
+                    onChange={(event) => setReservationQuantity(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Passwort zur erneuten Authentisierung
+                  <input
+                    autoComplete="current-password"
+                    type="password"
+                    required
+                    value={reauthenticationPassword}
+                    onChange={(event) => setReauthenticationPassword(event.target.value)}
+                  />
+                </label>
+                <button type="submit" className="primary-action" disabled={reauthentication.kind === "submitting"}>
+                  {reauthentication.kind === "submitting"
+                    ? "Berechtigung wird geprüft …"
+                    : reauthentication.kind === "ready"
+                      ? "Berechtigung erneuern"
+                      : "Reservierung freigeben"}
+                </button>
+                {reauthentication.kind === "ready" ? (
+                  <p className="success-message">Reservierung ist für diese Sitzung kurzzeitig freigegeben.</p>
+                ) : null}
+                {reauthentication.kind === "error" ? (
+                  <p className="error-message" role="alert">{reauthentication.message}</p>
+                ) : null}
+              </form>
+            ) : null}
+          </section>
+        </>
       )}
 
       <section className="overview-grid" aria-label="TCC-Startstatus">

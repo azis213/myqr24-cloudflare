@@ -40,6 +40,9 @@ describe("TAG Control Center admin auth contract", () => {
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("alert", vi.fn());
+    vi.stubGlobal("crypto", {
+      randomUUID: vi.fn(() => "00000000-0000-4000-8000-000000000099"),
+    });
   });
 
   it("starts signed out and reads only the authoritative TCP session", async () => {
@@ -253,6 +256,331 @@ describe("TAG Control Center admin auth contract", () => {
         method: "POST",
         credentials: "include",
         headers: expect.objectContaining({ "X-CSRF-TOKEN": "csrf-token" }),
+      }),
+    );
+  });
+
+  it("loads only TCP-confirmed pools for an authenticated session and requires a selected pool", async () => {
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse(true))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: {
+            pools: [
+              {
+                poolId: "demo-pool",
+                length: 6,
+                active: true,
+                rangeIds: ["demo-range"],
+              },
+            ],
+            correlation_id: correlationId,
+          },
+        }),
+      );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByText("admin@example.test");
+    expect(screen.getByText("Kritische Aktion freigeben")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Sichtbare Pools laden" }));
+
+    expect(await screen.findByText("demo-pool")).toBeVisible();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/tcp/api/v1/admin/tag-management/pools",
+      expect.objectContaining({ credentials: "include" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Reservierung vorbereiten" }));
+    expect(await screen.findByText("Kritische Aktion freigeben")).toBeVisible();
+  });
+
+  it("submits range configuration only through the CSRF-protected TCP command", async () => {
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse(true))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { csrf_token: "reauth-csrf", correlation_id: correlationId },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { status: "reauthenticated", correlation_id: correlationId },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { csrf_token: "range-csrf", correlation_id: correlationId },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 201,
+          body: {
+            range: {
+              rangeId: "range-6-001",
+              groupId: "group-001",
+              length: 6,
+              startValue: "60466176",
+              endValue: "60466275",
+              active: true,
+            },
+            correlation_id: correlationId,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { ranges: [], correlation_id: correlationId },
+        }),
+      );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByText("admin@example.test");
+    await user.type(screen.getByLabelText("Passwort zur erneuten Authentisierung"), "browser-only-password");
+    await user.click(screen.getByRole("button", { name: "Reservierung freigeben" }));
+    await screen.findByText("Reservierung ist für diese Sitzung kurzzeitig freigegeben.");
+
+    await user.type(screen.getByLabelText("Range-ID"), "range-6-001");
+    await user.type(screen.getByLabelText("Gruppen-ID"), "group-001");
+    await user.type(screen.getByLabelText("Startwert"), "60466176");
+    await user.type(screen.getByLabelText("Endwert"), "60466275");
+    await user.click(screen.getByRole("button", { name: "Range serverseitig anlegen" }));
+
+    expect(await screen.findByText("Range wurde serverseitig angelegt.")).toBeVisible();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      "/tcp/api/v1/admin/tag-management/ranges",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        headers: expect.objectContaining({
+          "X-CSRF-TOKEN": "range-csrf",
+          "Idempotency-Key": "00000000-0000-4000-8000-000000000099",
+        }),
+        body: JSON.stringify({
+          rangeId: "range-6-001",
+          groupId: "group-001",
+          length: 6,
+          startValue: "60466176",
+          endValue: "60466275",
+          active: true,
+        }),
+      }),
+    );
+  });
+
+  it("creates a pool from TCP-confirmed ranges only after reauthentication", async () => {
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse(true))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { csrf_token: "reauth-csrf", correlation_id: correlationId },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { status: "reauthenticated", correlation_id: correlationId },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: {
+            ranges: [{
+              rangeId: "range-6-001",
+              groupId: "group-001",
+              length: 6,
+              startValue: "60466176",
+              endValue: "60466275",
+              active: true,
+            }],
+            correlation_id: correlationId,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { csrf_token: "pool-csrf", correlation_id: correlationId },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 201,
+          body: {
+            pool: {
+              poolId: "pool-6-001",
+              length: 6,
+              active: true,
+              rangeIds: ["range-6-001"],
+            },
+            correlation_id: correlationId,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { pools: [], correlation_id: correlationId },
+        }),
+      );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByText("admin@example.test");
+    await user.type(screen.getByLabelText("Passwort zur erneuten Authentisierung"), "browser-only-password");
+    await user.click(screen.getByRole("button", { name: "Reservierung freigeben" }));
+    await screen.findByText("Reservierung ist für diese Sitzung kurzzeitig freigegeben.");
+
+    await user.click(screen.getByRole("button", { name: "Ranges laden" }));
+    await user.click(await screen.findByRole("checkbox", { name: "range-6-001" }));
+    await user.type(screen.getByLabelText("Pool-ID"), "pool-6-001");
+    await user.type(screen.getByLabelText("Anzeigename"), "Synthetic Pool");
+    await user.click(screen.getByRole("button", { name: "Pool serverseitig anlegen" }));
+
+    expect(await screen.findByText("Pool wurde serverseitig angelegt.")).toBeVisible();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      6,
+      "/tcp/api/v1/admin/tag-management/pools",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "X-CSRF-TOKEN": "pool-csrf",
+          "Idempotency-Key": "00000000-0000-4000-8000-000000000099",
+        }),
+        body: JSON.stringify({
+          poolId: "pool-6-001",
+          organizationId: null,
+          displayName: "Synthetic Pool",
+          channel: "test",
+          length: 6,
+          rangeIds: ["range-6-001"],
+          policyRef: "synthetic-policy",
+          capacityWarningThreshold: 10,
+          active: true,
+        }),
+      }),
+    );
+  });
+
+  it("reauthenticates and reserves only through CSRF- and idempotency-protected TCP commands", async () => {
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse(true))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: {
+            pools: [
+              {
+                poolId: "demo-pool",
+                length: 6,
+                active: true,
+                rangeIds: ["demo-range"],
+              },
+            ],
+            correlation_id: correlationId,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { csrf_token: "reauth-csrf", correlation_id: correlationId },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { status: "reauthenticated", correlation_id: correlationId },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { csrf_token: "reservation-csrf", correlation_id: correlationId },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 201,
+          body: {
+            job_id: "00000000-0000-4000-8000-000000000010",
+            tags: [{ id: "abcdef", length: 6, value: "100000", codecVersion: "TEST-S01" }],
+            correlation_id: correlationId,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          status: 200,
+          body: { pools: [], correlation_id: correlationId },
+        }),
+      );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByText("admin@example.test");
+    await user.click(screen.getByRole("button", { name: "Sichtbare Pools laden" }));
+    await user.click(await screen.findByRole("button", { name: "Reservierung vorbereiten" }));
+    await user.type(screen.getByLabelText("Passwort zur erneuten Authentisierung"), "browser-only-password");
+    await user.click(screen.getByRole("button", { name: "Reservierung freigeben" }));
+
+    expect(await screen.findByRole("button", { name: "Jetzt reservieren" })).toBeVisible();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/tcp/api/v1/auth/tag-management/reauthenticate",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "X-CSRF-TOKEN": "reauth-csrf" }),
+        body: JSON.stringify({ password: "browser-only-password" }),
+      }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Jetzt reservieren" }));
+
+    expect(await screen.findByText(/1 TAG\(s\) reserviert/)).toBeVisible();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      6,
+      "/tcp/api/v1/admin/tag-management/pools/demo-pool/reservations",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "X-CSRF-TOKEN": "reservation-csrf",
+          "Idempotency-Key": "00000000-0000-4000-8000-000000000099",
+        }),
+        body: JSON.stringify({ quantity: 1 }),
       }),
     );
   });

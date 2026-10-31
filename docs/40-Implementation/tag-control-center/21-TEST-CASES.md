@@ -1,7 +1,7 @@
 # Testfälle: TAG Control Center
 
 **Letzte Aktualisierung:** 2026-10-28  
-**Status:** Der lokale W1L-Auth-/Session-Schnitt ist gegen [`control-plane-admin-api-v1`](../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) implementiert und nachgewiesen: TCP-MySQL-Integration (**11 Tests, 65 Assertions**), TCC-Contract-UI-Suite (**6 Tests**) und TCC-Build sind am 2026-10-29 erfolgreich. Die Ziel-MFA/Re-Authentisierung für privilegierte Fachcommands, Rollenverwaltung, Recovery und Staging bleiben geplant.
+**Status:** Der lokale W1L-Auth-/Session-Schnitt und der lokale W2L-Pool-/Reservierungs-Slice sind nachgewiesen: TCP-MySQL-Integration (**14 Tests, 88 Assertions**), TCC-Contract-UI-Suite (**8 Tests**) und TCC-Build sind am 2026-10-29 erfolgreich. Range-/Pool-Mutationen, Lifecycle, echter Internal-Codec, Recovery und Staging bleiben offen.
 
 ## CC-I01 – Fundament, Authentisierung und Audit
 
@@ -28,12 +28,12 @@
 
 | ID | Bezug | Testfall | Erwartetes Ergebnis | Ebene |
 | --- | --- | --- | --- | --- |
-| `CC-TC-RANGE-001` | CC-US-012 | Gültige 6-stellige Range anlegen | kanonische, aktive und nicht überlappende Range wird akzeptiert | Unit/Integration |
-| `CC-TC-RANGE-002` | CC-US-012 | Überlappende oder unsortierte Range anlegen | Validierung verweigert Speicherung bzw. Publish | Unit/Integration |
-| `CC-TC-RANGE-003` | CC-US-012 | gültige lineare 8- oder 10-stellige Range im kanonischen Raum | Speicherung ist ohne Slotgrenzen zulässig | Unit |
-| `CC-TC-RANGE-004` | CC-US-012 | Range-/Gruppen-/Feature-Identifier ungültig | Eingabe wird serverseitig abgewiesen | Unit |
-| `CC-TC-POOL-001` | CC-US-015 | gültigen Pool für private, Partner- oder Enterprise-Ausgabe anlegen | UI übergibt kanonische Pooldaten; bestätigter Control-Plane-Status und Kapazität werden angezeigt | UI/Contract |
-| `CC-TC-POOL-002` | CC-US-015 | überlappende, erschöpfte oder fremd gebundene Poolkonfiguration | UI zeigt neutrale Control-Plane-Ablehnung; keine lokale Umgehung ist möglich | UI/Contract |
+| `CC-TC-RANGE-001` | CC-US-012 | Plattformadmin legt nach frischer Re-Authentisierung eine gültige 6-stellige Range an | CSRF- und Idempotency-Key-geschützter TCP-Command wird bestätigt; kanonische aktive nichtüberlappende Range entsteht | UI/Contract, lokal automatisiert |
+| `CC-TC-RANGE-002` | CC-US-012 | Überlappende oder unsortierte Range anlegen | TCP-Validierung verweigert Speicherung neutral | Integration, lokal automatisiert |
+| `CC-TC-RANGE-003` | CC-US-012 | Range außerhalb des linearen 8- oder 10-stelligen kanonischen Raums | TCP verweigert Speicherung ohne Slotgrenzen | Integration, lokal automatisiert |
+| `CC-TC-RANGE-004` | CC-US-012 | Range-/Gruppen-/Feature-Identifier ungültig | Eingabe wird serverseitig abgewiesen | Unit/Integration |
+| `CC-TC-POOL-001` | CC-US-015 | Plattformadmin legt nach Re-Auth einen Plattformpool aus TCP-geladenen aktiven Ranges gleicher Länge an | UI sendet ausschließlich bestätigte Range-IDs, CSRF und Idempotency-Key; TCP bestätigt Poolstatus und Referenzen | UI/Contract, lokal automatisiert |
+| `CC-TC-POOL-002` | CC-US-015 | Range anderer Länge, fehlende oder inaktive Range referenzieren | TCP verweigert Poolkonfiguration; keine lokale Umgehung ist möglich | Integration, lokal automatisiert |
 | `CC-TC-POOL-003` | CC-US-015 | Poolgrenzen als sichtbare Feistel-`tagId` interpretieren | UI erklärt/validiert `decodedValue`-Modell und sendet keine unzulässige Darstellung | UI |
 | `CC-TC-POOL-004` | CC-US-015 | Pool-/Kundensegment-/Ownerdaten in Routing- oder öffentliche Vorschau aufnehmen | Ansicht schließt private Felder aus; Contract/Leak-Test schlägt bei Durchreichung fehl | UI/Security |
 | `CC-TC-ALLOC-001` | CC-US-011 | 6-stellige TAG-ID vergeben | `tagId`, `decodedValue`, Länge und Range-Kontext sind eindeutig reserviert | Integration |
@@ -41,6 +41,9 @@
 | `CC-TC-ALLOC-003` | CC-US-011 | Parallele Vergaben derselben Range | keine Duplikate bei `tagId` oder `(length, decodedValue)` | Integration |
 | `CC-TC-ALLOC-004` | CC-US-011 | Wiederholung nach Request-/Jobfehler | keine unerwartete zweite Reservierung oder Doppelvergabe | Integration |
 | `CC-TC-ALLOC-005` | CC-US-011 | Secret-Leak-Prüfung | Feistel-Secrets fehlen in DB-Ausgaben, Logs, Fixtures und Responses | Security |
+| `CC-TC-ALLOC-006` | CC-US-011 | sichtbare Poolliste im angemeldeten TCC | TCC lädt ausschließlich den TCP-Response; keine lokale Pool-, Range- oder Organisationsautorität und keine fremden Objektinformationen | UI/Contract, lokal automatisiert |
+| `CC-TC-ALLOC-007` | CC-US-011 | Reservierung aus aktivem ausgewählten Pool | TCC verlangt frische Passwort-Re-Authentisierung, CSRF und Idempotency-Key; Browser sendet ausschließlich Menge und erhält nur serverbestätigte Job-/Mengeninformation | UI/Contract, lokal automatisiert |
+| `CC-TC-ALLOC-008` | CC-US-011 | Re-Auth-/Reservierungsfehler | TCP-Ablehnung bleibt neutral sichtbar; Passwort wird nach Request aus TCC-Zustand entfernt, Browser besitzt keinen Codec-Service-Key oder Feistel-Secret | UI/Security, lokal automatisiert |
 | `CC-TC-LIFECYCLE-001` | CC-US-010 / CC-US-013 | Erlaubter Ablauf `draft → pending-review → ready-to-publish` | Statuswechsel ist mit korrekter Rolle möglich und auditiert | Integration |
 | `CC-TC-LIFECYCLE-002` | CC-US-013 | Ungültiger Statussprung, etwa `draft → active` | Statuswechsel wird verweigert | Unit |
 | `CC-TC-PRINT-001` | CC-US-014 | Staging-QR-Daten erzeugen | kanonische Staging-URL ohne Secrets, klar als Staging markiert | Unit |

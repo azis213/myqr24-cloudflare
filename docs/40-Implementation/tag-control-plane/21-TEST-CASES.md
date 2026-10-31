@@ -26,12 +26,12 @@
 
 | ID | Bezug | Testfall | Erwartetes Ergebnis | Ebene |
 | --- | --- | --- | --- | --- |
-| `CP-TC-RANGE-001` | CP-US-010 | gültige kanonische 6-stellige Range | Speicherung ist zulässig | Unit/Integration |
-| `CP-TC-RANGE-002` | CP-US-010 | überlappende oder global unsortierte Range | Speicherung und Projektion werden verweigert | Unit/Integration |
-| `CP-TC-RANGE-003` | CP-US-010 | gültige lineare 8- oder 10-stellige Range im kanonischen Raum | Speicherung ist ohne Slotgrenzen zulässig | Unit |
+| `CP-TC-RANGE-001` | CP-US-010 | gültige kanonische 6-stellige Range nach frischer Plattformadmin-Re-Authentisierung | Speicherung ist zulässig | Integration, lokal automatisiert |
+| `CP-TC-RANGE-002` | CP-US-010 | überlappende Range | Speicherung wird verweigert | Integration, lokal automatisiert |
+| `CP-TC-RANGE-003` | CP-US-010 | Range außerhalb des kanonischen 8-stelligen Raums | Speicherung wird verweigert | Integration, lokal automatisiert |
 | `CP-TC-RANGE-004` | CP-US-010 | inaktive oder erschöpfte Range für Reservierung | keine neue TAG-ID wird vergeben | Integration |
-| `CP-TC-POOL-001` | CP-US-013 | gültigen Pool für private, Partner- oder Enterprise-Ausgabe anlegen | Pool akzeptiert nur gültige kanonische Range(s), Policy und optionalen Organisationskontext | Integration |
-| `CP-TC-POOL-002` | CP-US-013 | überlappende Poolrange oder sichtbare `tagId`-Grenze verwenden | Speicherung wird verweigert; Poolgrenzen bleiben `decodedValue`-basiert | Unit/Integration |
+| `CP-TC-POOL-001` | CP-US-013 | gültigen Plattformpool nach frischer Plattformadmin-Re-Authentisierung anlegen | Pool akzeptiert nur aktive vorhandene kanonische Range(s) derselben Länge und serverbestätigte Policy-Daten | Integration, lokal automatisiert |
+| `CP-TC-POOL-002` | CP-US-013 | Range anderer Länge, fehlende oder inaktive Range referenzieren | Speicherung wird verweigert; Poolgrenzen bleiben `decodedValue`-basiert | Integration, lokal automatisiert |
 | `CP-TC-POOL-003` | CP-US-013 | aus erschöpftem, inaktivem oder fremd gebundenem Pool reservieren | Reservierung wird serverseitig verweigert | Integration |
 | `CP-TC-POOL-004` | CP-US-013 | Pool-/Kundensegment-/Ownerdaten in KV oder Public Response einbringen | Leak-Test blockiert Projektion bzw. Response | Security |
 | `CP-TC-ALLOC-001` | CP-US-011 | sechsstelligen TAG reservieren | eindeutige `tagId` und vollständiger `decodedValue` werden transaktional gespeichert | Integration |
