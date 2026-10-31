@@ -1,0 +1,8 @@
+FROM node:24-bookworm-slim
+
+# Wrangler's Linux workerd binary requires glibc and a system CA bundle.
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/edge-router

@@ -34,6 +34,7 @@
 | `CP-TC-POOL-001` | CP-US-013 | gültigen Plattformpool nach frischer Plattformadmin-Re-Authentisierung anlegen | Pool akzeptiert nur aktive vorhandene kanonische Range(s) derselben Länge und serverbestätigte Policy-Daten | Integration, lokal automatisiert |
 | `CP-TC-POOL-002` | CP-US-013 | Range anderer Länge, fehlende oder inaktive Range referenzieren | Speicherung wird verweigert; Poolgrenzen bleiben `decodedValue`-basiert | Integration, lokal automatisiert |
 | `CP-TC-POOL-005` | CP-US-013 | Organisationsadmin patched zugewiesenen Pool bzw. verändert Organisationsbindung | eigener Pool wird nur nach Re-Auth aktualisiert und auditiert; unveränderliche/fremde Bindung wird verweigert | Integration/Security, lokal automatisiert |
+| `CP-TC-POOL-006` | CP-US-013 | Organisationsadmin listet, erstellt oder patched Plattform-/fremden Organisationspool | Poolliste enthält ausschließlich zugewiesene Pools; fremde und Plattformmutation werden neutral mit `403` verweigert und erzeugen keinen Pool | Integration/Security, lokal automatisiert |
 | `CP-TC-POOL-003` | CP-US-013 | aus erschöpftem, inaktivem oder fremd gebundenem Pool reservieren | Reservierung wird serverseitig verweigert | Integration |
 | `CP-TC-POOL-004` | CP-US-013 | Pool-/Kundensegment-/Ownerdaten in KV oder Public Response einbringen | Leak-Test blockiert Projektion bzw. Response | Security |
 | `CP-TC-ALLOC-001` | CP-US-011 | sechsstelligen TAG reservieren | eindeutige `tagId` und vollständiger `decodedValue` werden transaktional gespeichert | Integration |

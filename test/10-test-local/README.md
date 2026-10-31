@@ -10,6 +10,7 @@ Diese Topologie stellt den derzeit implementierten Stand der **TAG Control Plane
 | TCP Health API | `http://localhost:8080/api/v1/health` | implementiert |
 | MySQL 8.4 | nur internes Compose-Netz | implementiert |
 | TCP-Testdatenbank `myqr24_test` | nur internes Compose-Netz | isolierter Laravel-/MySQL-Testpfad |
+| Private TAG Codec | nur internes Compose-Netz `http://tag-codec:8788` | lokaler Wrangler-Worker mit synthetischen Secrets |
 | TAG Control Center (TCC) | `http://localhost:5174/` | Vite-Dev-Server mit Login-, E-Mail-MFA-, Session- und Logout-UI |
 
 MySQL wird bewusst **nicht** auf einen Host-Port veröffentlicht. Nur TCP kann sie über den Compose-DNS-Namen `mysql` erreichen.
@@ -22,6 +23,10 @@ MySQL wird bewusst **nicht** auf einen Host-Port veröffentlicht. Nur TCP kann s
 - ausschließlich synthetische lokale Zugangsdaten.
 
 Es werden keine Cloudflare-, Dogado-, Staging- oder Produktionssecrets verwendet.
+
+Der Private-Codec besitzt keinen Host-Port. Nur TCP-Testprozesse im Compose-Netz
+können ihn über `http://tag-codec:8788` erreichen. TCC und Browser erhalten
+weder diese Adresse noch den Service-Key.
 
 ## Umgebung starten
 
@@ -76,8 +81,9 @@ Der Startvorgang:
 4. führt TCP-Migrationen idempotent aus;
 5. erstellt oder prüft den lokalen Bootstrap-Platform-Admin idempotent;
 6. startet Laravel auf Port `8080`;
-7. startet den TCC-Vite-Dev-Server auf Port `5174` und installiert dessen lokale Node-Abhängigkeiten beim ersten Lauf in ein benanntes Docker-Volume;
-8. prüft TCP-Health und die TCC-Startseite.
+7. startet den getrennten Private-Codec-Worker im Compose-Netz; er erhält ausschließlich die synthetischen Werte `LOCAL_CODEC_FEISTEL_SECRET` und `LOCAL_CODEC_API_KEY` aus der ignorierten lokalen Umgebung;
+8. startet den TCC-Vite-Dev-Server auf Port `5174` und installiert dessen lokale Node-Abhängigkeiten beim ersten Lauf in ein benanntes Docker-Volume;
+9. prüft TCP-Health und die TCC-Startseite.
 
 Nach erfolgreichem Start:
 
@@ -106,6 +112,11 @@ Der Lauf prüft derzeit die Audit-Persistenz mit Korrelations-ID, rekursive
 Secret-/Credential-Redaktion, Transaktionsrollback bei einer fehlgeschlagenen
 Mutation sowie die Health-Endpunkt-Korrelation. Die manuelle Datenbank
 `LOCAL_MYSQL_DATABASE` wird dabei nicht zurückgesetzt.
+
+Zusätzlich startet der Testlauf den Compose-internen Private-Codec. Die
+dedizierten TCP-Integrationstests aktivieren den HTTP-Driver nur testlokal und
+prüfen die 6-/8-/10-stellige Reservierung über den echten Worker. Der
+Standardtestdriver bleibt der secret-freie Fake.
 
 ## Umgebung anhalten
 

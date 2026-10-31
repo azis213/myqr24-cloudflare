@@ -21,6 +21,29 @@ export DB_COLLATION=utf8mb4_0900_ai_ci
 export CACHE_STORE=array
 export QUEUE_CONNECTION=sync
 export SESSION_DRIVER=array
+export TCP_TAG_CODEC_DRIVER=fake
+export TCP_TAG_CODEC_BASE_URL="http://tag-codec:8788"
+export TCP_TAG_CODEC_API_KEY="${LOCAL_CODEC_API_KEY:?LOCAL_CODEC_API_KEY must be set for local tests}"
+export TCP_TAG_CODEC_TIMEOUT_SECONDS=3
+
+codec_ready=false
+for attempt in $(seq 1 45); do
+  if curl --silent --show-error --fail \
+    --header "Authorization: Bearer ${TCP_TAG_CODEC_API_KEY}" \
+    --header 'Content-Type: application/json' \
+    --data '{"length":6,"values":["60466176"]}' \
+    "${TCP_TAG_CODEC_BASE_URL}/api/v1/codec/encode-batch" >/dev/null; then
+    codec_ready=true
+    break
+  fi
+
+  sleep 1
+done
+
+if [ "$codec_ready" != true ]; then
+  echo 'The local private codec worker did not become ready.' >&2
+  exit 1
+fi
 
 php artisan migrate:fresh --force --no-interaction --database=mysql
 ./vendor/bin/phpunit --testdox

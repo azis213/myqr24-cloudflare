@@ -209,6 +209,40 @@ final class RangeAndPoolManagementTest extends TestCase
         $this->assertDatabaseHas('audit_events', ['object_type' => 'allocation_pool', 'object_id' => $pool->id, 'action' => 'allocation_pool.updated']);
     }
 
+    public function test_organization_admin_cannot_create_or_update_a_foreign_or_platform_pool(): void
+    {
+        $organization = Organization::query()->create(['display_name' => 'Assigned Organization', 'is_active' => true]);
+        $otherOrganization = Organization::query()->create(['display_name' => 'Other Organization', 'is_active' => true]);
+        $range = $this->range('range-6-organization-scope');
+        $assignedPool = $this->pool($range, $organization->id, 'assigned-organization-pool');
+        $foreignPool = $this->pool($range, $otherOrganization->id, 'foreign-organization-pool');
+        $platformPool = $this->pool($range, null, 'platform-pool');
+        $organizationAdmin = User::query()->create(['email' => 'organization-scope-admin@example.test', 'password' => Hash::make('correct-password'), 'role' => 'organization-admin', 'is_active' => true]);
+        $organization->users()->attach($organizationAdmin->id, ['role' => 'organization-admin']);
+        $this->actingAs($organizationAdmin);
+        $this->reauthenticate();
+
+        $this->getJson('/api/v1/admin/tag-management/pools')
+            ->assertOk()
+            ->assertJsonCount(1, 'pools')
+            ->assertJsonPath('pools.0.poolId', $assignedPool->pool_id);
+
+        $this->patchJson("/api/v1/admin/tag-management/pools/{$foreignPool->pool_id}", $this->poolPayload($foreignPool, $range), [
+            'Idempotency-Key' => '00000000-0000-4000-8000-000000000112',
+        ])->assertForbidden();
+        $this->patchJson("/api/v1/admin/tag-management/pools/{$platformPool->pool_id}", $this->poolPayload($platformPool, $range), [
+            'Idempotency-Key' => '00000000-0000-4000-8000-000000000113',
+        ])->assertForbidden();
+
+        $newPool = $this->poolPayload($assignedPool, $range);
+        $newPool['poolId'] = 'attempted-foreign-pool';
+        $newPool['organizationId'] = $otherOrganization->id;
+        $this->postJson('/api/v1/admin/tag-management/pools', $newPool, [
+            'Idempotency-Key' => '00000000-0000-4000-8000-000000000114',
+        ])->assertForbidden();
+        $this->assertDatabaseMissing('allocation_pools', ['pool_id' => 'attempted-foreign-pool']);
+    }
+
     private function platformAdmin(): User
     {
         return User::query()->create([

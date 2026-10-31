@@ -64,9 +64,12 @@ services:
       TCP_BOOTSTRAP_ADMIN_EMAIL: ${TCP_BOOTSTRAP_ADMIN_EMAIL:?Set TCP_BOOTSTRAP_ADMIN_EMAIL in .env.local}
       TCP_BOOTSTRAP_ADMIN_INITIAL_PASSWORD: ${TCP_BOOTSTRAP_ADMIN_INITIAL_PASSWORD:?Set TCP_BOOTSTRAP_ADMIN_INITIAL_PASSWORD in .env.local}
       TCP_EMAIL_MFA_ENABLED: ${TCP_EMAIL_MFA_ENABLED:?Set TCP_EMAIL_MFA_ENABLED in .env.local}
+      LOCAL_CODEC_API_KEY: ${LOCAL_CODEC_API_KEY:?Set LOCAL_CODEC_API_KEY in .env.local}
     depends_on:
       mysql:
         condition: service_healthy
+      tag-codec:
+        condition: service_started
     entrypoint: ["sh"]
     command: ["/workspace/local-test/scripts/start-tag-control-plane.sh"]
     ports:
@@ -77,6 +80,26 @@ services:
       - ../../apps/tag-control-plane:/workspace/tag-control-plane
       - ./scripts:/workspace/local-test/scripts:ro
       - tcp_storage:/workspace/tag-control-plane/storage
+
+  tag-codec:
+    build:
+      context: .
+      dockerfile: Dockerfile.codec
+    working_dir: /workspace/edge-router
+    environment:
+      FEISTEL_SECRET_S01: ${LOCAL_CODEC_FEISTEL_SECRET:?Set LOCAL_CODEC_FEISTEL_SECRET in .env.local}
+      TAG_CODEC_API_KEY_S01: ${LOCAL_CODEC_API_KEY:?Set LOCAL_CODEC_API_KEY in .env.local}
+    command:
+      [
+        "sh",
+        "-c",
+        "npm install --no-audit --no-fund --package-lock=false && printf 'FEISTEL_SECRET_S01=%s\\nTAG_CODEC_API_KEY_S01=%s\\n' \"$$FEISTEL_SECRET_S01\" \"$$TAG_CODEC_API_KEY_S01\" > .dev.vars && npx wrangler dev --local --persist-to /tmp/wrangler --config wrangler.codec.toml --ip 0.0.0.0 --port 8788",
+      ]
+    networks:
+      - local_test
+    volumes:
+      - ../../apps/edge-router:/workspace/edge-router
+      - codec_node_modules:/workspace/edge-router/node_modules
 
   tag-control-center:
     image: node:22-alpine
@@ -108,3 +131,4 @@ volumes:
   mysql_data:
   tcp_storage:
   tcc_node_modules:
+  codec_node_modules:

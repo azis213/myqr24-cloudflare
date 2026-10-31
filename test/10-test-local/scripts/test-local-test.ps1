@@ -24,11 +24,15 @@ Get-Content -LiteralPath $environmentFile |
 $testDatabase = $environmentValues['LOCAL_MYSQL_TEST_DATABASE']
 $mysqlUser = $environmentValues['LOCAL_MYSQL_USER']
 $mysqlRootPassword = $environmentValues['LOCAL_MYSQL_ROOT_PASSWORD']
+$codecApiKey = $environmentValues['LOCAL_CODEC_API_KEY']
+$codecFeistelSecret = $environmentValues['LOCAL_CODEC_FEISTEL_SECRET']
 
 if ([string]::IsNullOrWhiteSpace($testDatabase) -or
     [string]::IsNullOrWhiteSpace($mysqlUser) -or
-    [string]::IsNullOrWhiteSpace($mysqlRootPassword)) {
-    throw 'LOCAL_MYSQL_TEST_DATABASE, LOCAL_MYSQL_USER, and LOCAL_MYSQL_ROOT_PASSWORD must be configured in .env.local.'
+    [string]::IsNullOrWhiteSpace($mysqlRootPassword) -or
+    [string]::IsNullOrWhiteSpace($codecApiKey) -or
+    [string]::IsNullOrWhiteSpace($codecFeistelSecret)) {
+    throw 'LOCAL_MYSQL_TEST_DATABASE, LOCAL_MYSQL_USER, LOCAL_MYSQL_ROOT_PASSWORD, LOCAL_CODEC_API_KEY, and LOCAL_CODEC_FEISTEL_SECRET must be configured in .env.local.'
 }
 
 if ($testDatabase -notmatch '^[A-Za-z0-9_]+$' -or $mysqlUser -notmatch '^[A-Za-z0-9_]+$') {
@@ -40,7 +44,7 @@ $sql = 'CREATE DATABASE IF NOT EXISTS `' + $testDatabase + '` CHARACTER SET utf8
 
 Push-Location $repositoryRoot
 try {
-    & docker compose --env-file $environmentFile -f $composeFile up --detach mysql tag-control-plane
+    & docker compose --env-file $environmentFile -f $composeFile up --detach mysql tag-codec tag-control-plane
     if ($LASTEXITCODE -ne 0) {
         throw 'Docker Compose could not start the local services for testing.'
     }

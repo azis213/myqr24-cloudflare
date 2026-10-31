@@ -36,6 +36,7 @@
 | `CC-TC-POOL-002` | CC-US-015 | Range anderer Länge, fehlende oder inaktive Range referenzieren | TCP verweigert Poolkonfiguration; keine lokale Umgehung ist möglich | Integration, lokal automatisiert |
 | `CC-TC-POOL-003` | CC-US-015 | Poolgrenzen als sichtbare Feistel-`tagId` interpretieren | UI erklärt/validiert `decodedValue`-Modell und sendet keine unzulässige Darstellung | UI |
 | `CC-TC-POOL-004` | CC-US-015 | Pool-/Kundensegment-/Ownerdaten in Routing- oder öffentliche Vorschau aufnehmen | Ansicht schließt private Felder aus; Contract/Leak-Test schlägt bei Durchreichung fehl | UI/Security |
+| `CC-TC-POOL-005` | CC-US-015 | TCP liefert einer Organisationssitzung ausschließlich sichtbare Pools | TCC rendert ausschließlich die TCP-Poolliste; fremde oder Plattformpools werden weder konstruiert noch als Browserparameter übertragen | UI/Contract, lokal automatisiert |
 | `CC-TC-ALLOC-001` | CC-US-011 | 6-stellige TAG-ID vergeben | `tagId`, `decodedValue`, Länge und Range-Kontext sind eindeutig reserviert | Integration |
 | `CC-TC-ALLOC-002` | CC-US-011 | 8- oder 10-stellige TAG-ID vergeben | nächster freier linearer `decodedValue` wird durch den privaten Codec eindeutig als `tagId` reserviert und gespeichert | Unit/Integration |
 | `CC-TC-ALLOC-003` | CC-US-011 | Parallele Vergaben derselben Range | keine Duplikate bei `tagId` oder `(length, decodedValue)` | Integration |

@@ -17,6 +17,15 @@ if (-not (Test-Path -LiteralPath $environmentFile)) {
     Write-Warning "Created $environmentFile. Review the synthetic local values before sharing this environment."
 }
 
+$requiredCodecSettings = @('LOCAL_CODEC_API_KEY', 'LOCAL_CODEC_FEISTEL_SECRET')
+$missingCodecSettings = @($requiredCodecSettings | Where-Object {
+    -not (Select-String -LiteralPath $environmentFile -Pattern "^$_=" -Quiet)
+})
+
+if ($missingCodecSettings.Count -gt 0) {
+    throw "Missing local codec settings ($($missingCodecSettings -join ', ')) in $environmentFile. Add synthetic random values before starting the local environment."
+}
+
 $localConfiguration = Get-Content -LiteralPath $environmentFile
 
 $tcpPort = 8080

@@ -299,6 +299,32 @@ describe("TAG Control Center admin auth contract", () => {
     expect(await screen.findByText("Kritische Aktion freigeben")).toBeVisible();
   });
 
+  it("renders only the pool records delivered by the TCP visibility boundary", async () => {
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse(true))
+      .mockResolvedValueOnce(jsonResponse({
+        ok: true,
+        status: 200,
+        body: {
+          pools: [{ poolId: "assigned-pool", length: 6, active: true, rangeIds: ["assigned-range"] }],
+          correlation_id: correlationId,
+        },
+      }));
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("admin@example.test");
+    await user.click(screen.getByRole("button", { name: "Sichtbare Pools laden" }));
+
+    expect(await screen.findByText("assigned-pool")).toBeVisible();
+    expect(screen.queryByText("foreign-organization-pool")).not.toBeInTheDocument();
+    expect(screen.queryByText("platform-pool")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/tcp/api/v1/admin/tag-management/pools",
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+
   it("loads persisted tags only for the selected TCP-confirmed pool and offers the server-confirmed lifecycle command", async () => {
     fetchMock
       .mockResolvedValueOnce(sessionResponse(true))

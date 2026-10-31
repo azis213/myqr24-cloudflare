@@ -3,8 +3,8 @@
 **Orchestrierungsanweisung:** [`README.md`](README.md)  
 **Stand:** 2026-10-31
 **Gesamtstatus:** `in-progress`  
-**Aktive Welle:** `W2L – Local-first Verwaltungs- und Private-Codec-Slice in progress`
-**Nächster zulässiger Arbeitsschritt:** Den lokalen Private-Codec-Worker mit `wrangler dev --local` ausschließlich auf `127.0.0.1` starten und die lokale TCP-Reservierung über `InternalHttpTagCodecClient` mit synthetischen ignorierten Secrets für 6, 8 und 10 Stellen integrieren und testen. Danach den verbleibenden W2L-Umfang (Range-/Pool-Updates, Referenzvalidatoren, Organisationspools und TCC-Contracttests) ausschließlich lokal fortsetzen. Staging wird nach jeder abgeschlossenen lokalen Welle separat entschieden.
+**Aktive Welle:** `W3L – lokale Routing-Projektion und Fake-Publisher in progress`
+**Nächster zulässiger Arbeitsschritt:** Entscheidung `W3L-BLK-001` treffen: Soll der lokale v1-Projektions- und Edge-Umfang verbindlich bei `redirect`, `image` und `json` bleiben oder müssen `tag-vault`, `tag-chat`, `lost-found`, `tag-guestbook` und `tag-checkin` vor W3L als neue Router-/Contract-Version spezifiziert werden? Der reine lokale Projektionsgenerator für die drei aktuellen v1-Typen ist implementiert und getestet; Feature-Admin-API, Outbox, Fake-Publisher und TCC-Projektions-UI bleiben bis zur Entscheidung gesperrt.
 **Regel:** `apps/tag-control-plane` und `apps/tag-control-center` werden fachlich local-first weiterentwickelt. Persistenz-, Migrations-, Transaktions-, Outbox- und Rollbacktests laufen gegen die vorhandene isolierte Compose-MySQL-Topologie. Der Private-Codec darf ausschließlich lokal über den auf Loopback gebundenen Wrangler-Worker, synthetische ignorierte Secrets und den serverseitigen TCP-Adapter integriert werden; TCC, TAG-App und Browser bleiben ausgeschlossen. Cloudflare-Publishing, Dogado und Mail bleiben lokale Fakes. Reale Dogado-Verbindungen, echte Cloudflare-Tokens und manuelle oder automatisierte KV-Fachänderungen bleiben bis zu einer je Welle explizit entschiedenen Deployment-Freigabe verboten. `docs/00-Refinement/` ist bei regulären Wiederanläufen und Umsetzungsarbeiten ausdrücklich ausgeschlossen.
 
 ---
@@ -16,7 +16,7 @@
 | Edge Router | Staging-Scan-Worker ist historisch deployt; der getrennte Private-Codec wird local-first unter `/api/v1/codec/*` konsolidiert und kann lokal per Wrangler auf Loopback laufen. | Externe Route `codec.s.myqr24.com/api/v1/*` ist ein abzulösender historischer Slice; keine neue Staging-Nutzung ohne separate Wellenentscheidung |
 | Plattform-Homepage | KV-freier Worker `myqr24-platform-home` ist für `www.myqr24.com/*` bereitgestellt. | Deployment-Version `b3372d68-ac0a-431e-a902-8fba9f2fb201`; öffentliche Seite wurde anschließend als sichtbar bestätigt |
 | TAG-App | Bestehende React/Vite-PWA in `apps/tag-app`; öffentliche View-Darstellung ist fixturebasiert. | siehe `docs/40-Implementation/tag-app/STATUS.md` |
-| Control Plane | Laravel-13-/MySQL-Fundament unter `apps/tag-control-plane` mit Audit, Korrelation, Bootstrap-Admin, Web-Session und Übergangs-E-Mail-MFA. | keine fachliche Domäne, keine Public-Read-API, kein Publisher und keine Produktionsdaten |
+| Control Plane | Laravel-13-/MySQL-Fundament unter `apps/tag-control-plane` mit Audit, Korrelation, Bootstrap-Admin, Web-Session, Übergangs-E-Mail-MFA sowie lokaler TCP→Private-Codec-Reservierung. | keine Public-Read-API, kein Publisher und keine Produktionsdaten |
 | Control Center | React-/Vite-Shell unter `apps/tag-control-center` mit Readiness, Login, E-Mail-MFA, Sessionstatus und Logout über same-origin `/tcp`. | keine Verwaltungscommands, Rollenverwaltung oder Secret-Konfiguration |
 | Contracts | `tag-codec-internal-v1`, `tag-routing-projection-v1` und der lokale W1L-Browservertrag [`control-plane-admin-api-v1`](../../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) sind vorhanden. | Fach-, Public- und Owner-Contracts folgen in späteren Wellen |
 | TAG Lab | Bestehendes lokales Tool vorhanden; noch kein orchestrierter Testtag-Katalog. | W0/W3-Arbeit |
@@ -30,8 +30,8 @@
 | --- | --- | --- | --- | --- |
 | `W0` | Lokaler Ausgangspunkt, Entscheidungen, Contracts und Testtopologie | `in-progress` | Orchestrierungsanweisung und Startstatus vorhanden | Lokale Contracts, Toolchain und Testtag-Policy dokumentiert; Deployment-Backlog separat geführt |
 | `W1L` | Lokales Plane-Fundament und Admin-Sicherheitsrahmen | `implemented` | lokale Compose-MySQL-Topologie verifiziert | TCP-MySQL-Suite (11 Tests/65 Assertions), TCC-Contract-UI-Suite (6 Tests), TCC-Build und TCC-Dependency-Audit ohne Vulnerabilities am 2026-10-29 grün |
-| `W2L` | Lokale Ranges, Pools, Reservierung, Lifecycle und CC-Verwaltung | `in-progress` | W1L-Gate erfüllt; lokale AuthZ-/Re-Auth-/Fake-Codec-Reservierung implementiert | Range-/Pool-Mutationen, Lifecycle, CP-G2 und lokale Story-Tests grün |
-| `W3L` | Lokale Routing-Projektion und Publisher mit Fake-Adapter | `planned` | W2L-Gate erfüllt | Contract-, Outbox-, Retry- und Unpublish-Tests grün |
+| `W2L` | Lokale Ranges, Pools, Reservierung, Lifecycle und CC-Verwaltung | `implemented-local` | W1L-Gate erfüllt; lokale AuthZ-/Re-Auth-/Private-Codec-Reservierung implementiert | Range-/Pool-Mutationen, Organisationsgrenzen, Lifecycle, CP-G2 und lokale Story-Tests grün |
+| `W3L` | Lokale Routing-Projektion und Publisher mit Fake-Adapter | `in-progress` | W2L-Gate erfüllt | Contract-, Outbox-, Retry- und Unpublish-Tests grün |
 | `W3D` | Dogado-Deployment, echter Staging-Publish und Scan | `blocked` | W3L-Gate sowie Deployment-Blocker aufgelöst | `CP-G4`, Router-/PWA-Nachweis grün |
 | `W4` | PublicTagView, Basis-Vault, TAG-App-API-Ablösung | `planned` | W3-Gate erfüllt | `CP-G5`, `CP-G6`, E2E-Evidenz grün |
 | `W5` | Claiming, Besitzanker, Collections, Support | `planned` | W4-Gate erfüllt | Claim-/Lockout-/Leak-/Session-Gate grün |
@@ -55,6 +55,10 @@
 ---
 
 ## 4. Aktive Blocker und Entscheidungen
+
+| ID | Bereich | Status | Befund / erforderliche Entscheidung |
+| --- | --- | --- | --- |
+| `W3L-BLK-001` | Routing-Featureumfang | `decision-required` | [`tag-routing-projection-v1`](../../../10-Architecture/35-Contracts/tag-routing-projection-v1.md) und der aktuelle Edge Router erlauben v1 ausschließlich `redirect`, `image` und `json`. Ältere Architektur- und Fachbeispiele nennen zusätzlich `tag-vault`, `tag-chat`, `lost-found`, `tag-guestbook` und `tag-checkin`. Vor Feature-Admin-API, Outbox und TCC-UI verbindlich entscheiden, ob W3L auf die drei Routertypen begrenzt bleibt oder eine neue Contract-/Router-Version die weiteren Typen spezifiziert. |
 
 | ID | Status | Beschreibung | Auflösungskriterium | Nächste Aktion |
 | --- | --- | --- | --- | --- |
