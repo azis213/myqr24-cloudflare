@@ -7,6 +7,7 @@
 | Edge Router | [`../edge-router/`](../edge-router/) | Lokale Worker-Tests und Builds für den linearen 6/8/10-Vertrag verifiziert; frühere öffentliche Staging-Scans gehören zum abgelösten HMAC-Vertrag |
 | TAG-App | [`../tag-app/`](../tag-app/) | Pages-Deploy und öffentlicher Vault-Staging-MVP vorhanden; zusätzliche Browser-/PWA-Nachweise offen |
 | Router→TAG-App | [`../tag-app/20-TEST-STRATEGY.md`](../tag-app/20-TEST-STRATEGY.md#6-integrationsstrategie-edge-router--tag-app) | blockiert, bis aktiver Worker und gebundener KV-Namespace eindeutig identifiziert sind |
+| W3L TCP/TCC/React/D1/Access | [`../../90-Session-Change-Summaries/2026-10-31-REACT-D1-ACCESS-CORRECTION.md`](../../90-Session-Change-Summaries/2026-10-31-REACT-D1-ACCESS-CORRECTION.md) | `implemented-local`: TCP 47/309, Router 73, TAG-App 11, TCC 18 Tests plus Builds/Dry-Runs; keine reale Cloudflare-Mutation |
 
 Ein Nachweis gilt nur für den in der Tabelle angegebenen Strang. Insbesondere bestätigt der bisherige Scan-Redirect nicht die Sichtbarkeits-, Session- oder Feature-Autorisierung der späteren Application API.
 

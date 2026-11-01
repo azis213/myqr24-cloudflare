@@ -23,6 +23,17 @@
 
 `implemented` bedeutet hier: Testfall und/oder überprüfbarer Nachweis sind vorhanden. Für den Status `verified` der zugehörigen Story sind die gemäß Teststrategie geforderten automatisierten und Staging-Nachweise erforderlich.
 
+## Lokale React-/D1-/Access-v1-Testfälle
+
+| ID | Vertrag | Ebene | Testfall | Erwartetes Ergebnis | Status |
+| --- | --- | --- | --- | --- | --- |
+| APP-TC-ACCESS-001 | `tag-edge-d1-routing-v1` | Router/Unit | interner D1-Datensatz mit public/pin-Modus | 302 zur React-PWA mit zweckgebundenen `mode`/`av`/`rv`/`nonce`/`exp`/`sig`, ohne R2-Key | implemented-local |
+| APP-TC-ACCESS-002 | `tag-app-access-v1` | API/Fake | Content ohne Session, public Bootstrap für PIN-TAG, manipulierte Parameter | neutral abgelehnt; kein Content oder Medienzugriff | implemented-local |
+| APP-TC-ACCESS-003 | `tag-app-access-v1` | API/Fake | fünf falsche PINs je TAG/Client-Signal | Argon2id-/Pepper-Prüfung, 15-Minuten-Sperre und neutrale Antwort | implemented-local |
+| APP-TC-ACCESS-004 | `tag-app-access-v1` | API/Fake | korrekte PIN, danach Access-Version erhöhen | HttpOnly-Session liefert View; Access-Version widerruft sie zentral | implemented-local |
+| APP-TC-ACCESS-005 | `tag-app-access-v1` | API/Fake | autorisierte Content-ID/Variante an Media-Signer | nur serverseitiges Service Binding; lokale Signierung bis Secret-Gate fail-closed | implemented-local |
+| APP-TC-ACCESS-006 | `tag-app-access-v1` | Benchmark | Argon2id 8 MiB/1 Iteration/Parallelität 1 | lokaler Messwert dokumentiert; finale Worker-Kalibrierung bleibt Staging-Gate | implemented-local |
+
 ## Router→PWA-Integration
 
 | ID | Story | Ebene | Testfall | Erwartetes Ergebnis | Status |

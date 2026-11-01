@@ -27,6 +27,17 @@ final class TagManagementAuthorizer
         return $user->role === self::PLATFORM_ADMIN;
     }
 
+    public function canReadRouting(User $user): bool
+    {
+        return $user->role === self::PLATFORM_ADMIN;
+    }
+
+    public function requireRoutingMutation(Request $request, User $user): void
+    {
+        $this->requirePlatformAdmin($request, $user, 'routing.mutate');
+        $this->requireRecentReauthentication($request, $user, 'routing.mutate');
+    }
+
     public function requireRangeMutation(Request $request, User $user): void
     {
         $this->requirePlatformAdmin($request, $user, 'range.mutate');

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fixtures from "./fixtures/edge-routing.json";
 import {
+  toAppBootstrapRedirect,
   calculateRedirectSignature,
   decodeTagId,
   encodeFeistel,
@@ -11,6 +12,7 @@ import {
   isValidRangeIndex,
   parseBase36,
   resolveTag,
+  toPagesDefaultRedirect,
   toSafeRedirect,
   type Env,
   type FeatureAssignment,
@@ -39,10 +41,30 @@ function createEnv(
   reads: string[] = [],
   environment: ScanEnvironment = "production",
 ): Env {
+  const hasInternalFixture = Object.values(entries).some(
+    (entry) => typeof entry === "object" && entry !== null && (entry as { type?: unknown }).type === "json",
+  );
   return {
     ...secrets,
     SCAN_ENVIRONMENT: environment,
+    PAGES_URL_TEMPLATE: "https://app.example.test/tag/{tagId}",
     TAG_CONFIG: createConfig(entries, reads),
+    TAG_ROUTING: {
+      prepare: () => ({
+        bind: (tagId: string) => ({
+          first: async () => hasInternalFixture ? {
+            tag_id: tagId,
+            status: "active",
+            target_type: "internal",
+            external_url: null,
+            protection_mode: "public",
+            access_version: 1,
+            content_revision: 1,
+          } : null,
+        }),
+      }),
+    } as unknown as D1Database,
+    APP_BOOTSTRAP_SECRET_S01: "test-bootstrap-secret",
   };
 }
 
@@ -125,6 +147,18 @@ async function workerResponse(
     createEnv(entries, reads, environment),
     {} as ExecutionContext,
   );
+}
+
+function expectBootstrapLocation(location: string | null, tagId: string): void {
+  const url = new URL(location ?? "");
+  expect(url.origin).toBe("https://app.example.test");
+  expect(url.pathname).toBe(`/tag/${tagId}`);
+  expect(url.searchParams.get("mode")).toBe("public");
+  expect(url.searchParams.get("av")).toBe("1");
+  expect(url.searchParams.get("rv")).toBe("1");
+  expect(url.searchParams.get("nonce")).toMatch(/^[A-Za-z0-9_-]{24}$/);
+  expect(url.searchParams.get("exp")).toMatch(/^\d+$/);
+  expect(url.searchParams.get("sig")).toMatch(/^[A-Za-z0-9_-]{43}$/);
 }
 
 describe("URL extraction", () => {
@@ -515,6 +549,29 @@ describe("feature assignment priority", () => {
 });
 
 describe("features, templates and worker responses", () => {
+  it("TC-D1-001 creates a purpose-bound internal React bootstrap without exposing content keys", async () => {
+    const response = await toAppBootstrapRedirect("ab12cd", {
+      tag_id: "ab12cd", status: "active", target_type: "internal", external_url: null,
+      protection_mode: "pin_required", access_version: 4, content_revision: 12,
+    }, "https://app.example.test/tag/{tagId}", "bootstrap-test-secret", 1_790_786_000_000);
+    const location = new URL(response?.headers.get("location") ?? "");
+    expect(response?.status).toBe(302);
+    expect(location.pathname).toBe("/tag/ab12cd");
+    expect(location.searchParams.get("mode")).toBe("pin_required");
+    expect(location.searchParams.get("av")).toBe("4");
+    expect(location.searchParams.get("rv")).toBe("12");
+    expect(location.searchParams.get("exp")).toBe("1790786060");
+    expect(location.searchParams.get("sig")).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(location.toString()).not.toContain("content/");
+  });
+
+  it("TC-D1-002 fails closed for closed, external or malformed internal routing records", async () => {
+    const base = { tag_id: "ab12cd", status: "active" as const, target_type: "internal" as const, external_url: null, protection_mode: "public" as const, access_version: 1, content_revision: 1 };
+    await expect(toAppBootstrapRedirect("ab12cd", { ...base, protection_mode: "closed" }, "https://app.example.test/tag/{tagId}", "secret")).resolves.toBeNull();
+    await expect(toAppBootstrapRedirect("ab12cd", { ...base, target_type: "external" }, "https://app.example.test/tag/{tagId}", "secret")).resolves.toBeNull();
+    await expect(toAppBootstrapRedirect("ab12cd", base, "https://app.example.test/other/{tagId}", "secret")).resolves.toBeNull();
+  });
+
   it("TC-FEATURE-001 and TC-TEMPLATE-001 redirect through a fixed URL", async () => {
     const tag = await sixTag();
     const response = await workerResponse(requestFor(tag.id), {
@@ -704,7 +761,7 @@ describe("features, templates and worker responses", () => {
     }
   });
 
-  it("TC-RESPONSE-001/002 returns JSON for non-redirect features", async () => {
+  it("TC-RESPONSE-001/002 redirects non-redirect features to the canonical Pages default", async () => {
     const tag = await sixTag();
     const response = await workerResponse(requestFor(tag.id), {
       ...rangeIndex([range("range-default", tag.value, 6)]),
@@ -712,14 +769,22 @@ describe("features, templates and worker responses", () => {
       "feature:json-default": activeFeature("json-default"),
     });
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-store");
-    await expect(response.json()).resolves.toMatchObject({
-      tag: { id: tag.id, value: tag.value.toString(), length: 6 },
-      range: { id: "range-default", groupId: "group-default" },
-      group: { id: "group-default" },
-      features: [{ id: "json-default", type: "json" }],
-    });
+    expect(response.status).toBe(302);
+    expectBootstrapLocation(response.headers.get("location"), tag.id);
+    await expect(response.text()).resolves.toBe("");
+  });
+
+  it("TC-PAGES-001 accepts only the canonical HTTPS Pages template", () => {
+    expect(toPagesDefaultRedirect("ab12cd", "https://app.example.test/tag/{tagId}")?.headers.get("location")).toBe("https://app.example.test/tag/ab12cd");
+    for (const template of [
+      "http://app.example.test/tag/{tagId}",
+      "https://app.example.test/other/{tagId}",
+      "https://app.example.test/tag/{tagId}?exp=1",
+      "https://app.example.test/tag/{tagId}/{tagId}",
+      "https://app.example.test/tag/{decodedValue}",
+    ]) {
+      expect(toPagesDefaultRedirect("ab12cd", template)).toBeNull();
+    }
   });
 
   it("TC-HTTP-002/TC-RESPONSE-004 returns no body for a valid HEAD request", async () => {
@@ -730,7 +795,8 @@ describe("features, templates and worker responses", () => {
       "feature:json-default": activeFeature("json-default"),
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(302);
+    expectBootstrapLocation(response.headers.get("location"), tag.id);
     expect(await response.text()).toBe("");
   });
 
@@ -763,11 +829,8 @@ describe("eight- and ten-character edge integration", () => {
       "feature:json-default": activeFeature("json-default"),
     });
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      tag: { id: tag.id, value: tag.value.toString(), length: 8 },
-      range: { id: "range-eight" },
-    });
+    expect(response.status).toBe(302);
+    expectBootstrapLocation(response.headers.get("location"), tag.id);
   });
 
   it("TC-EDGE-010 resolves a ten-character value with exact BigInt range lookup", async () => {
@@ -778,10 +841,7 @@ describe("eight- and ten-character edge integration", () => {
       "feature:json-default": activeFeature("json-default"),
     });
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      tag: { id: tag.id, value: tag.value.toString(), length: 10 },
-      range: { id: "range-ten" },
-    });
+    expect(response.status).toBe(302);
+    expectBootstrapLocation(response.headers.get("location"), tag.id);
   });
 });

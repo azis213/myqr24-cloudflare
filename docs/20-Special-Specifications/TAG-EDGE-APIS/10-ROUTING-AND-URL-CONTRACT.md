@@ -102,11 +102,11 @@ Ein Request kann weder durch Pfad noch durch Header, Query-Parameter oder `tagId
 | --- | --- | --- | --- | --- |
 | Scan | `https://p.myqr24.com/t/ab12cd` | Edge Router | physischen TAG auflösen | verbindlich |
 | Scan v1 | `https://p.myqr24.com/t1/ab12cd` | Edge Router | reservierte Scan-/Decoderfamilie | verbindlich reserviert |
-| App | `https://app.myqr24.com/tag/ab12cd` | TAG-App | öffentliche TAG-Seite rendern | App-Grundroute verbindlich |
+| App | `https://app.myqr24.com/tag/ab12cd` | TAG-App / Pages Function | öffentliche TAG-Seite aus veröffentlichtem R2-Runtime-JSON rendern | lokaler v1-Slice |
 | App-Feature | `https://app.myqr24.com/tag/ab12cd/claim` | TAG-App | spezifischer Nutzerfluss | reserviert |
-| Runtime API | `https://p.myqr24.com/api/v1/tags/ab12cd/view` | Runtime API | aktuell zulässigen TAG-View liefern | reserviert |
+| Runtime API | interne Service-Binding-Anfrage für `tags/ab12cd/view` | Runtime API | aktuell zulässigen TAG-View liefern | lokaler interner v1-Slice; kein öffentlicher Route-Endpoint |
 | Access API | `https://p.myqr24.com/api/v1/tags/ab12cd/access` | Access/Runtime API | PIN-/Grant-Zugriff prüfen | konzeptionell |
-| Asset | `https://p.myqr24.com/media/v1/tags/ab12cd/assets/ast_7f31/cover-1280.webp` | Media Gateway | erlaubte Assetvariante ausliefern | reserviert |
+| Asset | `https://p.myqr24.com/media/v1/tags/ab12cd/assets/ast_7f31/cover-1280.webp` | Pages Media Function | freigegebene WebP-/AVIF-Variante aus öffentlichem R2 ausliefern | lokaler v1-Slice |
 | Owner API | `https://p.myqr24.com/api/v1/owner/tags/ab12cd` | TCP Owner API | Owner-Query bzw. -Command | reserviert |
 | Account API | `https://p.myqr24.com/api/v1/account/collection` | TCP Account API | Accountdaten und Collection | reserviert |
 
@@ -149,7 +149,7 @@ flowchart LR
 
 | Route | Verwendung | Zulässige Methoden | Ergebnis |
 | --- | --- | --- | --- |
-| `/t/{tagId}` | aktuelle kanonische Scan-Familie | `GET`, `HEAD` | Redirect oder erlaubtes JSON-Aktionsdokument |
+| `/t/{tagId}` | aktuelle kanonische Scan-Familie | `GET`, `HEAD` | Feature-Redirect oder Pages-Default-Redirect |
 | `/t1/{tagId}` | reservierte Scan-Familie für einen künftigen, explizit dokumentierten Decoder-/Secret-Kontext | `GET`, `HEAD` | bis Aktivierung dieselbe Decoderkonfiguration wie `/t/` |
 
 Die vollständigen Validierungs-, Feistel-, Range- und Feature-Regeln stehen verbindlich in [`../../DOMAIN_RULES.md`](../../DOMAIN_RULES.md).
@@ -164,7 +164,7 @@ Ziel-App-URL:
 https://app.myqr24.com/tag/ab12cd
 ```
 
-Ein erfolgreicher Scan kann für ein `tag-vault`-Feature auf die TAG-App weiterleiten. Andere serverseitig valide Features können auf eine andere feste App-Route oder ein erlaubtes Redirect-Ziel führen. Der Worker übernimmt dabei ausschließlich die technische Auflösung und keine Vault-, Owner- oder Visibilityentscheidung.
+Ein erfolgreicher Scan folgt der fachlichen Hierarchie Einzel-TAG → Allocation Pool → Range → Gruppe. TCP materialisiert Pool- und Einzel-TAG-Zuweisungen als vorhandene `tag:{decodedValue}`-Regeln, ohne Pooldaten in KV zu legen. Ein Redirect-Feature führt zu einem festen, geprüften Ziel; ohne Redirect verwendet der Worker das umgebungsseitige HTTPS-Pages-Template `/tag/{tagId}`. Der Worker erzeugt kein TAG-HTML und übernimmt keine Vault-, Owner- oder Visibilityentscheidung.
 
 ### 5.3 Keine Längenroute `/8/`
 
@@ -182,7 +182,7 @@ Eine neue Scanroute wie `/t2/{tagId}` darf ausschließlich eine neue langlebige 
 
 Die TAG-App ist eine browserseitige HTML-/PWA-Anwendung. Sie erhält eigene, menschenlesbare Deep Links unter `app-staging.myqr24.com` beziehungsweise `app.myqr24.com`.
 
-Sie wird niemals unter `/api/...` ausgeliefert. APIs liefern Daten; App-Routen liefern die PWA-Shell und anschließendes Client-Rendering.
+Sie wird niemals unter `/api/...` ausgeliefert. App-Routen liefern HTML; im lokalen v1-Slice rendert die Pages Function dieses HTML serverseitig aus dem veröffentlichten Runtime-Dokument. APIs liefern Daten und bleiben von der App-Route getrennt.
 
 ### 6.2 Öffentliche und reservierte App-Pfade
 
@@ -204,13 +204,13 @@ Die konkrete App-Route eines Features wird durch dessen serverseitig geprüfte D
 
 ```text
 1. Browser ruft /tag/{tagId} auf.
-2. Cloudflare Pages liefert die TAG-App-Shell (SPA-Deep-Link-Fallback).
-3. Die TAG-App fordert Runtime-Daten über die Runtime API an.
-4. Die Runtime API liefert die für diesen Request erlaubte View oder eine neutrale Nichtverfügbarkeit.
-5. Die TAG-App rendert nur den typisierten, serverseitig gefilterten Vertrag.
+2. Cloudflare Pages liefert die React-PWA-Shell; die App liest die signierten Bootstrapparameter als nicht vertrauenswürdigen UI-Hinweis.
+3. Die Application API prüft Bootstrap, D1-Status und Access-Session erneut, bevor sie ein serverseitig gefiltertes JSON liefert.
+4. Bilder und andere Medien werden erst nach Access-Prüfung über eine kurzlebige, objektgebundene Presigned URL geladen.
+5. Weder React noch Pages kennen R2-Keys, PIN-Hashes, Pepper oder Signiercredentials.
 ```
 
-Der aktuelle MVP hat bereits die Route `/tag/{tagId}`. Die im Client verwendeten Fixtures werden später durch den in Abschnitt 7 beschriebenen Runtime-Vertrag ersetzt.
+Der lokale v1-Slice verwendet wieder `/tag/*` als React-SPA-Fallback. Fixtures bleiben ein expliziter Testmodus; normale Browserpfade verwenden D1-Routing und die Access-API.
 
 ## 7. Runtime-API
 
@@ -235,19 +235,19 @@ Empfohlen:
 /api/v1/tags/{tagId}/assets/{assetId}/download
 ```
 
-Der gleiche fachliche Endpunkt kann — abhängig von TAG-Status und nachgewiesenem Zugriff — eine öffentliche, geschützte oder neutrale Repräsentation liefern. Der Server legt Antworten für geschützte bzw. personenbezogene Kontexte immer mit `Cache-Control: no-store` aus.
+Der gleiche fachliche Endpunkt kann — abhängig von TAG-Status und nachgewiesenem Zugriff — eine öffentliche, geschützte oder neutrale Repräsentation liefern. Der Server legt Antworten für geschützte bzw. personenbezogene Kontexte immer mit `Cache-Control: no-store` aus. Im lokalen v1-Slice existiert ausschließlich der interne Pfad `/internal/v1/tags/{tagId}/view` hinter Service Binding; ein öffentlicher `/api/v1/...`-Endpoint bleibt reserviert und ist nicht aktiviert.
 
 ### 7.2 Reservierte Runtime-Endpunkte
 
 | Methode | Route | Zweck | Ohne Session | Mit zulässiger Access-/Owner-Session |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/v1/tags/{tagId}/view` | aktuelle zulässige TAG-View abrufen | öffentlicher View oder neutrale Nichtverfügbarkeit | ggf. zusätzlich erlaubte Sichtbarkeit; `no-store` |
+| `GET` | intern `/internal/v1/tags/{tagId}/view` | aktuelle zulässige TAG-View ausschließlich per Service Binding abrufen | öffentlicher View oder neutrale Nichtverfügbarkeit | geschützte Sichtbarkeit erst nach separatem Session-/Grant-Contract; `no-store` |
 | `POST` | `/api/v1/tags/{tagId}/access` | PIN, Einladungs- oder Grant-Zugang prüfen | verarbeitet Zugangseingabe; rate-limited | kann Session/Grant aktualisieren |
 | `GET` | `/api/v1/tags/{tagId}/assets/{assetId}/download` | Downloadentscheidung für ein Asset treffen | nur wenn Asset öffentlich downloadbar ist | geschützt möglich nach Prüfung |
 | `GET` | `/api/v1/tags/{tagId}/features` | nur falls benötigt: erlaubte Runtime-Aktionen lesen | nur serverseitig gefilterte Actions | ggf. mehr erlaubte Actions |
 | `POST` | `/api/v1/tags/{tagId}/report` | Missbrauchs-, POI- oder Inhaltsmeldung abgeben | rate-limited, datensparsam | kontextbezogen |
 
-Die Endpunkte sind reserviert. Vor einer produktiven Implementierung müssen Request-/Response-Schema, Fehlerformat, Rate Limits, CORS, Session-Modell und Auditwirkung separat verbindlich festgelegt werden.
+Mit Ausnahme des lokal getesteten internen View-Endpunkts sind die Endpunkte reserviert. Vor einer produktiven Aktivierung müssen Request-/Response-Schema, Fehlerformat, Rate Limits, CORS, Session-Modell und Auditwirkung separat verbindlich festgelegt werden.
 
 ### 7.3 Warum `view` statt nur `/api/v1/tags/{tagId}`
 

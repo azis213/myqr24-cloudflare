@@ -196,7 +196,7 @@
 
 **Akzeptanzkriterien**
 
-1. Feature-Typen entsprechen ausschließlich dem dokumentierten Routing-Vertrag, etwa `redirect`, `tag-vault`, `tag-chat`, `lost-found`, `tag-guestbook` und `tag-checkin`.
+1. Der lokale Routing-v1-Umfang unterstützt ausschließlich `redirect`, `image` und `json`. `tag-vault`, `tag-chat`, `lost-found`, `tag-guestbook` und `tag-checkin` benötigen vor ihrer Aufnahme eine separate Router-/Contract-Version; öffentliche Inhalte folgen stattdessen dem Pages-/Runtime-/R2-Vertrag.
 2. Jedes Feature wird gegen ein typspezifisches serverseitiges Schema validiert.
 3. URL-Ziele sind absolute erlaubte `https:`- bzw. bei dokumentierten Redirects `http:`-/`https:`-URLs; unbekannte Templates oder Platzhalter werden abgewiesen.
 4. Feature-Dokumente enthalten keine personenbezogenen Daten, Geheimnisse, Vault-Inhalte, POI-Nachweise oder Berechtigungszustände.

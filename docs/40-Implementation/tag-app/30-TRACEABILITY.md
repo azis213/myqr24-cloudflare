@@ -33,6 +33,14 @@
 
 Die Router-seitige Validierung selbst wird nicht dupliziert. Ihre Stories und Tests befinden sich im [Edge-Router-Strang](../edge-router/30-TRACEABILITY.md).
 
+## APP-I02B — Lokale React-/D1-/Access-Runtime und Medien
+
+| Vertrag | Akzeptanzbereich | Testfälle | Testdaten | Code / Konfiguration | Evidenz / Status |
+| --- | --- | --- | --- | --- | --- |
+| `tag-edge-d1-routing-v1` | React-App-Shell, signierter Edge-Bootstrap und D1-Index ohne Content-/R2-Daten | Router-D1-Tests, `tagAccessService.test.ts` | synthetische 6/8/10-Bootstrapparameter | `public/_redirects`, `src/App.tsx`, `src/services/tagAccessService.ts`, Edge `toAppBootstrapRedirect` | 73 Router- und 11 TAG-App-Tests lokal grün; implemented-local |
+| `tag-app-access-v1` | Content erst nach Access-Session, PIN-Dialog vor JSON, keine R2-Keys/Token im Client | `test/app-api.test.ts`, `test/argon2-benchmark.test.ts` | D1-/R2-/Signer-Fakes und nicht geheime Benchmarkwerte | `workers/app-api.ts`, `database/0001_tag_access.sql`, `wrangler.app-api.toml` | implemented-local; reale D1/R2/Secrets bleiben W3D-Gate |
+| `tag-app-access-v1` | Medien nur über serverseitigen Service-Binding-Signer | `test/app-api.test.ts` | anonyme Content-ID und Variante | `workers/media-signer.ts`, `wrangler.media-signer.toml` | fail-closed bis R2-S3-Credential-Gate; keine öffentliche Medienroute |
+
 ## APP-I02A — Gemeinsame PWA, Scan und lokale Berechtigungspräferenzen
 
 | Story | Akzeptanzbereich | Testfälle | Testdaten | Geplante Komponenten | Status |

@@ -16,9 +16,13 @@
 | Vertrag | Owner | Status | Zweck |
 | --- | --- | --- | --- |
 | [`tag-codec-internal-v1.md`](tag-codec-internal-v1.md) | Cloudflare TAG Codec Worker | `implemented-local` | Authentisierter lokaler Private-Codec für 6, 8 und 10 Stellen mit `codecVersion` und Batch-Encoding bis 1.000 Werte; TCP darf ihn ausschließlich lokal auf Loopback mit synthetischen ignorierten Secrets ansprechen. Der externe Internal-Host bleibt eine spätere Wellenentscheidung. |
-| [`tag-routing-projection-v1.md`](tag-routing-projection-v1.md) | TAG Control Plane | `implemented-contract` | Minimale, nicht personenbezogene Control-Plane-zu-Edge-Router-KV-Projektion; lokale Erzeugung und Fake-Publisher folgen in W3L |
+| [`tag-routing-projection-v1.md`](tag-routing-projection-v1.md) | TAG Control Plane | `implemented-local` | Minimale, nicht personenbezogene Control-Plane-zu-Edge-Router-KV-Projektion mit Pool-/TAG-Materialisierung, Pages-Default, Outbox und lokalem Fake-Publisher |
 | [`control-plane-admin-api-v1.md`](control-plane-admin-api-v1.md) | TAG Control Plane | `implemented-local` | W1L-Session-, CSRF-, Passwortlogin-, E-Mail-MFA- und Logout-Contract für das Control Center; fachliche Admin-Queries/-Commands und RBAC folgen in späteren Wellen |
 | [`control-plane-tag-management-api-v1.md`](control-plane-tag-management-api-v1.md) | TAG Control Plane | `in-progress-local-slice` | W2L-Range-, Pool-, Reservierungs- und Lifecycle-Contract; lokale Facharbeit nutzt serverseitige AuthZ und wahlweise Fake oder den Loopback-Private-Codec. Externe Staging-Bindung bleibt separat gesperrt. |
+| [`control-plane-routing-admin-api-v1.md`](control-plane-routing-admin-api-v1.md) | TAG Control Plane | `implemented-local` | W3L-Feature-/Zuweisungsverwaltung, vier Ebenen, Diff, atomare Outbox und ausschließlich lokaler Staging-Fake-Publisher |
+| [`tag-pages-runtime-r2-v1.md`](tag-pages-runtime-r2-v1.md) | TAG-App / Pages Functions | `implemented-local` | Öffentliche Pages-HTML- und Medienauflösung aus getrennten R2-Bindings; interne Runtime-API nur per Service Binding |
+| [`tag-edge-d1-routing-v1.md`](tag-edge-d1-routing-v1.md) | TCP / Edge Router | `implemented-local` | D1-abgeleiteter interner/externer Routing-Lookup und signierter React-PWA-Bootstrap |
+| [`tag-app-access-v1.md`](tag-app-access-v1.md) | TAG Application API | `implemented-local` | Tokenbasierter Zugriff auf privates R2-Content-JSON, Argon2id/Pepper/Throttle und vorbereiteter Media-Signer |
 | `public-tag-view-v1` | TAG Control Plane | `planned` | Öffentliche, datensparsame TAG-App-Read-API |
 | `public-tag-claim-v1` | TAG Control Plane | `planned` | Neutralisierter öffentlicher Claim-Command |
 | `tag-runtime-projection-v1` | TAG Control Plane | `planned` | Öffentliche Runtime-Projektion |

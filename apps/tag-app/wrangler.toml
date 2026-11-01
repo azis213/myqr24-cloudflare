@@ -2,8 +2,9 @@ name = "myqr24-staging-test-pwa"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-10-02"
 
-# This Pages application renders public tag views. It intentionally has no
-# Worker, KV, D1, R2 or secret bindings in the public Vault MVP.
+# React Pages serves the static PWA shell. Tag content, sessions and media URLs
+# are issued only by the separate D1/R2 Application API; Pages has no R2/D1,
+# KV, secret or service bindings.
 #
 # Current staging project and temporary public URL:
 #   myqr24-staging-test-pwa -> https://myqr24-staging-test-pwa.pages.dev

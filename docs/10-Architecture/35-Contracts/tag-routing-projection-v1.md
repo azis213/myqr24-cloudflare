@@ -1,11 +1,11 @@
 # Vertrag: TAG Routing Projection v1
 
-**Version:** `v1`  
-**Status:** `implemented-contract`; lokale Erzeugungs- und Fake-Publisher-Implementierung folgen in W3L  
-**Owner:** TAG Control Plane (TCP)  
-**Producer:** serverseitiger TCP-Projektionsservice  
-**Consumer:** bestehender Cloudflare Edge Router (`apps/edge-router`)  
-**Transport:** serverseitiger, idempotenter Outbox-Publisher → exakt ein bestätigter `TAG_CONFIG`-KV-Namespace je Umgebung  
+**Version:** `v1`
+**Status:** `implemented-local`; Poolmaterialisierung, Pages-Default, Outbox und Fake-Publisher sind lokal getestet
+**Owner:** TAG Control Plane (TCP)
+**Producer:** serverseitiger TCP-Projektionsservice
+**Consumer:** bestehender Cloudflare Edge Router (`apps/edge-router`)
+**Transport:** serverseitiger, idempotenter Outbox-Publisher → exakt ein bestätigter `TAG_CONFIG`-KV-Namespace je Umgebung
 **Normative Referenzen:** [Domain Rules](../../DOMAIN_RULES.md), [Edge Routing and URL Contract](../../20-Special-Specifications/TAG-EDGE-APIS/10-ROUTING-AND-URL-CONTRACT.md), [Edge Router implementation](../../../apps/edge-router/src/index.ts)
 
 > Cloudflare KV ist eine vollständig ableitbare, nicht autoritative Read-Projektion. Die TCP bleibt fachliche Quelle für Ranges, Gruppen, TAG-Lebenszyklus, Features, Audit und Veröffentlichungsentscheidungen.
@@ -126,11 +126,12 @@ Der TCP-Projektionsvalidator muss die strikteren Routerregeln vor Outbox-Erzeugu
 1. Der Edge Router decodiert die öffentliche `tagId` mit seinem geheimen Feistel-Contract.
 2. Er sucht den kanonischen `decodedValue` im validierten, aktiven Range-Index.
 3. Er lädt `group:{groupId}`.
-4. Er bestimmt Feature-IDs mit Präzedenz `tag:{decodedValue}` → `range-rule:{rangeId}` → Gruppe.
-5. Er lädt jede referenzierte `feature:{featureId}`-Definition und führt nur ein vollständig gültiges Set aus.
-6. Ein Redirect-Feature erzeugt eine serverseitig geprüfte HTTP-Weiterleitung; ohne Redirect-Feature kann der Router ausschließlich sein bestehendes JSON-Aktionsdokument liefern.
+4. TCP materialisiert Einzel-TAG- und Poolzuweisungen als `tag:{decodedValue}`; Einzel-TAG überschreibt Pool. Pool-IDs und private Pooldaten werden nicht projiziert.
+5. Der Router bestimmt Feature-IDs mit Präzedenz `tag:{decodedValue}` → `range-rule:{rangeId}` → Gruppe. Die fachliche Gesamthierarchie lautet Einzel-TAG → Allocation Pool → Range → Gruppe → Pages-Default.
+6. Er lädt jede referenzierte `feature:{featureId}`-Definition und führt nur ein vollständig gültiges Set aus.
+7. Ein Redirect-Feature erzeugt eine serverseitig geprüfte HTTP-Weiterleitung. Ohne Redirect verwendet der Router ausschließlich sein umgebungsseitig konfiguriertes HTTPS-Pages-URL-Template mit `{tagId}` und erzeugt weder TAG-HTML noch ein JSON-Aktionsdokument.
 
-Fehler in einem Dokument, fehlende Referenzen, inaktive Ranges, unbekannte/ungültige IDs und nicht zulässige Features dürfen keine internen Gründe offenlegen. Für Scan-Routen ist die Wirkung neutral `404`; für nicht erlaubte Methoden gilt unverändert `405`.
+Fehler in einem Dokument, fehlende Referenzen, inaktive Ranges, unbekannte/ungültige IDs, nicht zulässige Features und ein fehlendes/unsicheres Pages-Template dürfen keine internen Gründe offenlegen. Für Scan-Routen ist die Wirkung neutral `404`; für nicht erlaubte Methoden gilt unverändert `405`.
 
 ## 6. Publikations- und Widerrufsprotokoll
 
@@ -142,7 +143,7 @@ Die lokale W3L-Implementierung muss atomar folgende TCP-Daten erzeugen:
 
 Der Publisher schreibt ausschließlich in den explizit konfigurierten Umgebungsnamespace. Er ist idempotent je `(environment, projectionRevision, operation)` und markiert ein Ereignis erst nach bestätigter Providerantwort erfolgreich.
 
-Unpublish entfernt oder neutralisiert zuerst direkte `tag:{decodedValue}`-/`range-rule:{rangeId}`-Zuweisungen und aktualisiert anschließend den Index bzw. die wirksamen Referenzen in einer Reihenfolge, die niemals eine ungewollte Route aktivieren darf. Da Cloudflare KV keine Multi-Key-Transaktion bietet, muss der Publisher revisionierte, retrybare Einzelschritte und einen sicheren neutralen Zwischenzustand verwenden. Die genaue Providersequenz wird in W3L durch Fake-Publisher- und Unpublish-Contracttests festgelegt; ein echter Write bleibt bis zum W3D-Deployment-Gate verboten.
+Unpublish neutralisiert zuerst `tag-range-index` mit einer leeren Range-Liste, entfernt danach direkte `tag:{decodedValue}`-/`range-rule:{rangeId}`-Zuweisungen und zuletzt nicht mehr benötigte Feature-/Gruppen-Dokumente. Publish verwendet ebenfalls einen neutralen Index-Zwischenzustand und aktiviert den neuen Index erst nach allen Referenzen. Da Cloudflare KV keine Multi-Key-Transaktion bietet, muss der Publisher revisionierte, retrybare Einzelschritte verwenden. Die Providersequenz wird in W3L durch Fake-Publisher- und Unpublish-Contracttests festgelegt; ein echter Write bleibt bis zum W3D-Deployment-Gate verboten.
 
 ## 7. Authentisierung, Autorisierung, CORS und Caching
 

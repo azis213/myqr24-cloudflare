@@ -11,7 +11,7 @@
 | --- | --- | --- | --- | --- |
 | `CC-I01` | Fundament und Sicherheitsbasis | ADR-002, separates React-/Vite-Projektgrundgerüst, TCP-Readiness-Check, versionierter W1L-Contract für serverseitigen Passwort-/Session-/E-Mail-MFA-/Logout-Flow und Bootstrap-Admin; lokale TCC-Contract-UI-Suite (6 Tests), TCP-MySQL-Suite (11 Tests/65 Assertions), TCC-Build und Dependency-Audit ohne bekannte Vulnerabilities; Rollen, Recovery und Ziel-MFA verbleiben offen | Dogado-Laufzeit, Staging-Mailtransport, Rollen-/Recovery-/Ziel-MFA-Entscheidung | implemented |
 | `CC-I02` | Pools, TAG-Stammdaten und sichere Vergabe | Plattformweite und organisationsgebundene Range-/Pool-Bearbeitung nach TCP-Re-Auth, sichtbare Pools, private TAG-Liste je sichtbarem Pool, TCP-bestätigte lokale Fake-/Private-Codec-Reservierung mit Jobnachweis und lokale Lifecycle-Übergänge; Claim-/Vorabzuweisung und QR-/Druckvorbereitung folgen | Produkt-/Pool-/Claim-Defaults und Staging-Nachweise | implemented-local |
-| `CC-I03` | Routing-Projektion und Publishing | Feature-Schemas, Projektion, Outbox, idempotenter Publisher, Publish-Diff, Retry, Unpublish | Cloudflare-Token, Staging-KV-Namespace, Edge-Router-Vertrag | planned |
+| `CC-I03` | Routing-Projektion und Publishing | v1-Featureeditor, vier Zuweisungsebenen, TCP-Katalog/Referenzen, Projektionsdiff, Publish-/Retry-/Unpublish-Status ausschließlich über TCP-Fake-Publisher | reale Cloudflare-/Staging-Nachweise bleiben W3D | implemented-local |
 | `CC-I04` | Öffentlicher Basis-Vault | veröffentlichte Basisinhalte, öffentliche Read-API, CORS/Cache/Rate-Limits, TAG-App-Adaptervertrag | API-Origin, TAG-App-Integration, Staging-Deployment | planned |
 | `CC-I05` | Produktklassen, Organisationen und POI | Produktpolicies, Organisationsrollen, POI-Onboarding, Nachweise, Review, Meldungen und Moderationsdefaults | verbindliche Produkt-, Retention- und POI-Entscheidungen | planned |
 | `CC-I06` | Erweiterte Vault- und Betriebsfunktionen | Owner-/Empfängerfreigaben, Medienpipeline, Reporting, Retention und operative Workflows | R2/API-Architektur, Datenschutz- und Sicherheitsfreigaben | deferred |
@@ -30,9 +30,9 @@
 | `CC-WP-06` | QR-Code- und Scan-URL-Vorbereitung für reservierte TAGs | CC-I02 | planned | kanonische URL-/QR-Daten ohne Druckfreigabe, Produktion, Range-Export oder Aktivierungswirkung |
 | `CC-WP-16` | Kontrollierter TCC-JSON-Druckexport für logische TAG-Ranges | CC-I07 | deferred | Berechtigungsprüfung, Anlegen eines persistenten Exportauftrags für eine `decodedValue`-Range, Download und erneuter Download eines unveränderlichen JSON-Snapshots mit Auftrags-ID, Datenminimierung, Ablauf und Audit. Der JSON-Snapshot enthält je TAG ID, kanonische Scan-URL, QR-Payload und – nur sofern der TAG nicht organisationsgebunden freigeschaltet ist – die zugehörige Claim-PIN. Keine PDF-/Label-Aufbereitung, Druckeransteuerung oder physische Ausgabe. |
 | `LOCAL-PRINT-TOOL` | Lokales PDF-/Label-Aufbereitungstool als spätere Single-Page-Anwendung unter `tools/` | außerhalb TCC-Iterationen | deferred | verarbeitet ausschließlich einen freigegebenen JSON-Exportauftrag lokal zu versionierten Zweckform-PDF-Labels mit QR-Code und übernimmt dessen `exportOrderId` als PDF-Header; die Ausgabe erfolgt ausschließlich über den lokalen Browser-/Betriebssystemdruckdialog. Keine API, DB, Reservierung, Range-Auswahl oder Aktivierungswirkung. |
-| `CC-WP-07` | Routing-Projektionsgenerator und Schema-Validierung | CC-I03 | planned | CC-TC-PROJECTION-*; Vergleich mit `DOMAIN_RULES.md` |
-| `CC-WP-08` | Outbox, idempotenter Cloudflare-KV-Publisher und Retry | CC-I03 | planned | CC-TC-PUBLISH-*, isolierter Staging-KV-Namespace |
-| `CC-WP-09` | Publish-/Unpublish-UX, Diff und Audit | CC-I03 | planned | CC-TC-PUBLISH-*, CC-TC-AUDIT-* |
+| `CC-WP-07` | Routing-Projektionsgenerator und Schema-Validierung | CC-I03 | implemented-local | TCP-Feature-/Zuweisungsverwaltung und Preview; CC-TC-FEATURE-001 bis 003, CC-TC-PROJECTION-001 bis 003 lokal grün |
+| `CC-WP-08` | Outbox, idempotenter Cloudflare-KV-Publisher und Retry | CC-I03 | implemented-local | TCP-Outbox und Fake-Publisher; Retry-/Idempotenz-/Environment-Tests; kein realer Cloudflare-Zugriff |
+| `CC-WP-09` | Publish-/Unpublish-UX, Diff und Audit | CC-I03 | implemented-local | `RoutingAdministration.tsx` zeigt TCP-Diff/Outbox/Status und löst Publish/Retry/Unpublish nur per CSRF/Re-Auth/Idempotenz aus |
 | `CC-WP-10` | Öffentliche Basis-Vault-Verwaltung und Veröffentlichungsstatus | CC-I04 | planned | CC-TC-PUBLIC-*, öffentliche Datenvertragsprüfung |
 | `CC-WP-11` | Read-API, CORS, Cache und Rate-Limits | CC-I04 | planned | CC-TC-API-*, Contract- und Security-Tests |
 | `CC-WP-12` | TAG-App-Integration und End-to-End-Staging-Nachweis | CC-I04 | planned | CC-TC-INTEGRATION-*, Router-/PWA-Evidenz |
@@ -47,7 +47,7 @@
 | Dokumentation | Control-Plane-Architektur, Fachregeln und ADR-002 für Administration, Bootstrap, MFA und Secret-Grenzen sind vorhanden | kein produktiver Admin- oder Secret-Konfigurationspfad |
 | Edge Router | Cloudflare-Worker-Code und Testbasis existieren | keine Verwaltungslogik oder Fachdaten im Worker/KV |
 | TAG-App | öffentlicher Fixture-MVP auf Cloudflare Pages existiert | keine autoritative API, keine Owner- oder Vault-Verwaltung |
-| Control Center | separate React-/Vite-Shell auf Port `5174`, Sicherheits-/Rollenübersicht, lokaler TCP-Readiness-Check, Login/MFA/Logout sowie TCP-bestätigte Range-/Pool-Anlage, Poolansicht, Re-Auth und lokale Reservierung über same-origin `/tcp`; Vitest-Contract-UI-Suite für Session, CSRF, Login, MFA, Logout, Readiness, Ranges, Pools und Reservierung | keine Range-/Pool-Updates, Organisationspool- oder Lifecycle-/Publish-Mutationen, keine Rollenverwaltung oder Recovery; produktive Origin-/CORS-/Cookie-Policy, Ziel-MFA und echte Internal-Codec-Integration bleiben offen |
+| Control Center | React-/Vite-Shell mit Auth, Range-/Pool-/Lifecycle-Verwaltung sowie W3L-Featureeditor, vier Zuweisungsebenen, TCP-Diff und Fake-Publish/Retry/Unpublish über same-origin `/tcp`; 18 Contracttests | keine reale Cloudflare-/Deployment-Mutation, Rollenverwaltung oder Recovery; produktive Origin-/Cookie-Policy und externe Staging-Evidenz bleiben offen |
 | Cloudflare-Publishing | als Zielprozess dokumentiert | keine Browser-Tokens, keine manuelle KV-Fachpflege |
 | Produktion | keine Control-Center-Produktivfreigabe | Staging-Abnahme ist zwingend vorgeschaltet |
 
@@ -66,7 +66,7 @@
 
 ## Nächster zulässiger Implementierungsschritt
 
-1. W3L-local begleiten: TCC-Contracttests und später die UI für TCP-bestätigte Routing-Featureverwaltung und Projektionsdiff ergänzen. TCC erhält weder Codec-/Publisher-Konfiguration noch Key und ruft den Codec bzw. Cloudflare nie direkt auf.
+1. W3L ist mit 18 TCC-Tests und erfolgreichem Build lokal abgeschlossen. Nächster Schritt ausschließlich separate W3D-Vorbereitung und kontrollierte Staging-Evidenz; TCC erhält weiterhin weder Codec-/Publisher-/R2-Konfiguration noch Keys und ruft Cloudflare nie direkt auf.
 
 ## Aktualisierungsregel
 

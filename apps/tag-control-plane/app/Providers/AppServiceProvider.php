@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Services\FakeRoutingProjectionPublisher;
 use App\Services\FakeTagCodecClient;
 use App\Services\InternalHttpTagCodecClient;
+use App\Services\RoutingProjectionPublisher;
 use App\Services\TagCodecClient;
+use InvalidArgumentException;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,6 +27,13 @@ class AppServiceProvider extends ServiceProvider
                 'api_key' => config('security.tag_codec.api_key'),
                 'timeout_seconds' => config('security.tag_codec.timeout_seconds'),
             ]);
+        });
+        $this->app->singleton(RoutingProjectionPublisher::class, function (): RoutingProjectionPublisher {
+            if (config('security.routing_publisher.driver') !== 'fake') {
+                throw new InvalidArgumentException('Only the local fake routing publisher is available.');
+            }
+
+            return new FakeRoutingProjectionPublisher;
         });
     }
 

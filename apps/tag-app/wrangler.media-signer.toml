@@ -1,0 +1,9 @@
+name = "myqr24-media-signer"
+main = "workers/media-signer.ts"
+compatibility_date = "2026-10-31"
+
+[env.staging]
+name = "myqr24-media-signer-staging"
+
+# APP_MEDIA_SIGNER_KEY_S01 and R2 S3-compatible signing credentials are
+# server-only secrets and intentionally unset until the W3D operating gate.

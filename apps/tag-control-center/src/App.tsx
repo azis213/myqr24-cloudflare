@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { RoutingAdministration } from "./RoutingAdministration";
 
 type ReadinessState =
   | { kind: "idle" }
@@ -1150,7 +1151,7 @@ export function App() {
                     </>
                   ) : (
                     <>
-                      Vor einer plattformweiten Range- oder Pool-Mutation bestätigt TCP Ihr Passwort erneut
+                      Vor einer plattformweiten Range-, Pool- oder Routing-Mutation bestätigt TCP Ihr Passwort erneut
                       für diese Sitzung.
                     </>
                   )}
@@ -1192,6 +1193,13 @@ export function App() {
               </form>
             ) : null}
           </section>
+          {auth.role === "platform-admin" ? (
+            <RoutingAdministration
+              tcpBaseUrl={tcpBaseUrl}
+              csrfToken={csrfToken}
+              reauthenticated={reauthentication.kind === "ready"}
+            />
+          ) : null}
         </>
       )}
 

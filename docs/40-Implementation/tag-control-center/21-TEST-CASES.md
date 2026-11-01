@@ -67,19 +67,19 @@
 
 | ID | Bezug | Testfall | Erwartetes Ergebnis | Ebene |
 | --- | --- | --- | --- | --- |
-| `CC-TC-FEATURE-001` | CC-US-020 | Gültiges `tag-vault`-Feature konfigurieren | typspezifisch validiertes, minimales Feature-Dokument wird akzeptiert | Unit |
-| `CC-TC-FEATURE-002` | CC-US-020 | Unbekannter Featuretyp, ungültiger Platzhalter oder unsicheres Ziel | Speicherung/Publish wird fail-closed verweigert | Unit |
-| `CC-TC-FEATURE-003` | CC-US-020 | Private/POI-/Vault-Daten im Feature | Schema bzw. Datenklassifikation verweigert die Projektion | Security |
-| `CC-TC-PROJECTION-001` | CC-US-021 | Vollständige gültige Routingdaten projizieren | ausschließlich erlaubte KV-Keys und referenzintegre Dokumente entstehen | Contract |
-| `CC-TC-PROJECTION-002` | CC-US-021 | Projektions-Diff erzeugen | Änderung zeigt vorher/nachher ohne Geheimnisse oder private Felder | UI/Integration |
-| `CC-TC-PROJECTION-003` | CC-US-021 | Fehlende Gruppe oder fehlendes Feature | Projektion und Outbox-Auftrag werden nicht erzeugt | Integration |
-| `CC-TC-PUBLISH-001` | CC-US-022 | Mutation, Audit und Outbox erfolgreich speichern | alle drei Daten entstehen atomar | Integration |
+| `CC-TC-FEATURE-001` | CC-US-020 | Gültiges `redirect`-Feature konfigurieren | typspezifisch validiertes, minimales Feature-Dokument wird akzeptiert; nicht v1-fähige Featuretypen werden abgewiesen | implemented-local |
+| `CC-TC-FEATURE-002` | CC-US-020 | Unbekannter Featuretyp, ungültiger Platzhalter oder unsicheres Ziel | Speicherung/Publish wird fail-closed verweigert | implemented-local |
+| `CC-TC-FEATURE-003` | CC-US-020 | Private/POI-/Vault-/Pooldaten im Feature | Schema bzw. Datenklassifikation verweigert die Projektion | implemented-local |
+| `CC-TC-PROJECTION-001` | CC-US-021 | Vollständige gültige Routingdaten projizieren | ausschließlich erlaubte KV-Keys und referenzintegre Dokumente entstehen | implemented-local |
+| `CC-TC-PROJECTION-002` | CC-US-021 | Projektions-Diff erzeugen | Änderung zeigt vorher/nachher ohne Geheimnisse oder private Felder | implemented-local |
+| `CC-TC-PROJECTION-003` | CC-US-021 | Fehlende Gruppe oder fehlendes Feature | Projektion und Outbox-Auftrag werden nicht erzeugt | implemented-local |
+| `CC-TC-PUBLISH-001` | CC-US-022 | Mutation, Audit und Outbox erfolgreich speichern | alle drei Daten entstehen atomar | implemented-local |
 | `CC-TC-PUBLISH-002` | CC-US-022 | Cloudflare-Publish erfolgreich | Publisher schreibt nur bestätigte Staging-Projektion und markiert Version erst danach als veröffentlicht | Sandbox/Staging |
-| `CC-TC-PUBLISH-003` | CC-US-022 | Timeout/429/5xx beim Publish | Auftrag bleibt nachvollziehbar retrybar; kein falscher Veröffentlichungsstatus | Integration |
-| `CC-TC-PUBLISH-004` | CC-US-022 | Idempotenter Retry eines erfolgreichen Auftrags | keine widersprüchliche Projektion und kein doppelter fachlicher Nebeneffekt | Integration |
-| `CC-TC-PUBLISH-005` | CC-US-022 | Browserkontext versucht Cloudflare-Schreibzugriff | kein Token/Endpoint ist verfügbar; Versuch wird verweigert | Security |
+| `CC-TC-PUBLISH-003` | CC-US-022 | Timeout/429/5xx beim Publish | Auftrag bleibt nachvollziehbar retrybar; kein falscher Veröffentlichungsstatus | implemented-local |
+| `CC-TC-PUBLISH-004` | CC-US-022 | Idempotenter Retry eines erfolgreichen Auftrags | keine widersprüchliche Projektion und kein doppelter fachlicher Nebeneffekt | implemented-local |
+| `CC-TC-PUBLISH-005` | CC-US-022 | Browserkontext versucht Cloudflare-Schreibzugriff | kein Token/Endpoint ist verfügbar; Versuch wird verweigert | implemented-local |
 | `CC-TC-UNPUBLISH-001` | CC-US-023 | Sperrung/Archivierung eines publizierten TAGs | direkte Regel wird entfernt oder definierte neutrale Projektion publiziert | Sandbox/Staging |
-| `CC-TC-UNPUBLISH-002` | CC-US-023 | Unpublish-Fehler | fehlgeschlagener Auftrag bleibt sichtbar, auditierbar und erneut ausführbar | Integration |
+| `CC-TC-UNPUBLISH-002` | CC-US-023 | Unpublish-Fehler | fehlgeschlagener Auftrag bleibt sichtbar, auditierbar und erneut ausführbar | implemented-local |
 | `CC-TC-RUNTIME-001` | CC-US-024 | Runtime-Vorschau für `public`, `pin-required`, `closed` und `redirect` öffnen | Ansicht zeigt nur zulässige Runtime-Attribute, Revision und Status; private Daten fehlen | UI/Contract |
 | `CC-TC-RUNTIME-002` | CC-US-024 | Runtime-Diff gegen letzte veröffentlichte Revision prüfen | vorher/nachher sowie betroffene Routing-/Runtime-Wirkung sind verständlich; Secrets und private Felder fehlen | UI/Integration |
 | `CC-TC-RUNTIME-003` | CC-US-024 | Publish-Command mit manipuliertem Runtime-Payload bzw. Browser-Schreibversuch senden | Server validiert/autorisert und erzeugt Outbox; Browser besitzt keinen KV-, R2- oder Worker-Schreibzugriff | Security/Contract |

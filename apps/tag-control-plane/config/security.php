@@ -66,4 +66,10 @@ return [
         'api_key' => env('TCP_TAG_CODEC_API_KEY'),
         'timeout_seconds' => (int) env('TCP_TAG_CODEC_TIMEOUT_SECONDS', 3),
     ],
+
+    /* Local W3L only. No Cloudflare token or production target is configured. */
+    'routing_publisher' => [
+        'driver' => env('TCP_ROUTING_PUBLISHER_DRIVER', 'fake'),
+        'environment' => env('TCP_ROUTING_ENVIRONMENT', 'staging'),
+    ],
 ];

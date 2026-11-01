@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\ApiAuthenticationController;
+use App\Http\Controllers\RoutingAdministrationController;
 use App\Http\Controllers\TagManagementController;
+use App\Http\Middleware\AddNoStoreHeader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +30,17 @@ Route::middleware(['web'])->prefix('v1/admin/tag-management')->group(function ()
     Route::get('/pools/{poolId}/tags', [TagManagementController::class, 'tags']);
     Route::post('/pools/{poolId}/reservations', [TagManagementController::class, 'reserve']);
     Route::post('/tags/{tagId}/transitions', [TagManagementController::class, 'transition']);
+});
+
+Route::middleware(['web', AddNoStoreHeader::class])->prefix('v1/admin/routing')->group(function (): void {
+    Route::get('/catalog', [RoutingAdministrationController::class, 'catalog']);
+    Route::put('/features/{featureId}', [RoutingAdministrationController::class, 'saveFeature']);
+    Route::put('/assignments/{scope}/{targetId}', [RoutingAdministrationController::class, 'assign']);
+    Route::get('/projection/preview', [RoutingAdministrationController::class, 'preview']);
+    Route::post('/projection/publish', [RoutingAdministrationController::class, 'publish']);
+    Route::post('/projection/unpublish', [RoutingAdministrationController::class, 'unpublish']);
+    Route::get('/outbox', [RoutingAdministrationController::class, 'outbox']);
+    Route::post('/outbox/{eventId}/retry', [RoutingAdministrationController::class, 'retry']);
 });
 
 Route::prefix('v1')->group(function (): void {

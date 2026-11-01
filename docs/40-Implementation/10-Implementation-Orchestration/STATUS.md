@@ -3,8 +3,8 @@
 **Orchestrierungsanweisung:** [`README.md`](README.md)  
 **Stand:** 2026-10-31
 **Gesamtstatus:** `in-progress`  
-**Aktive Welle:** `W3L – lokale Routing-Projektion und Fake-Publisher in progress`
-**Nächster zulässiger Arbeitsschritt:** Entscheidung `W3L-BLK-001` treffen: Soll der lokale v1-Projektions- und Edge-Umfang verbindlich bei `redirect`, `image` und `json` bleiben oder müssen `tag-vault`, `tag-chat`, `lost-found`, `tag-guestbook` und `tag-checkin` vor W3L als neue Router-/Contract-Version spezifiziert werden? Der reine lokale Projektionsgenerator für die drei aktuellen v1-Typen ist implementiert und getestet; Feature-Admin-API, Outbox, Fake-Publisher und TCC-Projektions-UI bleiben bis zur Entscheidung gesperrt.
+**Aktive Welle:** `W3L – implemented-local (React-/D1-/Access-Korrektur); W3D – blocked bis zur ausdrücklichen Deployment-Freigabe`
+**Nächster zulässiger Arbeitsschritt:** W3L ist lokal abgeschlossen. Ausschließlich W3D-Gate-Nachweise vorbereiten: aktive Worker-/KV-/D1-Zuordnung, Least-Privilege-Publisher-Token, Dogado sowie getrennte private R2-, App-API- und Media-Signer-Service-Binding-Ressourcen und kontrollierter Staging-Testplan. Keine reale KV-/D1-/R2-/Deployment-Mutation ohne ausdrückliche W3D-Freigabe. `W3L-BLK-001` bleibt für v1 (`redirect`, `image`, `json`) und die Hierarchie Einzel-TAG → Pool → Range → Gruppe → React-PWA-Bootstrap entschieden.
 **Regel:** `apps/tag-control-plane` und `apps/tag-control-center` werden fachlich local-first weiterentwickelt. Persistenz-, Migrations-, Transaktions-, Outbox- und Rollbacktests laufen gegen die vorhandene isolierte Compose-MySQL-Topologie. Der Private-Codec darf ausschließlich lokal über den auf Loopback gebundenen Wrangler-Worker, synthetische ignorierte Secrets und den serverseitigen TCP-Adapter integriert werden; TCC, TAG-App und Browser bleiben ausgeschlossen. Cloudflare-Publishing, Dogado und Mail bleiben lokale Fakes. Reale Dogado-Verbindungen, echte Cloudflare-Tokens und manuelle oder automatisierte KV-Fachänderungen bleiben bis zu einer je Welle explizit entschiedenen Deployment-Freigabe verboten. `docs/00-Refinement/` ist bei regulären Wiederanläufen und Umsetzungsarbeiten ausdrücklich ausgeschlossen.
 
 ---
@@ -15,10 +15,10 @@
 | --- | --- | --- |
 | Edge Router | Staging-Scan-Worker ist historisch deployt; der getrennte Private-Codec wird local-first unter `/api/v1/codec/*` konsolidiert und kann lokal per Wrangler auf Loopback laufen. | Externe Route `codec.s.myqr24.com/api/v1/*` ist ein abzulösender historischer Slice; keine neue Staging-Nutzung ohne separate Wellenentscheidung |
 | Plattform-Homepage | KV-freier Worker `myqr24-platform-home` ist für `www.myqr24.com/*` bereitgestellt. | Deployment-Version `b3372d68-ac0a-431e-a902-8fba9f2fb201`; öffentliche Seite wurde anschließend als sichtbar bestätigt |
-| TAG-App | Bestehende React/Vite-PWA in `apps/tag-app`; öffentliche View-Darstellung ist fixturebasiert. | siehe `docs/40-Implementation/tag-app/STATUS.md` |
+| TAG-App | React/Vite-PWA bleibt öffentliche `/tag/{tagId}`-Oberfläche; normale Pfade verwenden lokalen D1-/Access-/private-R2-Contract, Fixtures nur expliziter Testmodus. | siehe `docs/40-Implementation/tag-app/STATUS.md` |
 | Control Plane | Laravel-13-/MySQL-Fundament unter `apps/tag-control-plane` mit Audit, Korrelation, Bootstrap-Admin, Web-Session, Übergangs-E-Mail-MFA sowie lokaler TCP→Private-Codec-Reservierung. | keine Public-Read-API, kein Publisher und keine Produktionsdaten |
 | Control Center | React-/Vite-Shell unter `apps/tag-control-center` mit Readiness, Login, E-Mail-MFA, Sessionstatus und Logout über same-origin `/tcp`. | keine Verwaltungscommands, Rollenverwaltung oder Secret-Konfiguration |
-| Contracts | `tag-codec-internal-v1`, `tag-routing-projection-v1` und der lokale W1L-Browservertrag [`control-plane-admin-api-v1`](../../../10-Architecture/35-Contracts/control-plane-admin-api-v1.md) sind vorhanden. | Fach-, Public- und Owner-Contracts folgen in späteren Wellen |
+| Contracts | Zusätzlich zu TCP-/Routingverträgen sind `tag-edge-d1-routing-v1` und `tag-app-access-v1` lokal vorhanden; `tag-pages-runtime-r2-v1` ist ersetzt. | echte D1/R2-/Access-/Media-Signer-Betriebsfreigabe folgt W3D |
 | TAG Lab | Bestehendes lokales Tool vorhanden; noch kein orchestrierter Testtag-Katalog. | W0/W3-Arbeit |
 | Produktion | Nicht Gegenstand der aktuellen Ausführung. | Staging-first, explizite Produktionsfreigabe erforderlich |
 
@@ -31,9 +31,9 @@
 | `W0` | Lokaler Ausgangspunkt, Entscheidungen, Contracts und Testtopologie | `in-progress` | Orchestrierungsanweisung und Startstatus vorhanden | Lokale Contracts, Toolchain und Testtag-Policy dokumentiert; Deployment-Backlog separat geführt |
 | `W1L` | Lokales Plane-Fundament und Admin-Sicherheitsrahmen | `implemented` | lokale Compose-MySQL-Topologie verifiziert | TCP-MySQL-Suite (11 Tests/65 Assertions), TCC-Contract-UI-Suite (6 Tests), TCC-Build und TCC-Dependency-Audit ohne Vulnerabilities am 2026-10-29 grün |
 | `W2L` | Lokale Ranges, Pools, Reservierung, Lifecycle und CC-Verwaltung | `implemented-local` | W1L-Gate erfüllt; lokale AuthZ-/Re-Auth-/Private-Codec-Reservierung implementiert | Range-/Pool-Mutationen, Organisationsgrenzen, Lifecycle, CP-G2 und lokale Story-Tests grün |
-| `W3L` | Lokale Routing-Projektion und Publisher mit Fake-Adapter | `in-progress` | W2L-Gate erfüllt | Contract-, Outbox-, Retry- und Unpublish-Tests grün |
+| `W3L` | Lokale Routing-Projektion, React-/D1-/Access-/private-R2-Fakes und Publisher mit Fake-Adapter | `implemented-local` | W2L-Gate erfüllt; W3L-BLK-001 entschieden | TCP 47/309, Router 73, TAG-App 11, TCC 18 Tests sowie Builds/Dry-Runs grün; keine reale Mutation |
 | `W3D` | Dogado-Deployment, echter Staging-Publish und Scan | `blocked` | W3L-Gate sowie Deployment-Blocker aufgelöst | `CP-G4`, Router-/PWA-Nachweis grün |
-| `W4` | PublicTagView, Basis-Vault, TAG-App-API-Ablösung | `planned` | W3-Gate erfüllt | `CP-G5`, `CP-G6`, E2E-Evidenz grün |
+| `W4` | PublicTagView, Basis-Vault, TAG-App-API-Ablösung | `in-progress-local` | W3L-Access-Contract lokal vorhanden | React-/Access-Contract, D1-/R2-Fakes und spätere E2E-Evidenz grün |
 | `W5` | Claiming, Besitzanker, Collections, Support | `planned` | W4-Gate erfüllt | Claim-/Lockout-/Leak-/Session-Gate grün |
 | `W6` | Kontrollierter Druckexport, QA, Übergabe | `deferred` | lauffähiges TCC-/TCP-Fundament, W5-Gate und freigegebene Prozesspolicy | `CP-G3` und Staging-Probe grün; TCC/TCP erzeugen nur autorisierte Einzel-ID-/Range-Exporte, keine PDF-/Label-Aufbereitung oder physische Ausgabe |
 | `W7` | Owner-Inhalte, Produkt, Organisation und POI | `planned` | W5-Gate und Policy-Freigaben; unabhängig vom zurückgestellten Druckumfang W6 | Policy-/Review-/Privacy-Gate grün |
@@ -58,7 +58,7 @@
 
 | ID | Bereich | Status | Befund / erforderliche Entscheidung |
 | --- | --- | --- | --- |
-| `W3L-BLK-001` | Routing-Featureumfang | `decision-required` | [`tag-routing-projection-v1`](../../../10-Architecture/35-Contracts/tag-routing-projection-v1.md) und der aktuelle Edge Router erlauben v1 ausschließlich `redirect`, `image` und `json`. Ältere Architektur- und Fachbeispiele nennen zusätzlich `tag-vault`, `tag-chat`, `lost-found`, `tag-guestbook` und `tag-checkin`. Vor Feature-Admin-API, Outbox und TCC-UI verbindlich entscheiden, ob W3L auf die drei Routertypen begrenzt bleibt oder eine neue Contract-/Router-Version die weiteren Typen spezifiziert. |
+| `W3L-BLK-001` | Routing-Featureumfang | `resolved-local` | v1 bleibt bei `redirect`, `image` und `json`; weitere Typen benötigen eine neue Router-/Contract-Version. Die Hierarchie lautet Einzel-TAG → Allocation Pool → Range → Gruppe → Pages-Default. TCP materialisiert Pool/TAG als `tag:{decodedValue}` ohne Pooldaten in KV. Öffentliche Runtime-/Medieninhalte verwenden getrennte Pages-/R2-Verträge und lokale Fakes. |
 
 | ID | Status | Beschreibung | Auflösungskriterium | Nächste Aktion |
 | --- | --- | --- | --- | --- |
@@ -111,8 +111,8 @@
 
 1. Git-Arbeitsbaum und Branch gegen diesen Status abgleichen.
 2. Diese Datei, [`README.md`](README.md) und die [W0-Ressourcenmatrix](W0-HOSTING-AND-STAGING-RESOURCE-MATRIX.md) vollständig lesen. `docs/00-Refinement/` bleibt dabei ausgeschlossen, sofern kein separater Refinement-Auftrag vorliegt.
-3. Den vorhandenen W1L-Stand gegen die Status-, Contract-, Test- und Traceability-Verweise abgleichen. Vor jeder W2L-Codeänderung `W2L-BLK-AUTHZ` im `control-plane-tag-management-api-v1` entscheiden; für Reservierung zusätzlich `W2L-BLK-CODEC` lösen. Die lokale Compose-Topologie ist für jede MySQL-Integration zu verwenden; Cloudflare, Dogado und Mail werden als Fakes betrieben. Lokale Erfolge werden als `implemented`, nicht als `verified`, dokumentiert.
-4. Nach dem lokalen W3L-Gate den Nachweis für `W0-WP-01` und `W0-WP-02` fortsetzen: aktiv genutzte Dogado-Stagingwerte zu PHP-/MySQL-Minor-Versionen, Extensions/SAPIs, Datenbankrechten/TLS, Zieltarif- und Cron-Grenzen, geschütztem PHP-Secret-Pfad, HTTPS sowie Deployment-/Rollbackweg einholen. Zusätzlich den aktiven Scan-Worker, seinen isolierten `TAG_CONFIG`-Namespace und den minimalen Publisher-Token-Scope gegen den dokumentierten Vorschlag bestätigen. Die lokale Vorbelegung `tools/.env.local` bleibt die nicht versionierte Quelle der lokalen Testsecrets; reale Werte werden nie dokumentiert.
+3. Den W3L-Stand gegen `control-plane-routing-admin-api-v1`, `tag-routing-projection-v1`, `tag-pages-runtime-r2-v1`, Komponentenstatus und Traceability abgleichen. Lokale Erfolge bleiben `implemented-local`, nicht `verified`.
+4. Für W3D zuerst reale Ressourcen- und Betriebsnachweise einholen: Dogado-Stagingwerte, aktiver Scan-Worker, isolierter `TAG_CONFIG`-Namespace, minimaler Publisher-Token-Scope sowie getrennte Pages-/R2-/Service-Binding-Ressourcen und Rollbackweg. Erst danach eine ausdrückliche kontrollierte Staging-Freigabe erwägen; reale Werte und Secrets werden nie dokumentiert.
 5. Keine reale KV-Mutation durchführen, bis das W3D-Deployment-Gate erfüllt ist. Ein etwaiges lokales PDF-/Label-Aufbereitungstool bleibt bis zu seiner gesonderten Freigabe unter `tools/`, verarbeitet ausschließlich freigegebene Exportdaten, ist nicht Teil von TCC/TCP und darf keine externe Anbindung oder fachliche Wirkung erhalten.
 6. Nach Abschluss eines W0- oder lokalen W1L/W2L/W3L-Arbeitspakets Tabelle, Blocker, Testbefehle/Evidenz und den nächsten zulässigen Schritt aktualisieren.
 

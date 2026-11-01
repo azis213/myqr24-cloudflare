@@ -11,6 +11,7 @@ compatibility_date = "2026-09-30"
 #   npx wrangler secret put FEISTEL_SECRET_S01 --env staging
 #   npx wrangler secret put TAG_HMAC_SECRET_S01 --env staging
 #   npx wrangler secret put REDIRECT_SIGNING_SECRET_S01 --env staging
+#   npx wrangler secret put APP_BOOTSTRAP_SECRET_S01 --env staging
 #
 # Production secret-version names are intentionally not decided or configured
 # during W0. Do not reuse Staging secrets or deploy this Staging binding set
@@ -41,16 +42,25 @@ name = "myqr24-edge-routing-staging"
 
 [env.staging.vars]
 SCAN_ENVIRONMENT = "staging"
+PAGES_URL_TEMPLATE = "https://app-staging.myqr24.com/tag/{tagId}"
 
 [[env.staging.kv_namespaces]]
 binding = "TAG_CONFIG"
 id = "e05d3c9ead4b40b389e0e63db098e87a"
+
+# D1 metadata is a minimal derived routing projection. Its database_id is only
+# assigned after the explicit W3D resource gate; no deployment occurs locally.
+# [[env.staging.d1_databases]]
+# binding = "TAG_ROUTING"
+# database_name = "myqr24-tag-app-staging"
+# database_id = "<set-only-at-w3d-gate>"
 
 [env.production]
 name = "myqr24-edge-routing"
 
 [env.production.vars]
 SCAN_ENVIRONMENT = "production"
+PAGES_URL_TEMPLATE = "https://app.myqr24.com/tag/{tagId}"
 
 # [[env.production.kv_namespaces]]
 # binding = "TAG_CONFIG"

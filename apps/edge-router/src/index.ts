@@ -35,9 +35,24 @@ export type ScanEnvironment = "staging" | "production";
 
 export interface Env {
   TAG_CONFIG: KVNamespace;
+  TAG_ROUTING: D1Database;
   SCAN_ENVIRONMENT: ScanEnvironment;
   FEISTEL_SECRET_S01: string;
   REDIRECT_SIGNING_SECRET_S01: string;
+  APP_BOOTSTRAP_SECRET_S01: string;
+  PAGES_URL_TEMPLATE: string;
+}
+
+export type AppProtectionMode = "public" | "pin_required" | "login_required" | "closed";
+
+export interface AppRoutingRecord {
+  tag_id: string;
+  status: "active" | "suspended" | "deactivated" | "expired";
+  target_type: "internal" | "external";
+  external_url: string | null;
+  protection_mode: AppProtectionMode;
+  access_version: number;
+  content_revision: number;
 }
 
 export type RedirectStatus = 301 | 302 | 303 | 307 | 308;
@@ -681,29 +696,102 @@ function notFound(): Response {
   return new Response("Not Found", { status: 404 });
 }
 
-function jsonActionResponse(resolvedTag: ResolvedTag): Response {
-  return Response.json(
-    {
-      tag: {
-        id: resolvedTag.id,
-        value: resolvedTag.value.toString(),
-        length: resolvedTag.length,
-      },
-      range: {
-        id: resolvedTag.range.id,
-        groupId: resolvedTag.range.groupId,
-      },
-      group: {
-        id: resolvedTag.group.id,
-      },
-      features: resolvedTag.features,
-    },
-    {
-      headers: {
-        "cache-control": "no-store",
-      },
-    },
-  );
+export function toPagesDefaultRedirect(
+  tagId: string,
+  template: string,
+): Response | null {
+  if (
+    !TAG_ID_PATTERN.test(tagId) ||
+    template.split("{tagId}").length !== 2
+  ) {
+    return null;
+  }
+
+  try {
+    const destination = new URL(
+      template.replace("{tagId}", encodeURIComponent(tagId.toLowerCase())),
+    );
+    if (
+      destination.protocol !== "https:" ||
+      destination.username !== "" ||
+      destination.password !== "" ||
+      destination.pathname !== `/tag/${tagId.toLowerCase()}` ||
+      destination.search !== "" ||
+      destination.hash !== ""
+    ) {
+      return null;
+    }
+
+    return Response.redirect(destination.toString(), 302);
+  } catch {
+    return null;
+  }
+}
+
+function isAppProtectionMode(value: unknown): value is AppProtectionMode {
+  return value === "public" || value === "pin_required" || value === "login_required" || value === "closed";
+}
+
+function isAppRoutingRecord(value: unknown, tagId: string): value is AppRoutingRecord {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Partial<AppRoutingRecord>;
+  return record.tag_id === tagId
+    && record.status === "active"
+    && (record.target_type === "internal" || record.target_type === "external")
+    && isAppProtectionMode(record.protection_mode)
+    && Number.isSafeInteger(record.access_version) && record.access_version! >= 1
+    && Number.isSafeInteger(record.content_revision) && record.content_revision! >= 1
+    && (record.target_type !== "external" || typeof record.external_url === "string");
+}
+
+async function resolveAppRoutingRecord(env: Env, tagId: string): Promise<AppRoutingRecord | null> {
+  const result = await env.TAG_ROUTING.prepare(
+    "SELECT tag_id, status, target_type, external_url, protection_mode, access_version, content_revision FROM tag_routing WHERE tag_id = ?1 LIMIT 1",
+  ).bind(tagId).first<unknown>();
+  return isAppRoutingRecord(result, tagId) ? result : null;
+}
+
+function bootstrapPayload(tagId: string, mode: AppProtectionMode, accessVersion: number, revision: number, nonce: string, expiresAt: number): string {
+  return [
+    "myqr24/pwa-bootstrap/v1",
+    `tag=${tagId}`,
+    `mode=${mode}`,
+    `accessVersion=${accessVersion}`,
+    `revision=${revision}`,
+    `nonce=${nonce}`,
+    `exp=${expiresAt}`,
+  ].join("\n");
+}
+
+function randomNonce(): string {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  return toBase64Url(bytes);
+}
+
+export async function toAppBootstrapRedirect(
+  tagId: string,
+  record: AppRoutingRecord,
+  template: string,
+  bootstrapSecret: string,
+  now = Date.now(),
+): Promise<Response | null> {
+  if (record.target_type !== "internal" || record.protection_mode === "closed" || !bootstrapSecret) return null;
+  const base = toPagesDefaultRedirect(tagId, template);
+  if (!base) return null;
+  const destination = new URL(base.headers.get("location")!);
+  const nonce = randomNonce();
+  const expiresAt = Math.floor(now / 1000) + 60;
+  const key = await crypto.subtle.importKey("raw", toArrayBuffer(encoder.encode(bootstrapSecret)), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const payload = bootstrapPayload(tagId, record.protection_mode, record.access_version, record.content_revision, nonce, expiresAt);
+  const sig = toBase64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, toArrayBuffer(encoder.encode(payload)))));
+  destination.searchParams.set("mode", record.protection_mode);
+  destination.searchParams.set("av", record.access_version.toString());
+  destination.searchParams.set("rv", record.content_revision.toString());
+  destination.searchParams.set("nonce", nonce);
+  destination.searchParams.set("exp", expiresAt.toString());
+  destination.searchParams.set("sig", sig);
+  return Response.redirect(destination.toString(), 302);
 }
 
 export const handleRequest: ExportedHandlerFetchHandler<Env> = async (
@@ -752,11 +840,16 @@ export const handleRequest: ExportedHandlerFetchHandler<Env> = async (
     return notFound();
   }
 
-  const redirect = findRedirectFeature(resolved.features);
-
-  if (redirect) {
+  const appRouting = await resolveAppRoutingRecord(env, tagRequest.id);
+  if (appRouting?.target_type === "external") {
+    const external = {
+      id: "d1-external",
+      type: "redirect" as const,
+      enabled: true as const,
+      url: appRouting.external_url ?? undefined,
+    };
     const response = await toSafeRedirect(
-      redirect,
+      external,
       {
         tagId: tagRequest.id,
         decodedValue: tagValue.toString(),
@@ -768,15 +861,21 @@ export const handleRequest: ExportedHandlerFetchHandler<Env> = async (
 
     return response ?? notFound();
   }
-
-  if (request.method === "HEAD") {
-    return new Response(null, { status: 200 });
+  if (appRouting?.target_type === "internal") {
+    return await toAppBootstrapRedirect(tagRequest.id, appRouting, env.PAGES_URL_TEMPLATE, env.APP_BOOTSTRAP_SECRET_S01) ?? notFound();
   }
 
-  return jsonActionResponse({
-    ...resolved,
-    id: tagRequest.id,
-  });
+  // Legacy projection fallback: W3D publishes D1 records before enabling this
+  // compatibility branch for existing KV redirect configurations.
+  const redirect = findRedirectFeature(resolved.features);
+  if (!redirect) return notFound();
+  const response = await toSafeRedirect(redirect, {
+    tagId: tagRequest.id,
+    decodedValue: tagValue.toString(),
+    length: tagRequest.length.toString(),
+    groupId: resolved.group.id,
+  }, env.REDIRECT_SIGNING_SECRET_S01);
+  return response ?? notFound();
 };
 
 const worker: ExportedHandler<Env> = {

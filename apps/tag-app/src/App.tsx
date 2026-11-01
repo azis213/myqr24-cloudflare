@@ -11,6 +11,12 @@ import {
   getPublicTagView,
   UnknownPublicTagError,
 } from "./services/publicTagViewService";
+import {
+  authorizePublic,
+  bootstrapFromLocation,
+  clearBootstrapParameters,
+  verifyPin,
+} from "./services/tagAccessService";
 
 const featureLabels: Record<PublicTagView["enabledFeatures"][number], string> = {
   vault: "Vault",
@@ -94,12 +100,42 @@ function TagPage() {
   const [view, setView] = useState<PublicTagView>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
+  const [pinRequired, setPinRequired] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinSubmitting, setPinSubmitting] = useState(false);
+  const [bootstrap, setBootstrap] = useState(() => bootstrapFromLocation(tagId));
 
   useEffect(() => {
     let current = true;
     setLoading(true);
     setError(undefined);
     setView(undefined);
+    setPinRequired(false);
+    setPin("");
+    const currentBootstrap = bootstrapFromLocation(tagId);
+    setBootstrap(currentBootstrap);
+
+    if (import.meta.env.MODE !== "test" && import.meta.env.VITE_TAG_APP_DATA_SOURCE !== "fixtures") {
+      if (!currentBootstrap || currentBootstrap.mode === "closed" || currentBootstrap.mode === "login_required") {
+        setError("Diese TAG-Ansicht ist derzeit nicht verfügbar.");
+        setLoading(false);
+        return () => { current = false; };
+      }
+      if (currentBootstrap.mode === "pin_required") {
+        setPinRequired(true);
+        setLoading(false);
+        return () => { current = false; };
+      }
+      authorizePublic(tagId.toLowerCase(), currentBootstrap)
+        .then(() => {
+          clearBootstrapParameters();
+          return getPublicTagView(tagId);
+        })
+        .then((result) => current && setView(result))
+        .catch(() => current && setError("Diese TAG-Ansicht ist derzeit nicht verfügbar."))
+        .finally(() => current && setLoading(false));
+      return () => { current = false; };
+    }
 
     getPublicTagView(tagId)
       .then((result) => current && setView(result))
@@ -123,6 +159,33 @@ function TagPage() {
   }
 
   if (error || !view) {
+    if (pinRequired && bootstrap) {
+      return (
+        <main className="status-page">
+          <p className="eyebrow">Geschütztes TAG</p>
+          <h1>Zugangscode erforderlich</h1>
+          <p>Erst nach serverseitiger Prüfung wird der Inhalt dieses TAGs geladen.</p>
+          <form onSubmit={async (event) => {
+            event.preventDefault();
+            if (!pin.trim()) return;
+            setPinSubmitting(true);
+            try {
+              await verifyPin(tagId.toLowerCase(), pin, bootstrap);
+              setPin("");
+              clearBootstrapParameters();
+              setView(await getPublicTagView(tagId));
+              setPinRequired(false);
+            } catch {
+              setError("Der Zugangscode ist ungültig, gesperrt oder das TAG nicht verfügbar.");
+            } finally { setPinSubmitting(false); }
+          }}>
+            <label htmlFor="tag-pin">Zugangscode</label>
+            <input id="tag-pin" type="password" autoComplete="one-time-code" value={pin} onChange={(event) => setPin(event.target.value)} />
+            <button className="button button-primary" disabled={pinSubmitting} type="submit">{pinSubmitting ? "Prüfung läuft …" : "Freischalten"}</button>
+          </form>
+        </main>
+      );
+    }
     return (
       <main className="status-page">
         <p className="eyebrow">TAG nicht verfügbar</p>

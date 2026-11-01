@@ -1,6 +1,6 @@
 # Implementierungsstatus
 
-> Letzte fachliche Bewertung: 2026-10-27  
+> Letzte fachliche Bewertung: 2026-10-31
 > Statuswerte und Übergangsregeln: [`../README.md`](../README.md)
 
 ## Arbeitspakete
@@ -11,10 +11,10 @@
 | WP-02 | Kanonische Feistel-/Cycle-Walk-Domänen für 6, 8 und 10 Stellen | verified | TC-CRYPTO-001 bis TC-CRYPTO-005; lokale Router-Regression vom 2026-10-27 |
 | WP-03 | Lineare vollständige Range-Keys ohne HMAC- oder Slot-Regel | verified | TC-ID-001 bis TC-ID-004; lokale Codec- und Worker-Regression für 6, 8 und 10 Stellen |
 | WP-04 | Validierter aktiver Range-Index | verified | TC-RANGE-001 bis TC-RANGE-005 |
-| WP-05 | Feature-Zuweisung Tag → Range → Gruppe | verified | TC-RULE-001 bis TC-RULE-006 |
+| WP-05 | Feature-Zuweisung materialisiertes TAG → Range → Gruppe; TCP-Poolebene bleibt ohne neuen KV-Key | verified | TC-RULE-001 bis TC-RULE-006 sowie TCP-Poolmaterialisierung |
 | WP-06 | Zentrale KV-Feature-Dokumente | verified | TC-FEATURE-001 bis TC-FEATURE-005 |
 | WP-07 | Sichere Redirect-Templates | verified | TC-TEMPLATE-001 bis TC-TEMPLATE-006 |
-| WP-08 | JSON-Aktionsantwort und HTTP-Verhalten | verified | TC-RESPONSE-001 bis TC-RESPONSE-004 |
+| WP-08 | Pages-Default statt JSON-Fallback und HTTP-Verhalten | implemented-local | TC-RESPONSE-001 bis 004, TC-PAGES-001; 71 Routertests und Staging-/Production-Dry-Run grün |
 | WP-09 | Fixtures, automatisierte Tests, Build und Evidenz | verified | `npm test`, `npm run build`, `npm run build:codec` |
 | WP-10 | Gemeinsamer Codec-Kern und privater Codec-Worker | implemented | lokale Codec-Tests und `npm run build:codec` grün; bisheriger Einzel-Codec-Slice auf `codec.s.myqr24.com` implementiert |
 | WP-11 | Internal-Codec-API, Batch-Encoding und symmetrische Umgebungsrouten | planned | `internal.s.myqr24.com` / `internal.p.myqr24.com`, `/api/v1/codec/*`, `codecVersion`, Batch-Limit 1.000, TC-CODEC-006 bis 008 und TC-CODEC-STAGING-005 bis 006 |
@@ -30,7 +30,7 @@
 | Feature-Dokumente | Wiederverwendbare KV-Dokumente unter `feature:{featureId}` |
 | Cycle-Walk | Erzwingt für gerade Längen vollständig `36^(L-2) ≤ value < 36^L`; Public IDs werden auf L Zeichen aufgefüllt |
 | ID- und Range-Keys | Vollständige kanonische Werte für 6, 8 und 10 Stellen; keine HMAC-Prüfung, Slot-Ausrichtung oder Bitmaskierung |
-| Redirects | Ausschließlich `url` xor `urlTemplate`; Server-Placeholder-Allowlist und HTTP(S)-Prüfung |
+| Redirects | Ausschließlich `url` xor `urlTemplate`; Server-Placeholder-Allowlist und HTTP(S)-Prüfung. Ohne Redirect folgt ausschließlich der HTTPS-Pages-Default `/tag/{tagId}` aus `PAGES_URL_TEMPLATE`; kein TAG-HTML/JSON-Fallback |
 | Testdaten | Versionierte nicht geheime JSON-Fixture unter `test/fixtures/` plus dynamisch berechnete Testwerte |
 | Gemeinsamer Codec | `src/codec/index.ts` wird vom öffentlichen Scan-Worker und dem separaten privaten Codec-Worker importiert |
 | Codec-Worker | bestehender Slice: `POST /api/v1/tag-codec/encode` und `/decode`; Bearer-Authentisierung, keine KV-/Redirect-Secret-Bindung, keine CORS-Header. Nächste Welle: `/api/v1/codec/encode`, `/encode-batch`, `/decode` mit `codecVersion` |
@@ -51,7 +51,7 @@
 | US-006 | Feature-Zuweisung mit Priorität | verified |
 | US-007 | Wiederverwendbare Feature-Dokumente | verified |
 | US-008 | Sichere Redirect-Templates | verified |
-| US-009 | JSON-Aktionsdokumente | verified |
+| US-009 | Pages-Default ohne Redirect | implemented-local |
 | US-010 | Reproduzierbare Test- und Build-Evidenz | verified |
 | CP-US-011 | Private TAG-ID-Erstellung ohne Codec-Secrets in der Control Plane | implemented |
 | CP-US-013 | Poolgrenzen im kanonischen `decodedValue`-Raum | implemented |

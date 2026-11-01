@@ -249,13 +249,40 @@ th {
   font-weight: 700;
 }
 
-.auth-form input {
+.auth-form input,
+.auth-form textarea,
+.auth-form select {
   width: 100%;
   border: 1px solid #b9cbd2;
   border-radius: 0.55rem;
   background: #fff;
   padding: 0.72rem 0.8rem;
   color: #17212b;
+}
+
+.routing-administration .module-grid {
+  margin-top: 1.25rem;
+}
+
+.routing-administration .auth-form {
+  width: 100%;
+}
+
+.diff-view {
+  max-height: 28rem;
+  overflow: auto;
+  border-radius: 0.55rem;
+  background: #142d3d;
+  padding: 1rem;
+  color: #e7f7f2;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.outbox-event {
+  border-top: 1px solid #d8e2e6;
+  padding-top: 0.65rem;
 }
 
 .auth-form input:focus {

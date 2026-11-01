@@ -107,16 +107,16 @@
 
 | ID | Bezug | Testfall | Erwartetes Ergebnis | Ebene |
 | --- | --- | --- | --- | --- |
-| `CP-TC-PROJECTION-001` | CP-US-030 | gültige Konfiguration projizieren | ausschließlich erlaubte KV-Keys und referenzintegre Dokumente entstehen | Contract |
-| `CP-TC-PROJECTION-002` | CP-US-030 | private Produktions-/Owner-/Auditdaten einbringen | Projektion wird abgewiesen bzw. diese Felder fehlen garantiert | Security |
-| `CP-TC-PROJECTION-003` | CP-US-030 | ungültiges Feature, URL oder fehlende Referenz | keine Outbox wird erzeugt | Integration |
-| `CP-TC-PUBLISH-001` | CP-US-031 | Mutation, Audit und Outbox persistieren | alle drei Daten entstehen oder fehlen gemeinsam | Integration |
+| `CP-TC-PROJECTION-001` | CP-US-030 | gültige Konfiguration projizieren | ausschließlich erlaubte KV-Keys und referenzintegre Dokumente entstehen | implemented-local |
+| `CP-TC-PROJECTION-002` | CP-US-030 | private Produktions-/Owner-/Audit-/Pooldaten einbringen | Projektion wird abgewiesen bzw. diese Felder fehlen garantiert | implemented-local |
+| `CP-TC-PROJECTION-003` | CP-US-030 | ungültiges Feature, URL oder fehlende Referenz | keine Outbox wird erzeugt | implemented-local |
+| `CP-TC-PUBLISH-001` | CP-US-031 | Mutation, Audit und Outbox persistieren | alle drei Daten entstehen oder fehlen gemeinsam | implemented-local |
 | `CP-TC-PUBLISH-002` | CP-US-031 | bestätigter Staging-Publish | Version wird erst nach erfolgreicher Cloudflare-Antwort als veröffentlicht markiert | Sandbox/Staging |
-| `CP-TC-PUBLISH-003` | CP-US-031 | Timeout, 429 oder 5xx | Auftrag bleibt retrybar; Veröffentlichungsstatus bleibt korrekt | Integration |
-| `CP-TC-PUBLISH-004` | CP-US-031 | idempotenter Retry | keine widersprüchliche Projektion und kein doppelter fachlicher Nebeneffekt | Integration |
-| `CP-TC-PUBLISH-005` | CP-US-031 | Staging-Konfiguration auf Produktionsziel | Publisher verweigert Umgebungsüberschreitung | Security |
+| `CP-TC-PUBLISH-003` | CP-US-031 | Timeout, 429 oder 5xx | Auftrag bleibt retrybar; Veröffentlichungsstatus bleibt korrekt | implemented-local |
+| `CP-TC-PUBLISH-004` | CP-US-031 | idempotenter Retry und Processing-Claim | keine widersprüchliche Projektion und kein doppelter fachlicher Nebeneffekt | implemented-local |
+| `CP-TC-PUBLISH-005` | CP-US-031 | Staging-Konfiguration auf Produktionsziel | Publisher verweigert Umgebungsüberschreitung | implemented-local |
 | `CP-TC-UNPUBLISH-001` | CP-US-032 | Unpublish eines gesperrten/zerstörten TAGs | Regel wird entfernt oder zulässige Neutralisierung publiziert | Sandbox/Staging |
-| `CP-TC-UNPUBLISH-002` | CP-US-032 | Fehler beim Unpublish | Auftrag und Fehlergrund bleiben auditierbar und erneut ausführbar | Integration |
+| `CP-TC-UNPUBLISH-002` | CP-US-032 | Fehler beim Unpublish und sichere Neutralisierungssequenz | Auftrag/Fehlergrund bleiben auditierbar und retrybar; Index wird zuerst neutralisiert | implemented-local |
 | `CP-TC-RUNTIME-001` | CP-US-035 | freigegebene Runtime-Konfiguration mit `public`, `pin-required`, `closed` und validiertem `redirect` ableiten | ausschließlich schema-konforme öffentliche Runtime-Projektion mit korrektem Modus entsteht | Contract/Integration |
 | `CP-TC-RUNTIME-002` | CP-US-035 | Owner-, Account-, Credential-, PIN-, Session-, Audit-, Pool- oder Objektpfadfelder in Runtime-Input einschleusen | Mapper/Pipeline verweigert oder entfernt private Felder zuverlässig | Security |
 | `CP-TC-RUNTIME-003` | CP-US-035 | Key für kanonische TAG-ID und veröffentlichte Revision erzeugen; Clientpfad manipulieren | Key wird ausschließlich aus kanonischer `tagId` und Revision abgeleitet | Unit/Security |

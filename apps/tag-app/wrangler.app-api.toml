@@ -1,0 +1,23 @@
+name = "myqr24-tag-app-api"
+main = "workers/app-api.ts"
+compatibility_date = "2026-10-31"
+
+[env.staging]
+name = "myqr24-tag-app-api-staging"
+
+[[env.staging.d1_databases]]
+binding = "APP_DB"
+database_name = "myqr24-tag-app-staging"
+database_id = "<set-only-at-w3d-gate>"
+
+[[env.staging.r2_buckets]]
+binding = "PRIVATE_CONTENT"
+bucket_name = "myqr24-private-content-staging"
+
+[[env.staging.services]]
+binding = "MEDIA_SIGNER"
+service = "myqr24-media-signer-staging"
+
+# Required server-only secrets, never browser variables or committed values:
+# APP_BOOTSTRAP_SECRET_S01, APP_PIN_PEPPER_S01, APP_MEDIA_SIGNER_KEY_S01.
+# Production and real deployment remain blocked by W3D.

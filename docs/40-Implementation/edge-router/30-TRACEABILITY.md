@@ -7,10 +7,10 @@
 | US-003 | Kanonische Längenräume und `BigInt` | TC-CRYPTO-001 bis TC-CRYPTO-005 | deterministische Testsecrets und Vektoren | `src/codec/index.ts`: `parseBase36`, `decodeFeistel`, `formatBase36` | verified |
 | US-004 | HMAC-freie vollständige lineare Range- und Regel-Keys | TC-ID-001 bis TC-ID-004 | 6-/8-/10-Stellenvektoren, KV-Spy | `src/codec/index.ts`: `decodeTagId` | verified |
 | US-005 | Aktive, length-gebundene, nicht überlappende Ranges | TC-RANGE-001 bis TC-RANGE-005 | valide und fehlerhafte Range-Indizes | `isValidRangeIndex`, `findRange` | verified |
-| US-006 | Priorität Tag → Range → Gruppe | TC-RULE-001 bis TC-RULE-006 | Tag-, Range- und Gruppen-Zuweisungen | `resolveTag` | verified |
+| US-006 | Priorität materialisiertes TAG → Range → Gruppe; TCP-Poolebene ohne Pool-KV-Key | TC-RULE-001 bis TC-RULE-006 | Tag-, Range- und Gruppen-Zuweisungen | `resolveTag`; TCP `RoutingProjectionService` für Poolmaterialisierung | verified |
 | US-007 | Wiederverwendbare `feature:{featureId}`-Dokumente | TC-FEATURE-001 bis TC-FEATURE-005 | Feature-Fixtures | `resolveFeatures`, `isTagFeature` | verified |
 | US-008 | Sichere Redirect-Templates | TC-TEMPLATE-001 bis TC-TEMPLATE-006 | Redirect- und Fehlerfixtures | `renderTemplate`, `toSafeRedirect` | verified |
-| US-009 | JSON-Aktionsantwort | TC-RESPONSE-001 bis TC-RESPONSE-004 | JSON-Feature-Fixture | `jsonActionResponse`, `handleRequest` | verified |
+| US-009 | Pages-Default ohne Redirect | TC-RESPONSE-001 bis TC-RESPONSE-004, TC-PAGES-001 | JSON-Feature-Fixture, gültige/ungültige Pages-Templates | `toPagesDefaultRedirect`, `handleRequest`, `PAGES_URL_TEMPLATE` | implemented-local |
 | US-010 | Reproduzierbare Evidenz | TC-EVIDENCE-001 bis TC-EVIDENCE-003 | keine produktiven Daten | `package.json`, `test/worker.test.ts`, `test/codec-worker.test.ts`, Dokumentation | verified |
 | CP-US-011 | Private Erstellung öffentlicher TAG-IDs ohne Codec-Secrets in der Plane | TC-CODEC-001 bis TC-CODEC-005, TC-CODEC-STAGING-002 bis TC-CODEC-STAGING-004 | nicht geheime lokale Testsecrets, künstliche kanonische Staging-Werte | `src/codec/index.ts`, `src/codec-worker.ts`: `handleCodecRequest`, `handleEncode` | implemented |
 | CP-US-013 | Poolgrenzen im linearen `decodedValue`-Raum für 6, 8 und 10 Stellen | TC-CODEC-001 bis TC-CODEC-003, TC-CODEC-005, TC-CODEC-STAGING-002 bis TC-CODEC-STAGING-004 | kanonische 6-/8-/10-stellige Werte | `src/codec-worker.ts`: `handleEncode`, `isCanonicalValue` | implemented |

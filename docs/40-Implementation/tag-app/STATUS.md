@@ -1,7 +1,7 @@
 # Implementierungsstatus: TAG-App
 
-**Letzte Bewertung:** 2026-10-02  
-**Statusregeln:** [`README.md`](README.md)  
+**Letzte Bewertung:** 2026-10-31
+**Statusregeln:** [`README.md`](README.md)
 **Fachliche Stories:** [`10-USER-STORIES.md`](10-USER-STORIES.md)
 
 ## Arbeitspakete
@@ -16,6 +16,7 @@
 | APP-WP-05A | Hochzeits-Vault-Demo: Tabs, Galerie, Dokumente und Zugangscode-UX | APP-I01A | implemented | `trauung1`, `fest2026`, `menue202`, Adaptertests und App-Build |
 | APP-WP-06 | Kontrollierte Router→PWA-Staging-Integration | APP-I02 | blocked | aktiver Worker und tatsächlich gebundener KV-Namespace |
 | APP-WP-06A | Gemeinsame PWA-Navigation, integrierter Scan und lokale Berechtigungspräferenzen | APP-I02A | planned | APP-TC-PERMISSION-001 bis APP-TC-PERMISSION-004, keine fachliche Autorisierung im Client |
+| APP-WP-06B | Lokale React-/D1-/Access-Runtime und tokenbasierte Medienfreigabe | APP-I02B | implemented-local | `tag-edge-d1-routing-v1`, `tag-app-access-v1`, 11 App-/D1-/R2-Fake-Tests und Dry-Runs; keine reale Mutation |
 | APP-WP-07 | Öffentliche Application API, D1/R2 und Sichtbarkeiten | APP-I03 | planned | APP-TC-API-*, APP-TC-PERMISSION-005 bis APP-TC-PERMISSION-007, getrennte Staging-Ressourcen |
 | APP-WP-08 | Owner-Authentisierung, Vault-Verwaltung und Audit | APP-I04 | planned | APP-TC-OWNER-*, API und Session-Modell |
 | APP-WP-09 | Lost & Found, TAG Chat und Moderation | APP-I05 | planned | APP-TC-CHAT-*, Besucher-/Owner-Sessions |
@@ -61,6 +62,13 @@
 | APP-US-050 bis APP-US-056 | Check-ins, Collections und Campaigns | APP-I07 | planned |
 | APP-US-060 bis APP-US-063 | gemeinsame Navigation, integrierter Scan und Berechtigungszentrum | APP-I02A | planned |
 | APP-US-064 bis APP-US-065 | serverseitige Capabilities und datensparsame Scan-Speicherung | APP-I03 | planned |
+
+## Lokaler Pages-/R2-v1-Slice
+
+- React Pages liefert wieder `/tag/*` als App-Shell. `TagPage` verwendet im normalen Pfad nur den D1-/Access-Bootstrap; Fixtures bleiben ein expliziter Testmodus.
+- `workers/app-api.ts` prüft Bootstrap, Session, D1-Status, Access-Version und Scope vor dem Lesen privater revisionierter Content-JSONs aus R2.
+- PIN-Prüfung verwendet Argon2id mit serverseitigem Pepper und sperrt pro TAG/Client-Signal nach fünf Fehlversuchen für 15 Minuten. Der Media-Signer bleibt vor dem W3D-Credential-Gate fail-closed.
+- `test/app-api.test.ts`, `tagAccessService.test.ts` und der Argon2id-Benchmark decken Session-/PIN-/Widerrufs- und Medien-Signing-Grenzen lokal ab. Reale D1-/R2-/Pages-/Service-Binding-Deployments bleiben externe Gates.
 
 ## Blocker
 

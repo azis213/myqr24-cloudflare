@@ -296,6 +296,10 @@ tag:{decodedValue}.featureIds
 
 In der ersten Version ersetzt die spezifischere `featureIds`-Liste die Zuweisung der allgemeineren Ebene. Dies gewährleistet für Redirects ein eindeutiges Ziel. Eine spätere Erweiterung darf additive Begleitfeatures erst einführen, wenn primäre Aktionen und ergänzende Features explizit getrennt und z. B. durch `mode: "replace" | "append"` geregelt sind.
 
+Die fachliche Control-Plane-Hierarchie lautet **Einzel-TAG → Allocation Pool → Range → Gruppe → Pages-Default**. TCP materialisiert Pool- und Einzel-TAG-Zuweisungen ausschließlich als `tag:{decodedValue}`; eine Einzel-TAG-Zuweisung überschreibt dabei die Poolzuweisung. Pool-IDs, Poolnamen, Kapazitäten, Policy-Referenzen und Herstellungsdaten werden niemals in KV projiziert. Der Edge Router selbst benötigt daher keine Pool-Schlüsselklasse.
+
+Enthält das wirksame Feature-Set kein Redirect, leitet der Router mit `302` auf das umgebungsseitig konfigurierte HTTPS-Pages-Template `/tag/{tagId}` weiter. Das Template ist keine Browser- oder KV-Konfiguration und darf ausschließlich den Token `{tagId}` enthalten. Der Routing-Worker erzeugt weder TAG-HTML noch ein JSON-Aktionsdokument als Fallback.
+
 ### Redirect-Templates
 
 Ein `redirect`-Feature besitzt entweder ein festes `url`-Ziel oder ein `urlTemplate`. Ein Template ist ausschließlich serverseitige Konfiguration und darf nur folgende Platzhalter enthalten:

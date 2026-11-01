@@ -82,7 +82,7 @@ Lokale Testfälle werden automatisiert in Vitest umgesetzt; ihre Kennungen werde
 | ID | Story | Setup / Eingabe | Erwartetes Ergebnis |
 | --- | --- | --- | --- |
 | TC-FEATURE-001 | US-007 | Valides aktives Redirect-Feature | Feature wird geladen |
-| TC-FEATURE-002 | US-007 | Valides aktives JSON-Feature | JSON-Aktionsantwort |
+| TC-FEATURE-002 | US-007 | Valides aktives JSON-Feature | Feature wird validiert; ohne Redirect folgt Pages-Default |
 | TC-FEATURE-003 | US-007 | Fehlendes Feature-Dokument | `404` |
 | TC-FEATURE-004 | US-007 | `enabled: false` | `404` |
 | TC-FEATURE-005 | US-007 | Falsche ID, Typ oder Struktur | `404` |
@@ -102,10 +102,11 @@ Lokale Testfälle werden automatisiert in Vitest umgesetzt; ihre Kennungen werde
 
 | ID | Story | Setup / Eingabe | Erwartetes Ergebnis |
 | --- | --- | --- | --- |
-| TC-RESPONSE-001 | US-009 | Aktives JSON-Feature ohne Redirect | JSON mit Tag, Range, Gruppe und Features |
-| TC-RESPONSE-002 | US-009 | Erfolgreiche JSON-Antwort | `Cache-Control: no-store` |
-| TC-RESPONSE-003 | US-009 | Mehrere Features, erster aktiver Redirect | Redirect gewinnt gegenüber JSON-Ausgabe |
-| TC-RESPONSE-004 | US-002/US-009 | Valider `HEAD` auf Feature-Zuweisung | Kein Body |
+| TC-RESPONSE-001 | US-009 | Aktives Nicht-Redirect-Feature | `302` auf kanonische Pages-URL mit identischer `tagId`, kein TAG-HTML/JSON |
+| TC-RESPONSE-002 | US-009 | Pages-Default mit `GET` | kein Body und kein Cache-Leak |
+| TC-RESPONSE-003 | US-009 | Mehrere Features, erster aktiver Redirect | Redirect gewinnt gegenüber Pages-Default |
+| TC-RESPONSE-004 | US-002/US-009 | Valider `HEAD` auf Feature-Zuweisung | Pages-Status `302`, kein Body |
+| TC-PAGES-001 | US-009 | HTTP, falscher Pfad, Query, mehrfacher/falscher Token im Pages-Template | fail-closed `null`/404; nur kanonisches HTTPS `/tag/{tagId}` wird akzeptiert |
 
 ## Evidenz
 

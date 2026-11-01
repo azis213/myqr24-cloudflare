@@ -1,8 +1,8 @@
 # Architektur der `tag-app`
 
-**Status:** Implementierter Staging-MVP  
-**Stand:** 2026-10-02  
-**Geltungsbereich:** `apps/tag-app` – öffentliche myQR24 TAG-Ansicht auf Cloudflare Pages  
+**Status:** Implementierter React-Staging-MVP plus lokaler D1-/Access-v1-Slice
+**Stand:** 2026-10-31
+**Geltungsbereich:** `apps/tag-app` – öffentliche myQR24 TAG-Ansicht auf Cloudflare Pages
 **Ergänzt:** [Cloudflare-native PWA-Komponente](CLOUDFLARE_PWA_COMPONENT.md)
 
 ---
@@ -13,10 +13,10 @@ Die `tag-app` ist die öffentliche, browserseitige Zielanwendung nach einem erfo
 
 Der aktuelle MVP ist bewusst keine vollständige Fachanwendung:
 
-- öffentliche Ansichten werden aus lokalen, versionierten Fixtures gerendert;
+- die React-PWA bleibt die öffentliche `/tag/{tagId}`-Oberfläche; lokale Fixtures sind ein expliziter Testmodus, der normale Browserpfad verwendet den serverseitigen D1-/Access-Vertrag;
 - keine Owner-Verwaltung, Anmeldung oder Sessions;
-- keine Application API;
-- keine Cloudflare-Bindungen an KV, D1 oder R2;
+- keine öffentlich zugänglichen R2-Objekte; die Application API gibt nach Tokenprüfung nur autorisierte Content-JSONs und später kurzlebige Medien-URLs aus;
+- lokale D1-/privat-R2-/Service-Binding-Verträge, aber kein Deployment und keine realen Ressourcenmutationen;
 - keine privaten Inhalte und keine Kundendaten;
 - keine Berechtigungsentscheidung im Browser.
 
@@ -106,17 +106,11 @@ wrangler pages deploy dist --project-name myqr24-staging-test-pwa
 
 Die Details zur Scan-Domain, DNS, Worker-Route und der noch kontrolliert ausstehenden Umstellung des KV-Redirect-Ziels stehen in [`CLOUDFLARE_DNS_AND_TLS_CONFIGURATION.md`](CLOUDFLARE_DNS_AND_TLS_CONFIGURATION.md).
 
-### 3.2 Deep-Link-Fallback auf Pages
+### 3.2 React Pages Deep Links und Access-API
 
-Die Datei `apps/tag-app/public/_redirects` enthält:
+`public/_redirects` liefert `/tag/*` wieder als React-App-Shell aus. Der Edge Router übergibt bei einem internen Scan kurzlebig signierte Bootstrapparameter (`mode`, Access- und Contentrevision, Nonce, Ablauf). React verwendet sie nur als UI-Hinweis und lässt sie durch die Access-API erneut prüfen, bevor Content geladen wird.
 
-```text
-/tag/* /index.html 200
-```
-
-Dadurch liefert Cloudflare Pages für direkte Aufrufe wie `/tag/rsq45q` die React-Einstiegsseite aus. Der Client-Router wertet anschließend die konkrete URL aus und rendert die TAG-Ansicht.
-
-Weitere künftige öffentliche App-Routen müssen ausdrücklich in dieser Regel ergänzt oder durch eine bewusst geprüfte allgemeinere SPA-Regel abgedeckt werden.
+Content-JSONs liegen privat unter `content/v1/tags/{tagId}/{revision}.json`. Die PWA erhält sie erst nach einer `HttpOnly`-Session. R2-Keys, PINs, Pepper, Ownerdaten und Presigned URLs erscheinen nicht im App-Bootstrap oder dauerhaftem Browser-Speicher.
 
 ---
 
@@ -132,12 +126,11 @@ Weitere künftige öffentliche App-Routen müssen ausdrücklich in dieser Regel 
 
 ```text
 1. Scanner öffnet https://s.qr4.uk/t/{tagId}
-2. Edge Router validiert den Scan und liefert einen signierten HTTP-Redirect.
+2. Edge Router validiert den Scan, liest die minimale D1-Routingprojektion und folgt externem Ziel oder internem React-Bootstrap.
 3. Browser folgt dem Redirect auf /tag/{tagId} der Pages-App.
-4. Pages liefert wegen _redirects die React-Shell aus.
-5. React Router rendert TagPage.
-6. PublicTagViewService löst den öffentlichen View auf.
-7. VaultBlockRenderer stellt ausschließlich die vertragskonformen öffentlichen Blöcke dar.
+4. React prüft den Bootstrap serverseitig über die Access-API und erhält eine kurzlebige Access-Session oder ausschließlich den PIN-/Login-Dialog.
+5. Erst mit gültiger Session lädt React die serverseitig gefilterte Content-View aus privatem R2.
+6. React fordert Medien-URLs nur für autorisierte anonyme Content-IDs über die API an.
 ```
 
 Aktuell verweist die aktive Scan-Konfiguration möglicherweise noch auf die frühere, statische Test-PWA. Die Umstellung auf die React-App darf ausschließlich nach Identifikation des tatsächlich aktiven Workers und dessen KV-Namespace erfolgen. Keine KV-Konfiguration blind überschreiben.
@@ -235,23 +228,11 @@ Der Renderer verarbeitet nur diese diskriminierten, typisierten Blockformen. Es 
 
 Der Adapter enthält keine geheimen Werte und keinen Zugriff auf Cloudflare-Ressourcen.
 
-### 6.3 Geplante API-Ablösung
+### 6.3 D1-Routing, Access-API und private R2-Inhalte
 
-Die zukünftige Implementierung des Adapters ruft auf:
+Die verbindlichen lokalen Verträge sind [`tag-edge-d1-routing-v1`](35-Contracts/tag-edge-d1-routing-v1.md) und [`tag-app-access-v1`](35-Contracts/tag-app-access-v1.md). Die React-PWA erhält keinen direkten R2-Zugriff. Die Access-API prüft Bootstrap, PIN-/Login-Status, Access-Version und Sichtbarkeit erneut, bevor sie die View ausliefert oder den serverseitigen Media-Signer anspricht.
 
-```text
-GET /api/v1/tags/{tagId}/view
-```
-
-Anforderungen an diese Ablösung:
-
-- Das Response-Schema muss dem fachlich überprüften öffentlichen View-Vertrag entsprechen.
-- Die API liefert ausschließlich serverseitig autorisierte öffentliche Inhalte.
-- Unbekannte, gesperrte oder nicht öffentliche Tags dürfen keine Detailinformationen preisgeben.
-- API-Antworten mit privaten, geteilten oder dynamischen Inhalten erhalten `Cache-Control: no-store`.
-- Der Browser darf keine Autorisierungsentscheidung aus lokalen Feature-Flags ableiten.
-
-Erst nach Einführung dieser API dürfen Fixtures schrittweise entfernt werden. Bis dahin sind Fixtures ausdrücklich Test- und Demo-Daten.
+Für PIN-geschützte Tags erscheint vor erfolgreicher API-Prüfung ausschließlich ein PIN-Dialog. Owner-, Gast- und Empfänger-/Scanner-Sessions sind getrennt. Die lokale Medien-Signer-Implementierung bleibt bis zum W3D-Credential-Gate fail-closed; Fixtures bleiben ausschließlich explizite Demo-/Testdaten.
 
 ---
 
