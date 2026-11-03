@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"name": "myqr24-cloudflare-tag-app",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.exclude": {
+			"apps/tag-control-center": true,
+			"apps/tag-control-plane": true,
+
+			"docs/40-Implementation/edge-router": true,
+			"docs/40-Implementation/tag-control-center": true,
+			"docs/40-Implementation/tag-control-plane": true,
+			"docs/80-Deployment": true,
+			"docs/90-Session-Change-Summaries": true
+		}
+	}
+}

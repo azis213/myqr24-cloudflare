@@ -1,6 +1,6 @@
 # Lokale manuelle Testumgebung
 
-Diese Topologie stellt den derzeit implementierten Stand der **TAG Control Plane (TCP)**, des **TAG Control Centers (TCC)** und einer ausschließlich lokalen MySQL-8.4-Datenbank für manuelle Tests bereit.
+Diese Topologie stellt den derzeit implementierten Stand der **TAG Control Plane (TCP)**, des **TAG Control Centers (TCC)**, der **TAG-App** und einer ausschließlich lokalen MySQL-8.4-Datenbank für manuelle Tests bereit.
 
 ## Aktueller Umfang
 
@@ -12,6 +12,7 @@ Diese Topologie stellt den derzeit implementierten Stand der **TAG Control Plane
 | TCP-Testdatenbank `myqr24_test` | nur internes Compose-Netz | isolierter Laravel-/MySQL-Testpfad |
 | Private TAG Codec | nur internes Compose-Netz `http://tag-codec:8788` | lokaler Wrangler-Worker mit synthetischen Secrets |
 | TAG Control Center (TCC) | `http://localhost:5174/` | Vite-Dev-Server mit Login-, E-Mail-MFA-, Session- und Logout-UI |
+| TAG-App | `http://localhost:5173/` | Vite-Dev-Server mit explizitem Fixture-Modus |
 
 MySQL wird bewusst **nicht** auf einen Host-Port veröffentlicht. Nur TCP kann sie über den Compose-DNS-Namen `mysql` erreichen.
 
@@ -27,6 +28,15 @@ Es werden keine Cloudflare-, Dogado-, Staging- oder Produktionssecrets verwendet
 Der Private-Codec besitzt keinen Host-Port. Nur TCP-Testprozesse im Compose-Netz
 können ihn über `http://tag-codec:8788` erreichen. TCC und Browser erhalten
 weder diese Adresse noch den Service-Key.
+
+Die TAG-App wird mit `VITE_TAG_APP_DATA_SOURCE=fixtures` gestartet. Damit
+lassen sich die öffentliche Beispielansicht `stagv001` und Deep Links im
+Browser prüfen. Dieser Modus verwendet ausschließlich nicht sensible,
+versionierte UI-Fixtures und ruft die Access-API nicht auf; er weist weder eine
+Pages-/Worker-Integration noch serverseitige Autorisierung nach. Die
+Access-API-Tests laufen separat mit den lokalen D1-, R2- und Media-Signer-Test-
+Doubles der TAG-App. Die TAG-App-Quell- und Worker-Dateien werden dafür nicht
+verändert.
 
 ## Umgebung starten
 
@@ -83,7 +93,8 @@ Der Startvorgang:
 6. startet Laravel auf Port `8080`;
 7. startet den getrennten Private-Codec-Worker im Compose-Netz; er erhält ausschließlich die synthetischen Werte `LOCAL_CODEC_FEISTEL_SECRET` und `LOCAL_CODEC_API_KEY` aus der ignorierten lokalen Umgebung;
 8. startet den TCC-Vite-Dev-Server auf Port `5174` und installiert dessen lokale Node-Abhängigkeiten beim ersten Lauf in ein benanntes Docker-Volume;
-9. prüft TCP-Health und die TCC-Startseite.
+9. startet die TAG-App auf Port `5173` und installiert ihre lokalen Node-Abhängigkeiten in ein eigenes benanntes Docker-Volume;
+10. prüft TCP-Health sowie die Startseiten und den TAG-App-Deep-Link `/tag/stagv001`.
 
 Nach erfolgreichem Start:
 
@@ -91,9 +102,11 @@ Nach erfolgreichem Start:
 TCC:    http://localhost:5174/
 TCP:    http://localhost:8080/
 Health: http://localhost:8080/api/v1/health
+TAG-App: http://localhost:5173/
+TAG-App-Test-TAG: http://localhost:5173/tag/stagv001
 ```
 
-Die Host-Ports können in `.env.local` über `LOCAL_TCP_PORT` und `LOCAL_TCC_PORT` geändert werden.
+Die Host-Ports können in `.env.local` über `LOCAL_TCP_PORT`, `LOCAL_TCC_PORT` und `LOCAL_TAG_APP_PORT` geändert werden.
 
 Der TCC-Container proxyed `/tcp/*` intern an `tag-control-plane:8000`. Browseranfragen bleiben dadurch gegen `http://localhost:5174` same-origin; Cookies und CSRF-Verhalten können ohne lokale CORS-Ausnahme manuell geprüft werden. Für den separaten Host-Vite-Betrieb bleibt das Proxyziel standardmäßig `http://localhost:8080`.
 
@@ -113,6 +126,17 @@ Secret-/Credential-Redaktion, Transaktionsrollback bei einer fehlgeschlagenen
 Mutation sowie die Health-Endpunkt-Korrelation. Die manuelle Datenbank
 `LOCAL_MYSQL_DATABASE` wird dabei nicht zurückgesetzt.
 
+Die TAG-App- und Access-API-Tests sowie der Produktionsbuild lassen sich
+separat aus dem Repository-Root ausführen:
+
+```powershell
+npm run test:app
+npm run build:app
+```
+
+Die Access-API-Tests verwenden ausschließlich lokale Test-Doubles; sie starten
+keinen zusätzlichen API-Worker und benötigen keine Cloudflare-Ressourcen.
+
 Zusätzlich startet der Testlauf den Compose-internen Private-Codec. Die
 dedizierten TCP-Integrationstests aktivieren den HTTP-Driver nur testlokal und
 prüfen die 6-/8-/10-stellige Reservierung über den echten Worker. Der
@@ -128,7 +152,7 @@ Der Befehl entfernt Container und Netzwerk, behält aber die benannten lokalen V
 
 ## Lokale Daten vollständig zurücksetzen
 
-> **Achtung:** Dieser Vorgang löscht alle Datenbank-, TCP-Storage- und TCC-Dependency-Volumes dieser lokalen Testtopologie endgültig.
+> **Achtung:** Dieser Vorgang löscht alle Datenbank-, TCP-Storage-, TCC- und TAG-App-Dependency-Volumes dieser lokalen Testtopologie endgültig.
 
 ```powershell
 .\test\10-test-local\scripts\reset-local-test.ps1
@@ -156,7 +180,8 @@ Diese Umgebung ist für manuelle Exploration, lokale Smoke-Tests und komplexe Te
 - TCP↔TCC-API-Contracts über den lokalen same-origin `/tcp`-Proxy;
 - AuthZ-, CSRF-, Audit- und negative Tests;
 - Browser-Smoke-Tests gegen lokale Services;
-- lokale Worker-/Edge-Adaptertests mit Fakes oder Emulation.
+- lokale Worker-/Edge-Adaptertests mit Fakes oder Emulation;
+- manuelle TAG-App-UI- und Deep-Link-Tests mit synthetischen Fixtures.
 
 Die bestehende Topologie unter `tools/local-php-mysql/` bleibt separat. Sie ist ein schlanker, reproduzierbarer MySQL-Integrationstest-Runner und soll nicht auf manuelle Persistenz oder HTTP-Bedienung erweitert werden.
 

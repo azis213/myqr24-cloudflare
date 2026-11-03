@@ -30,6 +30,7 @@ $localConfiguration = Get-Content -LiteralPath $environmentFile
 
 $tcpPort = 8080
 $tccPort = 5174
+$tagAppPort = 5173
 
 $tcpPortConfiguration = $localConfiguration |
     Where-Object { $_ -match '^\s*LOCAL_TCP_PORT=' } |
@@ -45,6 +46,14 @@ $tccPortConfiguration = $localConfiguration |
 
 if ($tccPortConfiguration -match '^\s*LOCAL_TCC_PORT=(\d+)\s*$') {
     $tccPort = [int]$Matches[1]
+}
+
+$tagAppPortConfiguration = $localConfiguration |
+    Where-Object { $_ -match '^\s*LOCAL_TAG_APP_PORT=' } |
+    Select-Object -First 1
+
+if ($tagAppPortConfiguration -match '^\s*LOCAL_TAG_APP_PORT=(\d+)\s*$') {
+    $tagAppPort = [int]$Matches[1]
 }
 
 $composeArguments = @(
@@ -68,9 +77,12 @@ try {
 
     $healthUrl = "http://localhost:$tcpPort/api/v1/health"
     $tccUrl = "http://localhost:$tccPort/"
+    $tagAppUrl = "http://localhost:$tagAppPort/"
+    $tagAppSmokeUrl = "$($tagAppUrl)tag/stagv001"
     $deadline = (Get-Date).AddMinutes(3)
     $tcpReady = $false
     $tccReady = $false
+    $tagAppReady = $false
 
     do {
         if (-not $tcpReady) {
@@ -93,18 +105,30 @@ try {
             }
         }
 
-        if ($tcpReady -and $tccReady) {
+        if (-not $tagAppReady) {
+            try {
+                $response = Invoke-WebRequest -Uri $tagAppSmokeUrl -UseBasicParsing -TimeoutSec 5
+                $tagAppReady = $response.StatusCode -eq 200
+            }
+            catch {
+                # Vite is still installing dependencies or starting.
+            }
+        }
+
+        if ($tcpReady -and $tccReady -and $tagAppReady) {
             Write-Host "Local test environment is ready." -ForegroundColor Green
             Write-Host "TCC:    $tccUrl"
             Write-Host "TCP:    http://localhost:$tcpPort/"
             Write-Host "Health: $healthUrl"
+            Write-Host "TAG-App: $tagAppUrl"
+            Write-Host "TAG-App smoke test: $tagAppSmokeUrl"
             exit 0
         }
 
         Start-Sleep -Seconds 2
     } while ((Get-Date) -lt $deadline)
 
-    throw "The local test environment did not become fully ready within three minutes. Inspect logs with: docker compose --env-file `"$environmentFile`" -f `"$composeFile`" logs --follow"
+    throw "The local test environment did not become fully ready within three minutes (TCP=$tcpReady, TCC=$tccReady, TAG-App=$tagAppReady). Inspect logs with: docker compose --env-file `"$environmentFile`" -f `"$composeFile`" logs --follow"
 }
 finally {
     Pop-Location
