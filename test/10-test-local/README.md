@@ -108,6 +108,17 @@ TAG-App-Test-TAG: http://localhost:5173/tag/stagv001
 
 Die Host-Ports können in `.env.local` über `LOCAL_TCP_PORT`, `LOCAL_TCC_PORT` und `LOCAL_TAG_APP_PORT` geändert werden.
 
+Der TAG-App-Port wird standardmäßig an alle Host-Netzwerkschnittstellen
+(`LOCAL_TAG_APP_BIND_ADDRESS=0.0.0.0`) gebunden und ist dadurch grundsätzlich
+auch von Geräten im selben WLAN erreichbar. Ermittle auf dem Entwicklungs-PC
+seine WLAN-IPv4-Adresse mit `ipconfig` und öffne dort zum Beispiel
+`http://<WLAN-IPv4>:5173/tag/stagv001`. Die Windows-Firewall kann eingehende
+Verbindungen weiterhin blockieren; erlaube bei Bedarf TCP-Port `5173` nur im
+privaten Netzwerk. Für lokalen Zugriff ausschließlich auf diesem PC kann
+`LOCAL_TAG_APP_BIND_ADDRESS=127.0.0.1` in `.env.local` gesetzt werden. TCP,
+MySQL und andere Dienste werden durch diese Einstellung nicht zusätzlich
+freigegeben.
+
 Der TCC-Container proxyed `/tcp/*` intern an `tag-control-plane:8000`. Browseranfragen bleiben dadurch gegen `http://localhost:5174` same-origin; Cookies und CSRF-Verhalten können ohne lokale CORS-Ausnahme manuell geprüft werden. Für den separaten Host-Vite-Betrieb bleibt das Proxyziel standardmäßig `http://localhost:8080`.
 
 ## Automatisierte TCP-/MySQL-Tests
