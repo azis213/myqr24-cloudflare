@@ -142,6 +142,25 @@ services:
       - ../../apps/tag-app:/workspace/tag-app
       - tag_app_node_modules:/workspace/tag-app/node_modules
 
+  tag-app-pwa:
+    profiles:
+      - pwa
+    image: node:22-alpine
+    working_dir: /workspace/tag-app
+    command:
+      [
+        "sh",
+        "-c",
+        "npm install --no-audit --no-fund --package-lock=false && npm run preview -- --host 0.0.0.0 --port 4173 --strictPort",
+      ]
+    ports:
+      - "${LOCAL_TAG_APP_BIND_ADDRESS:-0.0.0.0}:${LOCAL_TAG_APP_PWA_PORT:-4174}:4173"
+    networks:
+      - local_test
+    volumes:
+      - ../../apps/tag-app:/workspace/tag-app
+      - tag_app_pwa_node_modules:/workspace/tag-app/node_modules
+
 networks:
   local_test:
     internal: false
@@ -152,3 +171,4 @@ volumes:
   tcc_node_modules:
   codec_node_modules:
   tag_app_node_modules:
+  tag_app_pwa_node_modules:

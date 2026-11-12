@@ -168,7 +168,9 @@ apps/tag-app/
 │   ├── _redirects
 │   ├── manifest.webmanifest
 │   ├── service-worker.js
-│   └── icon.svg
+│   ├── qr-icon.png
+│   ├── qr-icon-192.png
+│   └── qr-icon-512.png
 ├── vite.config.ts
 ├── package.json
 └── wrangler.toml
@@ -184,7 +186,7 @@ apps/tag-app/
 | `src/styles.css` | Darstellung der öffentlichen Staging-Oberfläche |
 | `public/_redirects` | Cloudflare-Pages-Deep-Link-Fallback |
 | `public/manifest.webmanifest` | Installationsmetadaten für die PWA |
-| `public/service-worker.js` | Minimaler Offline-/App-Shell-Support |
+| `public/service-worker.js` | Offline-/App-Shell-Support ohne API- oder Inhaltscache |
 | `wrangler.toml` | Pages-Projekt, Build-Ausgabe und Betriebsnotizen |
 
 ---
@@ -270,21 +272,24 @@ Die spätere API muss erlaubte Protokolle, öffentliche URLs, Medien-MIME-Typen 
 
 ### 8.1 Installierbarkeit
 
-- `manifest.webmanifest` beschreibt Name, Anzeigeart und Icon.
+- `manifest.webmanifest` beschreibt Name, Standalone-Anzeigeart, Scope und Icons in 192×192 sowie 512×512 Pixeln.
+- `index.html` verweist auf das Manifest und stellt iOS-Web-App-Metadaten sowie ein Apple-Touch-Icon bereit.
 - `main.tsx` registriert den Service Worker.
-- `icon.svg` ist das aktuelle App-Icon.
+- Die Installationsicons werden aus `public/qr-icon.png` abgeleitet.
 
 ### 8.2 Aktueller Service Worker
 
-Der Service Worker verwendet den Cache `myqr24-tag-app-shell-v1` und legt ausschließlich diese App-Shell-Ressourcen ab:
+Der Service Worker verwendet den Cache `myqr24-tag-app-shell-v2` und legt diese App-Shell-Ressourcen ab:
 
 ```text
 /
  /manifest.webmanifest
- /icon.svg
+ /qr-icon.png
+ /qr-icon-192.png
+ /qr-icon-512.png
 ```
 
-Bei Aktivierung entfernt er ältere Shell-Caches. Für Navigationen versucht er zuerst das Netzwerk und liefert bei einem Netzwerkfehler `/` als Fallback aus.
+Bei Aktivierung entfernt er ältere Shell-Caches. Für Navigationen versucht er zuerst das Netzwerk und liefert bei einem Netzwerkfehler `/` als Fallback aus. Gebaute, versionierte `/assets/*`-Dateien werden beim ersten Abruf gecacht und offline wiederverwendet.
 
 ### 8.3 Bewusste Cache-Grenzen
 

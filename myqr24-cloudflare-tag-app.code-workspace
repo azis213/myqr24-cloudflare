@@ -10,7 +10,7 @@
 			"apps/tag-control-center": true,
 			"apps/tag-control-plane": true,
 
-			"docs/40-Implementation/edge-router": true,
+			"docs/40-Implementation/edge-router": false,
 			"docs/40-Implementation/tag-control-center": true,
 			"docs/40-Implementation/tag-control-plane": true,
 			"docs/80-Deployment": true,

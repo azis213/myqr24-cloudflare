@@ -13,6 +13,7 @@ Diese Topologie stellt den derzeit implementierten Stand der **TAG Control Plane
 | Private TAG Codec | nur internes Compose-Netz `http://tag-codec:8788` | lokaler Wrangler-Worker mit synthetischen Secrets |
 | TAG Control Center (TCC) | `http://localhost:5174/` | Vite-Dev-Server mit Login-, E-Mail-MFA-, Session- und Logout-UI |
 | TAG-App | `http://localhost:5173/` | Vite-Dev-Server mit explizitem Fixture-Modus |
+| TAG-App PWA Preview | `http://localhost:4174/` | Produktionsbuild mit Manifest und Service Worker |
 
 MySQL wird bewusst **nicht** auf einen Host-Port veröffentlicht. Nur TCP kann sie über den Compose-DNS-Namen `mysql` erreichen.
 
@@ -147,6 +148,19 @@ npm run build:app
 
 Die Access-API-Tests verwenden ausschließlich lokale Test-Doubles; sie starten
 keinen zusätzlichen API-Worker und benötigen keine Cloudflare-Ressourcen.
+
+Für einen Produktionsbuild der PWA im Docker-Testcontainer:
+
+```powershell
+.\test\00-Test-Scripts\deploy-tag-app-docker.ps1
+```
+
+Das Skript baut die TAG-App mit den lokalen Fixtures, startet den separaten
+Compose-Service `tag-app-pwa` und prüft Startseite, Deep Link, Manifest,
+Service Worker sowie beide Installationsicons. Der Dev-Server auf Port `5173`
+bleibt davon unabhängig. Die PWA-Preview verwendet HTTP; eine Installation auf
+einem Mobilgerät benötigt HTTPS und muss daher über ein HTTPS-Deployment oder
+einen HTTPS-Tunnel erfolgen.
 
 Zusätzlich startet der Testlauf den Compose-internen Private-Codec. Die
 dedizierten TCP-Integrationstests aktivieren den HTTP-Driver nur testlokal und
