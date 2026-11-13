@@ -54,7 +54,7 @@ Lokale Testfälle werden automatisiert in Vitest umgesetzt; ihre Kennungen werde
 | TC-CODEC-STAGING-003 | CP-US-011 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für einen künstlichen kanonischen 8-stelligen Wert | Beide Requests liefern `200 OK`; Länge und decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
 | TC-CODEC-STAGING-004 | CP-US-011 | Autorisierter `POST /encode`, anschließend autorisierter `POST /decode` für einen künstlichen kanonischen 10-stelligen Wert | Beide Requests liefern `200 OK`; Länge, `codecVersion` und decodierter Wert entsprechen dem ursprünglichen Eingabewert. |
 | TC-CODEC-STAGING-005 | CP-US-011/CP-BLK-005 | Autorisierter `POST /encode-batch` mit 1.000 künstlichen kanonischen Werten | `200 OK`; geordnete vollständige Antwort mit identischer Länge, Werten und `codecVersion`; keine Cloudflare- oder TCP-Secrets in Nachweis oder Antwort. |
-| TC-CODEC-STAGING-006 | CP-BLK-005 | Kontrollierter Routenwechsel vom abzulösenden `codec.s.myqr24.com/api/v1/*` zu `internal.s.myqr24.com/api/v1/codec/*` | nur neue Internal-Route ist aktiviert; WAF-/Rate-Limit-/Access-Grenzen und erneute 6/8/10-Roundtrips sind redigiert nachgewiesen. |
+| TC-CODEC-STAGING-006 | CP-BLK-005 | Kontrollierter Routenwechsel von `codec.s.myqr24.com/api/v1/codec/*` zu `internal.s.myqr24.com/api/v1/codec/*` | neue Route ist DNS/TLS-verifiziert; danach ist die alte Route deaktiviert; Auth-/Methodengate, WAF-/Rate-Limit-/Access-Grenzen und erneute 6/8/10-Roundtrips sind redigiert nachgewiesen. |
 
 ## Range-Index
 

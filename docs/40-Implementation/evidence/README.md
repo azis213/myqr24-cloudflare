@@ -110,6 +110,19 @@ Die private Staging-Route `codec.s.myqr24.com/api/v1/*` ist öffentlich per DNS 
 
 Damit sind DNS, TLS, die Custom Route, das Auth-Gate, das Methodengate sowie die autorisierte Codierung und Decodierung für beide unterstützten TAG-Längen über die vorgesehene Staging-Domain verifiziert. Die Bearer-Authentisierung bleibt auch nach WAF-/Rate-Limit-Regeln und optionalem Cloudflare Access oder einer IP-Allowlist verpflichtend.
 
+### Wechsel auf den internen Staging-Host
+
+Der vorstehende Deployment-Nachweis ist historische Evidenz für `codec.s.myqr24.com` und wird durch die Migration nicht umgeschrieben. Die Zielroute `internal.s.myqr24.com/api/v1/codec/*` wurde bereitgestellt. Dafür wurde ein proxied A-Record angelegt; DNS-Auflösung und HTTPS funktionieren.
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Deployment-Version | `18527339-72fe-4f96-a28b-701b6cf76c10` |
+| `POST https://internal.s.myqr24.com/api/v1/codec/encode` ohne Zugangsdaten | `401 Unauthorized`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` |
+| `GET https://internal.s.myqr24.com/api/v1/codec/encode` | `405 Method Not Allowed`, `Allow: POST`, `Cache-Control: no-store` |
+| `POST https://codec.s.myqr24.com/api/v1/codec/encode` ohne Zugangsdaten | Weiterhin `401 Unauthorized`; alter Worker-DNS-Eintrag ist noch aktiv |
+
+Damit sind nur DNS/TLS und das Auth-/Methodengate der neuen Route verifiziert. Der alte Worker-DNS-Eintrag muss noch separat entfernt werden. Autorisierte 6/8/10-Roundtrips, Secret-Parität sowie WAF-/Rate-Limit-/Access-Grenzen bleiben offen.
+
 ### Verifizierter öffentlicher Staging-Durchlauf — 2026-10-01
 
 Die Staging-Worker-Route auf der kurzen, Cloudflare-proxied Scan-Domain wurde mit einem nicht produktiven, nicht in diesem Repository dokumentierten Testtag geprüft. Das Redirect-Ziel war die eigenständige Cloudflare-Pages-Test-PWA.

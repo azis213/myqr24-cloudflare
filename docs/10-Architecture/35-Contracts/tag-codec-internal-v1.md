@@ -5,7 +5,8 @@
 **Owner:** Cloudflare TAG Codec Worker  
 **Implementierende Komponenten:** Cloudflare TAG Codec Worker (`apps/edge-router/src/codec-worker.ts`); spätere serverseitige TAG Control Plane  
 **Stand:** 2026-10-29  
-**Nächste spezifizierte Welle:** lokale TCP-Bindung an den Loopback-Worker mit ausschließlich synthetischen, ignorierten Secrets; kein Browserzugriff.
+**Staging-Deployment:** 2026-11-12; unauthentisierte `401`-Probe erfolgreich, autorisierte Roundtrips noch ausstehend.
+**Nächste spezifizierte Welle:** autorisierte Staging-Roundtrips und serverseitige TCP-Anbindung mit geschütztem Service-Key; kein Browserzugriff.
 
 ## 1. Zweck und fachliche Grenze
 
@@ -35,7 +36,7 @@ Der lokal getestete Worker-Slice umfasst einzelne Encode-/Decode-Operationen sow
 - keine Worker-seitige Idempotenzspeicherung oder fachliche Batch-Reservierung;
 - kein im Worker implementiertes Rate Limit, IP-Allowlisting oder Cloudflare Access.
 
-Diese aufgeschobenen Betriebs- und Batch-Funktionen bleiben Teil von `CP-BLK-005` und sind vor einer produktiven oder breiter erreichbaren Route verbindlich zu ergänzen. Die Cloudflare-Routenbindung, WAF-/Rate-Limit-Regeln und optionale Access-/IP-Regeln sind daher absichtlich nicht in `wrangler.codec.toml` hinterlegt.
+Diese aufgeschobenen Betriebs- und Batch-Funktionen bleiben Teil von `CP-BLK-005` und sind vor einer produktiven oder breiter erreichbaren Route verbindlich zu ergänzen. Die Staging-Routenbindung ist in `wrangler.codec.toml` auf den Codec-API-Pfad begrenzt. WAF-/Rate-Limit-Regeln und optionale Access-/IP-Regeln werden separat in Cloudflare konfiguriert und müssen vor einer breiteren Freigabe geprüft werden.
 
 Öffentliche Scans werden weiterhin direkt im Edge Router dekodiert. Der Edge Router nutzt nur den gemeinsamen Codec-Kern und keine Netzwerkweiterleitung zum Codec-Worker.
 
@@ -70,7 +71,7 @@ Der Internal-Host ist die allgemeine private technische Grenze und kein Browser-
 | Staging | `https://internal.s.myqr24.com` | `https://s.myqr24.com` |
 | Produktion | `https://internal.p.myqr24.com` | `https://p.myqr24.com` |
 
-Die bisher aktive Staging-Route `codec.s.myqr24.com/api/v1/*` ist ein abzulösender Slice. Der lokale Worker und alle lokalen TCP-Adapter verwenden bereits ausschließlich `/api/v1/codec/*`; der spätere Umzug der externen Route auf `internal.s.myqr24.com/api/v1/codec/*` erfolgt erst nach einer getrennten Wellenentscheidung. Der öffentliche Scan-Worker decodiert unverändert lokal und ruft den Internal-Worker nie über das Netzwerk auf.
+Der Zielhost des Staging-Codec-Workers ist `internal.s.myqr24.com`; die Route ist in `wrangler.codec.toml` auf `/api/v1/codec/*` begrenzt. Diese Route ist bereitgestellt und liefert ohne Bearer-Key `401`; `GET` liefert `405`. Der bisherige Cloudflare-Worker-DNS-Eintrag `codec.s.myqr24.com` ist davon unabhängig und antwortet derzeit ebenfalls noch. Er muss separat entfernt werden, bevor die Umstellung vollständig ist. Der öffentliche Scan-Worker decodiert unverändert lokal und ruft den Codec-Worker nie über das Netzwerk auf.
 
 ### 4.2 Pflicht-Request-Header
 

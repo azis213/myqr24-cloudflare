@@ -2,7 +2,7 @@
 
 **Stand:** 2026-10-31  
 **Status:** `blocked` – externe Betriebsfreigaben fehlen
-**Geltungsbereich:** ausschließlich die spätere serverseitige Staging-Bindung von TCP an `codec.s.myqr24.com`; keine KV-, Scan-Worker-, TCC- oder Produktionsänderung.
+**Geltungsbereich:** ausschließlich die spätere serverseitige Staging-Bindung von TCP an `internal.s.myqr24.com`; keine KV-, Scan-Worker-, TCC- oder Produktionsänderung.
 
 ## 1. Ausgangspunkt
 
@@ -26,7 +26,7 @@ Zusätzlich fehlen redigierte Betriebsnachweise für:
 
 1. den endgültigen serverseitigen TCP-Staging-Host und dessen geschützten Secret-Speicher;
 2. die getrennte Staging-Kopie des Codec-Service-Keys, ohne seinen Wert zu dokumentieren;
-3. die freigegebene Private-Route `codec.s.myqr24.com/api/v1/*`;
+3. die bereitgestellte Ziel-Private-Route `internal.s.myqr24.com/api/v1/codec/*`; der alte Worker-DNS-Eintrag `codec.s.myqr24.com` ist noch separat zu entfernen;
 4. route-spezifische WAF-/Rate-Limit-Regeln und die Entscheidung zu Cloudflare Access bzw. IP-Allowlisting;
 5. einen kontrollierten, redigierten Staging-Smoketest.
 

@@ -46,20 +46,14 @@ Der private Codec-Worker wird unabhängig mit direkten `handleCodecRequest`-Aufr
 
 ### 3. Cloudflare-Staging-End-to-End-Tests
 
-Der bestehende Staging-Slice ist über die abzulösende Route erreichbar:
-
-```text
-https://codec.s.myqr24.com/api/v1/tag-codec
-```
-
-Die nächste kontrollierte Deployment-Welle migriert auf die symmetrische Internal-Grenze:
+Der Staging-Codec ist über die bereitgestellte Zielroute erreichbar:
 
 ```text
 https://internal.s.myqr24.com/api/v1/codec
 https://internal.p.myqr24.com/api/v1/codec
 ```
 
-Bis zum erfolgreichen Routenwechsel bleibt die alte Route historische Betriebsreferenz; neue Batch- oder Browser-Annahmen dürfen daraus nicht abgeleitet werden.
+Der bisherige Worker-DNS-Eintrag `codec.s.myqr24.com` ist derzeit noch aktiv und muss separat entfernt werden. Bis dahin sind beide Hosts erreichbar; der alte Host ist nach Abschluss der Entfernung keine Betriebsreferenz mehr.
 
 Diese Prüfungen sind bewusst keine Vitest-Fälle, weil sie DNS, TLS, die Cloudflare-Route und nicht auslesbare Runtime-Secrets voraussetzen. Sie verwenden einen lokal bereitgestellten Bearer-Key ausschließlich im Arbeitsspeicher; weder Secret-Werte noch erzeugte öffentliche TAG-IDs oder reale Kundendaten dürfen ausgegeben oder versioniert werden.
 
@@ -77,7 +71,7 @@ Vor Abschluss der nächsten Codec-Welle werden zusätzlich geprüft:
 - ein authentisierter `encode-batch`-Roundtrip mit genau 1.000 künstlichen Werten, geordneter Response und fester `codecVersion`;
 - neutraler Fehler für 0, mehr als 1.000, doppelte oder nichtkanonische Batch-Werte sowie für übergroße Bodies;
 - dass kein Browser-Origin, keine Browser-Session und keine SPA Zugriff auf den Internal-Codec oder einen dauerhaften Codec-Service-Key erhält;
-- die deaktivierte alte Route erst nach erfolgreichem neuen Internal-Route-, WAF-/Rate-Limit-/Access- und 6/8/10-Staging-Nachweis.
+- nach dem Routenwechsel: alter Worker-DNS-Eintrag deaktiviert, nur die Internal-Route für den neuen Codec-Vertrag aktiv; WAF-/Rate-Limit-/Access- und 6/8/10-Staging-Nachweise sind redigiert dokumentiert.
 
 Die Ausführung wird ohne sensitive Daten in [`../evidence/README.md`](../evidence/README.md) dokumentiert.
 

@@ -2,11 +2,12 @@
 #
 # This is a separate Worker deployment that bundles the shared src/codec
 # implementation but deliberately has neither TAG_CONFIG nor the redirect
-# signing secret. Bind only the codec host route after DNS, WAF/Access and
-# rate-limit controls have been approved.
+# signing secret. The Staging route is restricted to the codec API path; apply
+# DNS, WAF/Access and rate-limit controls before deploying the route.
 name = "myqr24-tag-codec"
 main = "src/codec-worker.ts"
 compatibility_date = "2026-09-30"
+workers_dev = false
 
 # Required local-only values belong in the ignored `.dev.vars` file:
 #   FEISTEL_SECRET_S01=<synthetic local test secret>
@@ -16,14 +17,14 @@ compatibility_date = "2026-09-30"
 #   npx wrangler secret put FEISTEL_SECRET_S01 --config wrangler.codec.toml --env staging
 #   npx wrangler secret put TAG_CODEC_API_KEY_S01 --config wrangler.codec.toml --env staging
 #
-# A later, separately approved Edge deployment binds only:
-#   internal.s.myqr24.com/api/v1/codec/* -> myqr24-tag-codec-staging
+# The staging route is restricted to the codec API path. Ensure the DNS record
+# is proxied and configure route-specific WAF/rate limits before deployment.
 #
-# Apply strict, route-specific WAF/rate-limit controls and optional Cloudflare
-# Access/IP allowlisting to codec.*. API authentication remains mandatory.
+# API authentication remains mandatory: Authorization: Bearer <service key>.
 
 [env.staging]
 name = "myqr24-tag-codec-staging"
+routes = [{ pattern = "internal.s.myqr24.com/api/v1/codec/*", zone_name = "myqr24.com" }]
 
 [env.production]
 name = "myqr24-tag-codec"
