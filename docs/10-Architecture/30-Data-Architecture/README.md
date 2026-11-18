@@ -34,6 +34,7 @@ TAG Control Center
 | [10-DOMAIN-DATA-MODEL.md](10-DOMAIN-DATA-MODEL.md) | Fachliches Gesamtmodell: Aggregate, Datenobjekte, Schlüssel, Lebenszyklen, Beziehungen, Datenklassifikation und Ownership |
 | [20-COMPONENT-DATA-ARCHITECTURE.md](20-COMPONENT-DATA-ARCHITECTURE.md) | Logische Datensicht je Komponente: Edge Router, TAG-App, TCP und TCC einschließlich Ein- und Ausgaben |
 | [30-PHYSICAL-DATA-ARCHITECTURE.md](30-PHYSICAL-DATA-ARCHITECTURE.md) | Physische Abbildung: MySQL-Relationen, Cloudflare KV, R2, Runtime-JSON, Browser-Speicher, Sessions, Outbox und Publikationspfade |
+| [40-TAG-APP-DATA-MODEL.md](40-TAG-APP-DATA-MODEL.md) | TAG Application API: versionierte D1-Contentprojektionen, Elemente, wiederverwendbare Items, globale Zuordnungen und Medienvarianten |
 
 ## Verbindliche Leitprinzipien
 

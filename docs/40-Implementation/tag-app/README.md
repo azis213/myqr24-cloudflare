@@ -83,3 +83,4 @@ Eine Story ist erst `verified`, wenn alle verknüpften Tests erfolgreich sind un
 5. Öffentliche Routen müssen in React Router und dem Cloudflare-Pages-Fallback berücksichtigt werden.
 6. Jede neue Story erhält vor dem Status `implemented` Testfälle und Traceability-Verweise.
 7. Änderungen an der Scan-Weiterleitung gehören in den Integrationsnachweis; sie dürfen nie durch unkontrollierte KV-Änderungen erfolgen.
+8. Die TAG Application API bleibt im bestehenden `apps/tag-app`-Worker und verwendet Hono für Routing und HTTP-Middleware. Dadurch ändern sich weder ihre Verträge noch die Trennung von Edge Router, Media Signer und TCP.

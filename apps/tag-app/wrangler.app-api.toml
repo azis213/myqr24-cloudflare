@@ -9,6 +9,7 @@ name = "myqr24-tag-app-api-staging"
 binding = "APP_DB"
 database_name = "myqr24-tag-app-staging"
 database_id = "<set-only-at-w3d-gate>"
+migrations_dir = "database"
 
 [[env.staging.r2_buckets]]
 binding = "PRIVATE_CONTENT"

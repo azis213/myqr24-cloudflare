@@ -4,6 +4,9 @@ node_modules/
 # Wrangler local state and generated files
 .wrangler/
 apps/edge-router/.dev.vars
+apps/tag-app/.dev.vars
+test/10-test-local/seed/generated.sql
+test/10-test-local/seed/generated-routing.sql
 
 # Local Tag Lab registry (may contain non-public test tag IDs)
 .tag-lab/

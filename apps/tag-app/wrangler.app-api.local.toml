@@ -1,0 +1,24 @@
+# Local-only Wrangler configuration for the Docker test environment.
+# Deployments continue to use wrangler.app-api.toml.
+name = "myqr24-tag-app-api-local"
+main = "workers/app-api.local.ts"
+compatibility_date = "2026-10-03"
+
+# Local-only schema/seed is created through the worker's own D1/R2 bindings.
+
+[[d1_databases]]
+binding = "APP_DB"
+database_name = "11111111-2222-4333-8444-555555555555"
+database_id = "11111111-2222-4333-8444-555555555555"
+migrations_dir = "database"
+
+[[r2_buckets]]
+binding = "PRIVATE_CONTENT"
+bucket_name = "myqr24-private-content-local"
+
+[[services]]
+binding = "MEDIA_SIGNER"
+service = "myqr24-media-signer-local"
+
+# Local secrets are read from apps/tag-app/.dev.vars (ignored):
+# APP_BOOTSTRAP_SECRET_S01, APP_PIN_PEPPER_S01, APP_MEDIA_SIGNER_KEY_S01.

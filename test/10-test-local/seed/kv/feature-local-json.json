@@ -1,0 +1,8 @@
+{
+  "id": "local-json",
+  "type": "json",
+  "enabled": true,
+  "payload": {
+    "purpose": "local-docker-smoke-test"
+  }
+}

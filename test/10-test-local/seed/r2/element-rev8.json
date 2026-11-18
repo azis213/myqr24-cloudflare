@@ -1,0 +1,9 @@
+{
+  "schema": "myqr24-tag-element-v1",
+  "elementId": "cel_gallery",
+  "elementType": "gallery",
+  "payload": {
+    "title": "Lokale Galerie",
+    "layout": "grid"
+  }
+}

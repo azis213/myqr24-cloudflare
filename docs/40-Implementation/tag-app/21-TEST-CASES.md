@@ -33,6 +33,18 @@
 | APP-TC-ACCESS-004 | `tag-app-access-v1` | API/Fake | korrekte PIN, danach Access-Version erhöhen | HttpOnly-Session liefert View; Access-Version widerruft sie zentral | implemented-local |
 | APP-TC-ACCESS-005 | `tag-app-access-v1` | API/Fake | autorisierte Content-ID/Variante an Media-Signer | nur serverseitiges Service Binding; lokale Signierung bis Secret-Gate fail-closed | implemented-local |
 | APP-TC-ACCESS-006 | `tag-app-access-v1` | Benchmark | Argon2id 8 MiB/1 Iteration/Parallelität 1 | lokaler Messwert dokumentiert; finale Worker-Kalibrierung bleibt Staging-Gate | implemented-local |
+| APP-TC-ACCESS-007 | `tag-app-access-v1` | API/Fake | gültiger Public-Bootstrap über versionierte Hono-Route | TAG-gebundene Public-Session mit `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api`; autorisierte Contentausgabe mit `no-store`/`nosniff` | implemented-local |
+| APP-TC-ACCESS-008 | `tag-app-access-v1` | API/Routing | unbekannte Pfade, Trailing Slash, falsche Methode und `HEAD` über Hono | neutral `404`, `no-store`, `nosniff`, keine Sessionausstellung | implemented-local |
+| APP-TC-ACCESS-009 | `tag-app-access-v1` | API/Validation | malformed JSON, falscher Content-Type und JSON-Array | neutral `400`, keine Session-, Throttle- oder Signer-Nebenwirkung | implemented-local |
+| APP-TC-ACCESS-010 | `tag-app-access-v1` | API/Error | unerwarteter interner Fehler | neutral `500` ohne interne Details, mit `no-store`/`nosniff` | implemented-local |
+| APP-TC-DATA-001 | TAG-App-Datenmodell v2 | Schema/SQLite | Access- und Content-Migrationsserie mehrfach lokal anwenden | idempotentes Schema mit gültigen Fremdschlüsseln; keine Revisionstabelle | implemented-local |
+| APP-TC-DATA-002 | TAG-App-Datenmodell v2 | Schema/SQLite | numerischen TAG-PK und Base36-Lookup prüfen | numerischer PK, eindeutiger Base36-Index und kanonischer Längenraum erzwungen | implemented-local |
+| APP-TC-DATA-003 | TAG-App-Datenmodell v2 | Schema/SQLite | benannte Elemente aus relationalen Item-Zuordnungen rekonstruieren | Reihenfolge, Sichtbarkeit und globale Items werden über Mitgliedschaft gelesen | implemented-local |
+| APP-TC-DATA-004 | TAG-App-Datenmodell v2 | Unit/TS | 52-Bit-Content-ID und R2-Pfade ableiten | Sekunden/Zufall gepackt, JSON-Roundtrip, keine Base36-/Traversal-Segmente | implemented-local |
+| APP-TC-DATA-005 | TAG-App-Datenmodell v2 | Schema/SQLite | parallele/namensgleiche Uploads und unfertige Items zuordnen | Dateiname pro Element eindeutig; `pending`/Quarantäne nicht zuordenbar | implemented-local |
+| APP-TC-DATA-006 | TAG-App-Datenmodell v2 | Schema/SQLite | Varianten, Range- und Global-Beschreibungen speichern | Metadaten ohne Blob-Key; strenge Identifier und Fremdschlüssel | implemented-local |
+| APP-TC-DATA-007 | TAG-App-Datenmodell v2 | Schema/SQLite | neue Revision projizieren | pro TAG bleibt genau ein aktueller Elementbestand; alter Bestand wird ersetzt | implemented-local |
+| APP-TC-ACCESS-011 | `tag-app-access-v1` | API/Fake | Content- und Medienabruf über D1-Pfadprojektion | Tag-/Elementdateien aus numerischem Pfad; Content-ID dezimal; Signer erhält nur den serverseitig abgeleiteten Objekt-Key | implemented-local |
 
 ## Router→PWA-Integration
 
@@ -41,6 +53,7 @@
 | APP-TC-INTEGRATION-001 | APP-US-006 | Staging E2E | kanonische, gesäte Staging-Scans mit 6, 8 und 10 Stellen unter `/t/{tagId}` ausführen | jeder Scan führt per `302` auf die zugehörige `/tag/{tagId}`-Route; TAG-App rendert ausschließlich die öffentliche Fixture | blocked |
 | APP-TC-INTEGRATION-002 | APP-US-006 | Staging E2E | route-lose, ungültige und nicht erlaubte Routenpfade am Scan-Host aufrufen | Router liefert `404`; keine App-Ansicht | blocked |
 | APP-TC-INTEGRATION-003 | APP-US-006 | Configuration | aktiven Worker und KV-Namespace vor Redirect-Wechsel abgleichen | Änderung betrifft ausschließlich identifizierte Staging-Ressource | blocked |
+| APP-TC-INTEGRATION-004 | APP-I02B | Docker/Cloudflare | vollständige lokale Runtime mit Seed starten | TAG-App-API liefert D1/R2-Content; Media Signer fail-closed; Edge Router liefert `302` | implemented-local |
 
 ## Geplante Permission- und Capability-Testfälle: APP-I02A und APP-I03
 

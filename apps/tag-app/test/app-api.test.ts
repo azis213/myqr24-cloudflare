@@ -22,27 +22,55 @@ async function bootstrap(mode = "pin_required") {
   return { mode, accessVersion: 3, revision: 8, nonce, exp, sig: await hmac(payload) };
 }
 
-function fakeEnvironment() {
+function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_required") {
   const sessions: Array<Record<string, unknown>> = [];
   const throttles = new Map<string, { failed_attempts: number; locked_until: string | null }>();
+  const r2Keys: string[] = [];
+  const signerBodies: Array<Record<string, unknown>> = [];
   let accessVersion = 3;
   let signerRequests = 0;
   const pinHashPromise = argon2id({ password: "123456", secret: pepper, salt: "local-test-salt", iterations: 1, parallelism: 1, memorySize: 8192, hashLength: 32, outputType: "encoded" });
+  const tagDocument = {
+    schema: "myqr24-tag-content-v2",
+    tagNumericId: "623187229",
+    tagId: "ab12cd",
+    revision: 8,
+    view: { tag: { id: "ab12cd", displayName: "Test", presentation: "standard" }, vault: { blocks: [] }, enabledFeatures: ["vault"] },
+  };
+  const elementDocument = {
+    schema: "myqr24-tag-element-v1",
+    elementId: "cel_gallery",
+    elementType: "gallery",
+    payload: { title: "Testgalerie" },
+  };
   const env = {
     APP_BOOTSTRAP_SECRET_S01: secret,
     APP_PIN_PEPPER_S01: pepper,
     APP_MEDIA_SIGNER_KEY_S01: "service-key",
     PRIVATE_CONTENT: {
-      get: async () => ({ json: async () => ({ schema: "myqr24-tag-content-v1", tagId: "ab12cd", revision: 8, blocks: [], assets: { cnt_photo: { variants: { cover: { contentType: "image/webp" } } } }, view: { tag: { id: "ab12cd", displayName: "Test", presentation: "standard" }, vault: { blocks: [] }, enabledFeatures: ["vault"] } }) }),
+      get: async (key: string) => {
+        r2Keys.push(key);
+        if (key === "content/v1/tags/623187229/tag-rev8.json") return { json: async () => tagDocument };
+        if (key === "content/v1/tags/623187229/elements/cel_gallery/element-rev8.json") return { json: async () => elementDocument };
+        return null;
+      },
     },
-    MEDIA_SIGNER: { fetch: async () => { signerRequests++; return Response.json({ url: "https://r2.example.test/signed", expiresAt: 60, contentType: "image/webp" }); } },
+    MEDIA_SIGNER: {
+      fetch: async (_url: string, init: RequestInit) => {
+        signerRequests++;
+        signerBodies.push(typeof init.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : {});
+        return Response.json({ url: "https://r2.example.test/signed", expiresAt: 60, contentType: "image/webp" });
+      },
+    },
     APP_DB: {
       prepare(sql: string) {
         return {
           bind(...values: unknown[]) {
             return {
               async first() {
-                if (sql.includes("FROM tag_routing")) return { ...routing, access_version: accessVersion };
+                if (sql.includes("FROM tag_routing")) return { ...routing, protection_mode: protectionMode, access_version: accessVersion };
+                if (sql.includes("FROM tag_content WHERE tag_base36_id")) return { tag_numeric_id: 623187229, tag_base36_id: "ab12cd", content_revision: 8, content_file: "tag-rev8.json", content_sha256: "a".repeat(64), content_bytes: 1, content_type: "application/json" };
+                if (sql.includes("FROM tag_content AS tc")) return { content_id: 1850000000000000, scope: "tag", owner_tag_numeric_id: 623187229, content_type: "image/webp", element_visibility: "public", assignment_visibility: "public" };
                 if (sql.includes("FROM tag_pin_credentials")) return { pin_hash: await pinHashPromise };
                 if (sql.includes("FROM tag_pin_throttles")) return throttles.get(`${values[0]}:${values[1]}`) ?? null;
                 if (sql.includes("FROM tag_access_sessions")) {
@@ -50,6 +78,15 @@ function fakeEnvironment() {
                   return found ?? null;
                 }
                 return null;
+              },
+              async all() {
+                if (sql.includes("FROM tag_content_element_items AS assignment")) {
+                  return { results: [{ content_element_id: "cel_gallery", content_id: 1850000000000000, content_item_type: "image", title: "Testbild", alt_text: "Testbeschreibung", original_filename: "Titelbild.jpg", display_order: 0, visibility: "public", scope: "tag" }] };
+                }
+                if (sql.includes("FROM tag_content_elements")) {
+                  return { results: [{ content_element_id: "cel_gallery", content_element_type: "gallery", display_order: 0, content_file: "element-rev8.json", content_sha256: "b".repeat(64), content_bytes: 1, content_type: "application/json", visibility: "public" }] };
+                }
+                return { results: [] };
               },
               async run() {
                 if (sql.startsWith("INSERT INTO tag_access_sessions")) sessions.push({ id: values[0], tag_id: values[1], token_hash: values[2], access_version: values[3], scope: values[4], expires_at: values[5], revoked_at: null });
@@ -66,7 +103,7 @@ function fakeEnvironment() {
       },
     },
   } as unknown as Parameters<typeof handleAppApiRequest>[1];
-  return { env, sessions, throttles, setAccessVersion: (value: number) => { accessVersion = value; }, signerRequests: () => signerRequests };
+  return { env, sessions, throttles, r2Keys, signerBodies, setAccessVersion: (value: number) => { accessVersion = value; }, signerRequests: () => signerRequests };
 }
 
 describe("tag access API", () => {
@@ -102,12 +139,108 @@ describe("tag access API", () => {
     expect(cookie).toContain("SameSite=Strict");
     const content = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/content", { headers: { cookie: cookie ?? "" } }), state.env);
     expect(content.status).toBe(200);
-    expect(JSON.stringify(await content.json())).not.toContain("object_key");
-    const media = await handleAppApiRequest(new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json", cookie: cookie ?? "" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "cnt_photo", variant: "cover" }) }), state.env);
+    const contentBody = await content.json<Record<string, unknown>>();
+    expect(contentBody).toMatchObject({
+      schema: "myqr24-tag-content-v2",
+      tagId: "ab12cd",
+      revision: 8,
+      elements: [{ id: "cel_gallery", type: "gallery", payload: { title: "Testgalerie" }, items: [{ contentId: "1850000000000000", type: "image", title: "Testbild", altText: "Testbeschreibung", filename: "Titelbild.jpg", scope: "tag" }] }],
+    });
+    expect(JSON.stringify(contentBody)).not.toContain("object_key");
+    expect(state.r2Keys).toEqual([
+      "content/v1/tags/623187229/tag-rev8.json",
+      "content/v1/tags/623187229/elements/cel_gallery/element-rev8.json",
+    ]);
+    const media = await handleAppApiRequest(new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json", cookie: cookie ?? "" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "1850000000000000", variant: "cover" }) }), state.env);
     expect(media.status).toBe(200);
     expect(state.signerRequests()).toBe(1);
+    expect(state.signerBodies[0]).toEqual({
+      objectKey: "content/v1/tags/623187229/items/1850000000000000/variants/cover",
+      contentType: "image/webp",
+      expiresIn: 60,
+    });
     state.setAccessVersion(4);
     const revoked = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/content", { headers: { cookie: cookie ?? "" } }), state.env);
     expect(revoked.status).toBe(404);
+  });
+
+  it("issues a public access session through the versioned Hono route", async () => {
+    const state = fakeEnvironment("public");
+    const data = await bootstrap("public");
+    const authorized = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/access/public", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) }), state.env);
+    expect(authorized.status).toBe(200);
+    const cookie = authorized.headers.get("set-cookie");
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("Secure");
+    expect(cookie).toContain("SameSite=Strict");
+    expect(cookie).toContain("Path=/api");
+    expect(state.sessions).toHaveLength(1);
+    expect(state.sessions[0]?.scope).toBe("public");
+
+    const content = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/content", { headers: { cookie: cookie ?? "" } }), state.env);
+    expect(content.status).toBe(200);
+    expect(content.headers.get("cache-control")).toBe("no-store");
+    expect(content.headers.get("x-content-type-options")).toBe("nosniff");
+
+    const head = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/content", { method: "HEAD", headers: { cookie: cookie ?? "" } }), state.env);
+    expect(head.status).toBe(404);
+  });
+
+  it("keeps unknown paths, trailing slashes and unsupported methods fail-closed", async () => {
+    const state = fakeEnvironment();
+    const requests = [
+      new Request("https://app.test/api/unknown"),
+      new Request("https://app.test/api/v1/tags/not-a-tag/content"),
+      new Request("https://app.test/api/v1/tags/%E0%A4%A/content"),
+      new Request("https://app.test/api/verify-pin", { method: "OPTIONS" }),
+      new Request("https://app.test/api/verify-pin/", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
+      new Request("https://app.test/api/verify-pin"),
+      new Request("https://app.test/api/v1/tags/ab12cd/content", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
+      new Request("https://app.test/api/v1/tags/ab12cd/content", { method: "HEAD" }),
+    ];
+
+    for (const request of requests) {
+      const response = await handleAppApiRequest(request, state.env);
+      expect(response.status).toBe(404);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    }
+    expect(state.sessions).toHaveLength(0);
+  });
+
+  it("rejects malformed JSON, wrong content types and non-object bodies without side effects", async () => {
+    const state = fakeEnvironment();
+    const requests = [
+      new Request("https://app.test/api/verify-pin", { method: "POST", headers: { "content-type": "application/json" }, body: "{" }),
+      new Request("https://app.test/api/v1/tags/ab12cd/access/public", { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" }),
+      new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json" }, body: "[]" }),
+      new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "cnt_photo", variant: "cover" }) }),
+      new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "0185000000000000", variant: "cover" }) }),
+    ];
+
+    for (const request of requests) {
+      const response = await handleAppApiRequest(request, state.env);
+      expect(response.status).toBe(400);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    }
+    expect(state.sessions).toHaveLength(0);
+    expect(state.throttles.size).toBe(0);
+    expect(state.signerRequests()).toBe(0);
+  });
+
+  it("normalizes unexpected errors without disclosing internal details", async () => {
+    const state = fakeEnvironment();
+    state.env.APP_DB = {
+      prepare() {
+        throw new Error("private database details");
+      },
+    } as unknown as typeof state.env.APP_DB;
+
+    const response = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/content", { headers: { cookie: "myqr24_tag_access=invalid" } }), state.env);
+    expect(response.status).toBe(500);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(await response.text()).toBe("Not Found");
   });
 });

@@ -1,0 +1,25 @@
+{
+  "schema": "myqr24-tag-content-v2",
+  "tagNumericId": "623187229",
+  "tagId": "ab12cd",
+  "revision": 8,
+  "view": {
+    "tag": {
+      "id": "ab12cd",
+      "displayName": "Lokaler Docker-Testtag",
+      "presentation": "standard"
+    },
+    "vault": {
+      "blocks": [
+        {
+          "type": "text",
+          "title": "Lokale Testdaten",
+          "paragraphs": [
+            "Diese Ansicht kommt aus der lokalen D1-/R2-Projektion der TAG Application API."
+          ]
+        }
+      ]
+    },
+    "enabledFeatures": ["vault"]
+  }
+}

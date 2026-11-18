@@ -1,0 +1,5 @@
+# Local-only synthetic values. Never commit this file.
+APP_BOOTSTRAP_SECRET_S01=local-bootstrap-secret-change-me-000000000001
+APP_PIN_PEPPER_S01=local-pin-pepper-change-me-00000000000000002
+APP_MEDIA_SIGNER_KEY_S01=local-media-signer-key-change-me-000000003
+APP_LOCAL_SEED_KEY=local-seed-key-change-me-000000000000000004

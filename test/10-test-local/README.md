@@ -1,6 +1,6 @@
 # Lokale manuelle Testumgebung
 
-Diese Topologie stellt den derzeit implementierten Stand der **TAG Control Plane (TCP)**, des **TAG Control Centers (TCC)**, der **TAG-App** und einer ausschließlich lokalen MySQL-8.4-Datenbank für manuelle Tests bereit.
+Diese Topologie stellt den derzeit implementierten Stand der **TAG Control Plane (TCP)**, des **TAG Control Centers (TCC)**, der **TAG-App**, einer ausschließlich lokalen MySQL-8.4-Datenbank sowie der lokalen **Cloudflare-Runtime** mit TAG Application API, Media Signer und Edge Router für manuelle Tests bereit.
 
 ## Aktueller Umfang
 
@@ -14,6 +14,10 @@ Diese Topologie stellt den derzeit implementierten Stand der **TAG Control Plane
 | TAG Control Center (TCC) | `http://localhost:5174/` | Vite-Dev-Server mit Login-, E-Mail-MFA-, Session- und Logout-UI |
 | TAG-App | `http://localhost:5173/` | Vite-Dev-Server mit explizitem Fixture-Modus |
 | TAG-App PWA Preview | `http://localhost:4174/` | Produktionsbuild mit Manifest und Service Worker |
+| TAG Application API | `http://localhost:8787/` | lokaler Wrangler-Worker mit D1/R2 und Seed-Endpunkt |
+| TAG Media Signer | nur internes Compose-Netz | lokaler Wrangler-Worker, fail-closed |
+| Edge Router | `http://localhost:8786/` | lokaler Wrangler-Worker mit KV/D1-Projektion |
+| TAG Codec API | `http://127.0.0.1:8788/` | lokal, ausschließlich Loopback, Bearer-Auth |
 
 MySQL wird bewusst **nicht** auf einen Host-Port veröffentlicht. Nur TCP kann sie über den Compose-DNS-Namen `mysql` erreichen.
 
@@ -26,9 +30,10 @@ MySQL wird bewusst **nicht** auf einen Host-Port veröffentlicht. Nur TCP kann s
 
 Es werden keine Cloudflare-, Dogado-, Staging- oder Produktionssecrets verwendet.
 
-Der Private-Codec besitzt keinen Host-Port. Nur TCP-Testprozesse im Compose-Netz
-können ihn über `http://tag-codec:8788` erreichen. TCC und Browser erhalten
-weder diese Adresse noch den Service-Key.
+Der Private-Codec ist für TCP-Testprozesse im Compose-Netz unter
+`http://tag-codec:8788` erreichbar. Zusätzlich wird er für lokale Tests
+ausschließlich auf `127.0.0.1:8788` veröffentlicht; die Bindung erfolgt nicht
+auf `0.0.0.0`. TCC und Browser erhalten weder diese Adresse noch den Service-Key.
 
 Die TAG-App wird mit `VITE_TAG_APP_DATA_SOURCE=fixtures` gestartet. Damit
 lassen sich die öffentliche Beispielansicht `stagv001` und Deep Links im
@@ -36,8 +41,9 @@ Browser prüfen. Dieser Modus verwendet ausschließlich nicht sensible,
 versionierte UI-Fixtures und ruft die Access-API nicht auf; er weist weder eine
 Pages-/Worker-Integration noch serverseitige Autorisierung nach. Die
 Access-API-Tests laufen separat mit den lokalen D1-, R2- und Media-Signer-Test-
-Doubles der TAG-App. Die TAG-App-Quell- und Worker-Dateien werden dafür nicht
-verändert.
+Doubles der TAG-App. Die vollständige Cloudflare-Docker-Umgebung startet
+zusätzlich einen echten lokalen Wrangler-Worker mit D1/R2-Seed; Details stehen
+im Abschnitt „Vollständige Cloudflare-Docker-Umgebung starten“.
 
 ## Umgebung starten
 
@@ -48,6 +54,87 @@ Aus dem Repository-Root:
 ```
 
 Beim ersten Start wird `test/10-test-local/.env.local` aus `.env.example` erzeugt. Die Datei ist global ignoriert und darf nur lokale, synthetische Werte enthalten.
+
+## Vollständige Cloudflare-Docker-Umgebung starten
+
+Für TAG Application API, Media Signer, Edge Router, D1/R2/KV-Seed und Smoke-Tests:
+
+```powershell
+npm run local:cloudflare
+```
+
+Alternativ direkt:
+
+```powershell
+.\test\00-Test-Scripts\start-cloudflare-test-env.ps1
+```
+
+Das Skript:
+
+1. ergänzt fehlende lokale Ports und synthetische Secrets in `.env.local`,
+2. schreibt die ignorierten `.dev.vars` für TAG-App-API und Edge Router,
+3. startet den bestehenden TCP/TCC/TAG-App-Stack,
+4. startet die Cloudflare-Profile `tag-media-signer`, `tag-app-api` und `edge-router`,
+5. erzeugt Schema und Testdaten über die lokale D1-/R2-Bindung der API,
+6. seedet die Edge-Routing-DB und KV-Projektion,
+7. prüft Public-Session, Content, Item-Mitgliedschaft, fail-closed Media Signer und Edge-Router-`302`.
+
+Der lokale Seed verwendet ein minimales D1-Testschema über die Bindung des laufenden Workers. Die vollständige produktive Migrations-DDL wird separat durch `database-schema.test.mjs` geprüft.
+
+Danach erreichbar:
+
+```text
+TAG-App (Fixtures):   http://localhost:5173/tag/ab12cd
+TAG Application API:  http://localhost:8787/
+Edge Router:          http://localhost:8786/
+TAG Compose-Codec:    http://127.0.0.1:8788/
+TAG Control Center:   http://localhost:5174/
+TCP Health:           http://localhost:8080/api/v1/health
+```
+
+Der Codec ist nur über Loopback erreichbar und benötigt
+`Authorization: Bearer <LOCAL_CODEC_API_KEY>`. Eine vollständige Anleitung mit
+Start, Endpunkten, TCP-Zugriff, Reset und Fehlerbehebung steht in
+[`scripts/Codec-Local-use.md`](scripts/Codec-Local-use.md). Beispiel:
+
+```powershell
+$key = (Get-Content test/10-test-local/.env.local |
+    Where-Object { $_ -match '^LOCAL_CODEC_API_KEY=(.*)$' } |
+    ForEach-Object { $Matches[1] })
+
+curl.exe -sS -X POST "http://127.0.0.1:8788/api/v1/codec/decode" `
+  -H "Authorization: Bearer $key" `
+  -H "Content-Type: application/json" `
+  -d '{"tagId":"ab12cd"}'
+```
+
+Lokale API-Testdaten:
+
+```text
+tagId=ab12cd
+revision=8
+contentId=1850000000000000
+variant=cover
+element=cel_gallery
+```
+
+Der Media Signer bleibt lokal absichtlich fail-closed; `get-image-url` liefert deshalb `404`. Das ist kein Fehler, sondern der bestehende R2-Signatur-Gate.
+
+### Cloudflare-Testdaten zurücksetzen
+
+Wenn Tests den D1/R2/KV-Zustand verändert haben:
+
+```powershell
+npm run local:cloudflare:reset
+```
+
+Alternativ direkt:
+
+```powershell
+.\test\00-Test-Scripts\reset-cloudflare-test-data.ps1
+```
+
+Das Skript stoppt die Cloudflare-Worker, löscht ausschließlich das benannte Volume `myqr24-local-test_cloudflare_state` und baut den initialen Seed wieder auf. MySQL-, TCP- und TCC-Daten bleiben erhalten. Für einen vollständigen Reset inklusive MySQL siehe `reset-local-test.ps1`.
 
 ## Lokaler Bootstrap-Admin
 
@@ -146,8 +233,10 @@ npm run test:app
 npm run build:app
 ```
 
-Die Access-API-Tests verwenden ausschließlich lokale Test-Doubles; sie starten
-keinen zusätzlichen API-Worker und benötigen keine Cloudflare-Ressourcen.
+Die Access-API-Unit-Tests verwenden ausschließlich lokale Test-Doubles; sie
+starten keinen zusätzlichen API-Worker. Die Docker-Variante mit echtem
+Wrangler-Worker, D1/R2-Seed und Edge-Router-Smoke wird über
+`start-cloudflare-test-env.ps1` gestartet.
 
 Für einen Produktionsbuild der PWA im Docker-Testcontainer:
 
@@ -189,12 +278,33 @@ Zur nicht-interaktiven Ausführung, etwa bei einem lokalen Testlauf:
 .\test\10-test-local\scripts\reset-local-test.ps1 -Force
 ```
 
+## Skripte und Verwendung
+
+| Skript | Zweck | Noch erforderlich? |
+| --- | --- | --- |
+| `test/00-Test-Scripts/start-cloudflare-test-env.ps1` | startet den gesamten lokalen Stack inklusive TAG Application API, Media Signer, Edge Router, D1/R2/KV-Seed und Smoke-Tests | **Ja, zentraler Einstieg für die vollständige Umgebung** |
+| `test/00-Test-Scripts/reset-cloudflare-test-data.ps1` | löscht nur den Cloudflare-Testzustand und baut die initialen Seed-Daten wieder auf | **Ja, für Datenchaos nach Tests** |
+| `test/10-test-local/scripts/start-local-test.ps1` | startet TCP, TCC, Codec und TAG-App ohne Cloudflare-API-Profil | Ja, für leichte TCP-/TCC-/UI-Tests |
+| `test/10-test-local/scripts/reset-local-test.ps1` | löscht alle lokalen Compose-Volumes inklusive MySQL | Ja, für einen vollständigen Neuanfang |
+| `test/10-test-local/scripts/test-local-test.ps1` / `npm run local:test` | TCP-/MySQL-Testlauf in Docker | Ja |
+| `test/00-Test-Scripts/deploy-tag-app-docker.ps1` | baut und prüft die PWA-Preview | Ja, separater PWA-Nachweis |
+| `test/00-Test-Scripts/test-edge-router.ps1` | führt die Edge-Router-Unit-Tests aus | Ja, unabhängig vom Docker-Start |
+| `test/00-Test-Scripts/start-codec-worker.ps1` | startet den Codec-Worker auf dem Host unter `127.0.0.1:8788` | Optional; nicht gleichzeitig mit dem Compose-Codec starten, da beide Port `8788` belegen |
+| `test/10-test-local/scripts/start-tag-control-plane.sh` | interner TCP-Container-Entrypoint | Ja, wird von Compose verwendet |
+| `test/10-test-local/scripts/run-tag-control-plane-tests.sh` | interner TCP-Test-Entrypoint | Ja, wird von `npm run local:test` verwendet |
+| `test/10-test-local/scripts/cloudflare-test-data.ps1` | gemeinsame Seed-/Compose-/Secret-Helfer | Ja, wird von Start- und Reset-Skript verwendet |
+| `test/10-test-local/scripts/app-api-smoke.mjs` | prüft Public-Session, D1/R2-Content und fail-closed Media Signer | Ja, wird vom Startskript ausgeführt |
+
+`start-cloudflare-test-env.ps1` ruft bewusst `start-local-test.ps1` auf, damit TCP/TCC/TAG-App weiterhin auch ohne Cloudflare-API gestartet werden können. Die älteren Einzelskripte bleiben deshalb erhalten.
+
 ## Logs und Status
 
 ```powershell
 docker compose --env-file test/10-test-local/.env.local -f test/10-test-local/compose.yaml ps
 
-docker compose --env-file test/10-test-local/.env.local -f test/10-test-local/compose.yaml logs --follow
+docker compose --env-file test/10-test-local/.env.local -f test/10-test-local/compose.yaml --profile cloudflare logs --follow
+
+docker compose --env-file test/10-test-local/.env.local -f test/10-test-local/compose.yaml --profile cloudflare logs --follow tag-app-api edge-router tag-media-signer
 ```
 
 ## Abgrenzung zu automatisierten Tests und Staging

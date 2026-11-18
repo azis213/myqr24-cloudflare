@@ -1,0 +1,7 @@
+{
+  "schema": "myqr24-content-item-v1",
+  "contentId": "1850000000000000",
+  "type": "image",
+  "title": "Lokales Testbild",
+  "alt": "Lokales Testbild aus der Docker-Testumgebung"
+}

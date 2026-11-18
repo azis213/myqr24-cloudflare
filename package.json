@@ -31,6 +31,8 @@
     "deploy:app:staging": "npm run deploy:staging --workspace=@myqr24/tag-app",
     "tag-lab": "node tools/tag-lab/server.mjs",
     "local:up": "powershell -ExecutionPolicy Bypass -File test/10-test-local/scripts/start-local-test.ps1",
+    "local:cloudflare": "powershell -ExecutionPolicy Bypass -File test/00-Test-Scripts/start-cloudflare-test-env.ps1",
+    "local:cloudflare:reset": "powershell -ExecutionPolicy Bypass -File test/00-Test-Scripts/reset-cloudflare-test-data.ps1",
     "local:rebuild": "powershell -ExecutionPolicy Bypass -File test/10-test-local/scripts/start-local-test.ps1 -Rebuild",
     "local:down": "powershell -ExecutionPolicy Bypass -File test/10-test-local/scripts/stop-local-test.ps1",
     "local:reset": "powershell -ExecutionPolicy Bypass -File test/10-test-local/scripts/reset-local-test.ps1",

@@ -1,6 +1,6 @@
 # Implementierungsstatus: TAG-App
 
-**Letzte Bewertung:** 2026-10-31
+**Letzte Bewertung:** 2026-11-17
 **Statusregeln:** [`README.md`](README.md)
 **Fachliche Stories:** [`10-USER-STORIES.md`](10-USER-STORIES.md)
 
@@ -16,7 +16,7 @@
 | APP-WP-05A | Hochzeits-Vault-Demo: Tabs, Galerie, Dokumente und Zugangscode-UX | APP-I01A | implemented | `trauung1`, `fest2026`, `menue202`, Adaptertests und App-Build |
 | APP-WP-06 | Kontrollierte Router→PWA-Staging-Integration | APP-I02 | blocked | aktiver Worker und tatsächlich gebundener KV-Namespace |
 | APP-WP-06A | Gemeinsame PWA-Navigation, integrierter Scan und lokale Berechtigungspräferenzen | APP-I02A | planned | APP-TC-PERMISSION-001 bis APP-TC-PERMISSION-004, keine fachliche Autorisierung im Client |
-| APP-WP-06B | Lokale React-/D1-/Access-Runtime und tokenbasierte Medienfreigabe | APP-I02B | implemented-local | `tag-edge-d1-routing-v1`, `tag-app-access-v1`, 11 App-/D1-/R2-Fake-Tests und Dry-Runs; keine reale Mutation |
+| APP-WP-06B | Lokale React-/D1-/Access-Runtime, operative Contentprojektion und tokenbasierte Medienfreigabe | APP-I02B | implemented-local | `tag-edge-d1-routing-v1`, `tag-app-access-v1`, Hono Application API, flache D1-Contentmigration, 31 TAG-App-Tests, Docker-Cloudflare-Smoke für API/Edge und Dry-Runs; keine reale Mutation |
 | APP-WP-07 | Öffentliche Application API, D1/R2 und Sichtbarkeiten | APP-I03 | planned | APP-TC-API-*, APP-TC-PERMISSION-005 bis APP-TC-PERMISSION-007, getrennte Staging-Ressourcen |
 | APP-WP-08 | Owner-Authentisierung, Vault-Verwaltung und Audit | APP-I04 | planned | APP-TC-OWNER-*, API und Session-Modell |
 | APP-WP-09 | Lost & Found, TAG Chat und Moderation | APP-I05 | planned | APP-TC-CHAT-*, Besucher-/Owner-Sessions |
@@ -66,16 +66,18 @@
 ## Lokaler Pages-/R2-v1-Slice
 
 - React Pages liefert wieder `/tag/*` als App-Shell. `TagPage` verwendet im normalen Pfad nur den D1-/Access-Bootstrap; Fixtures bleiben ein expliziter Testmodus.
-- `workers/app-api.ts` prüft Bootstrap, Session, D1-Status, Access-Version und Scope vor dem Lesen privater revisionierter Content-JSONs aus R2.
-- PIN-Prüfung verwendet Argon2id mit serverseitigem Pepper und sperrt pro TAG/Client-Signal nach fünf Fehlversuchen für 15 Minuten. Der Media-Signer bleibt vor dem W3D-Credential-Gate fail-closed.
-- `test/app-api.test.ts`, `tagAccessService.test.ts` und der Argon2id-Benchmark decken Session-/PIN-/Widerrufs- und Medien-Signing-Grenzen lokal ab. Reale D1-/R2-/Pages-/Service-Binding-Deployments bleiben externe Gates.
+- `workers/app-api.ts` verwendet Hono mit typisierten Bindings und prüft Bootstrap, Session, D1-Status, Access-Version und Scope vor dem Lesen der aktuellen Tag-/Element-JSONs aus R2. Der R2-Pfad wird ausschließlich aus dem numerischen TAG-PK und den D1-Dateinamen abgeleitet. Element-Payloads kommen aus R2; Item-Mitgliedschaft und Anzeigefelder kommen aus D1. Zentrale Hono-Fallbacks und Middleware erhalten neutrale Fehler sowie `no-store`/`nosniff` auch an den HTTP-Grenzen.
+- `database/0002_tag_content.sql` modelliert genau einen aktuellen Contentstand pro TAG: numerischer TAG-PK, Base36-Suchindex, Elemente, 52-Bit-Items, relationale Mitgliedschaft, Varianten sowie Range-/Global-Beschreibungen. Revisionen bleiben ausschließlich in TCP/TCC. Die API liest diese Projektion; TCP-Publish, Upload-Endpunkte, Cleanup und Downloadsignierung bleiben geplante Schritte.
+- `workers/app-api.local.ts` und `workers/local-seed.ts` bilden ausschließlich die lokale Docker-Testumgebung: Der lokale Worker erzeugt ein minimales D1-Testschema und seedet D1/R2 über seine eigenen Bindungen. Die Produktionskonfiguration `wrangler.app-api.toml` und der Produktions-Worker bleiben unverändert.
+- PIN-Prüfung verwendet Argon2id mit serverseitigem Pepper und sperrt pro TAG/Client-Signal nach fünf Fehlversuchen für 15 Minuten. Der Media-Signer erhält nur den vom Application API autorisierten und abgeleiteten Objekt-Key und bleibt vor dem W3D-Credential-Gate fail-closed.
+- `test/app-api.test.ts`, `tagAccessService.test.ts`, `database-schema.test.mjs`, `content-id.test.ts`, `content-paths.test.ts` und der Argon2id-Benchmark decken Public-/PIN-Sessions, Widerruf, numerische Content-IDs, R2-Pfadableitung, Schema-Constraints, Medien-Signing, Hono-Routinggrenzen, Request-Validierung und neutrale Fehler lokal ab. Reale D1-/R2-/Pages-/Service-Binding-Deployments bleiben externe Gates.
 
 ## Blocker
 
 | ID | Betroffener Bereich | Beschreibung | Auflösungskriterium |
 | --- | --- | --- | --- |
 | APP-BLK-001 | APP-US-006 / APP-WP-06 | Der in lokaler Staging-Konfiguration gebundene KV-Namespace ist leer, während die aktive Scan-Route einen Redirect der früheren Teststrecke ausliefert. | Aktiven Cloudflare Worker und dessen tatsächlich gebundenen Namespace im Dashboard identifizieren; Redirect anschließend kontrolliert auf den neuen Pages-Alias umstellen. |
-| APP-BLK-002 | APP-I03 bis APP-I07 | Es existiert noch keine autoritative Application API mit getrennten Staging-Datenressourcen. Die Hochzeits-PIN- und Upload-Oberfläche ist deshalb ausschließlich eine lokale UX-Demo. | API-Architektur, Staging-D1/R2, Authentisierung und Schema-Verträge implementieren; Gastbeiträge an serverseitige Session-IDs binden sowie Downloads und Löschungen pro Request autorisieren. |
+| APP-BLK-002 | APP-I03 bis APP-I07 | Die Hono Application API und die operative D1-Contentprojektion existieren lokal, aber ohne reale Staging-D1/R2-Ressourcen, TCP-Publisher, Upload-Endpunkte und externe Secrets. | Reale Staging-Ressourcen und Secrets bereitstellen, TCP-Publish/Upload implementieren, Gastbeiträge an serverseitige Session-IDs binden sowie Downloads und Löschungen pro Request autorisieren. |
 | APP-BLK-003 | APP-US-061 | Kamera- und QR-Scan-API-Verfügbarkeit ist Browser- und Geräteabhängig; eine PWA kann externe NFC-/QR-Links nicht plattformübergreifend garantiert direkt übernehmen. | Scanner mit manueller Eingabe als Fallback implementieren; App Links/Universal Links nur bei späterer nativer Hülle bewerten. |
 
 ## Aktualisierungsregel

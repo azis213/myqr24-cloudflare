@@ -2,6 +2,11 @@ export interface MediaSignerEnv {
   APP_MEDIA_SIGNER_KEY_S01: string;
 }
 
+/**
+ * Service-binding only. The Application API authorizes TAG, element and item
+ * first and sends an already derived object key. This worker must never accept
+ * a client-supplied bucket, key or path.
+ */
 export async function handleMediaSignerRequest(request: Request, env: MediaSignerEnv): Promise<Response> {
   if (request.method !== "POST" || request.headers.get("x-myqr24-service-key") !== env.APP_MEDIA_SIGNER_KEY_S01) {
     return new Response("Not Found", { status: 404, headers: { "cache-control": "no-store" } });

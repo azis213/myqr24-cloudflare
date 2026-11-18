@@ -22,6 +22,8 @@ Testdaten bleiben nicht geheim, minimal und wiederholbar. Sie repräsentieren ke
 | APP-TD-008 | lokale myQR24-Präferenzen und Berechtigungszentrum-Zustände | künftige APP-I02A-Component-Fixture | geplant |
 | APP-TD-009 | anonyme, angemeldete und Owner-`TagCapabilities` | künftige APP-I03-Contract-Fixture | geplant |
 | APP-TD-010 | veröffentlichter/nicht veröffentlichter/widerrufener API-View | künftige API-Contract-Fixture | geplant |
+| APP-TD-013 | operative Contentprojektion mit numerischem TAG-PK, 52-Bit-Item-IDs, lokaler Galerie, globalem Dokument, unfertigem Upload und Varianten | `apps/tag-app/test/database-schema.test.mjs`, `content-id.test.ts`, `content-paths.test.ts` | vorhanden |
+| APP-TD-014 | Docker-Cloudflare-Seed `ab12cd` mit Revision 8, `cel_gallery`, Content-ID `1850000000000000` und Variante `cover` | `apps/tag-app/workers/local-seed.ts`, `test/10-test-local/seed/` | vorhanden |
 | APP-TD-020 | Owner- und Session-Fälle ohne echte Credentials | künftige API-Testfixture | geplant |
 | APP-TD-030 | Lost-&-Found- und Chat-Statusfälle | künftige API-Testfixture | geplant |
 | APP-TD-040 | Guestbook-Zeitfenster und Moderationszustände | künftige API-Testfixture | geplant |

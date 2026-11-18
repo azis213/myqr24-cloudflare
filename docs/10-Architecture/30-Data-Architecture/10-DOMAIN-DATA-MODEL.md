@@ -77,15 +77,15 @@ Die Darstellung abstrahiert optionale Features wie Lost & Found, Chat, Guestbook
 
 ### 3.1 Identität, Ausgabe und Routing-Kontext
 
-| Objekt                       | Fachliche Aufgabe                                                  | Primärschlüssel / stabile Identität                                                   | Wesentliche Attribute                                                                                | Autorität                      |
-| ---------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------- |
-| **TAG**                | verwaltetes physisches oder selbstgedrucktes TAG als Kernaggregate | interne`tagId`-Referenz; fachlich eindeutig durch öffentliche ID und kanonischen Wert | Lifecycle-Status, Ausgabedatum, Range-/Gruppenkontext, Aktivierungs- und Ablaufzeit                  | TCP                             |
-| **TAG Identity**       | kryptografisch und öffentlich relevante TAG-Identität            | `tagId` plus `(length, decodedValue)`                                                | kanonische Base36-`tagId`, `length`, vollständiger linearer `decodedValue` | TCP; Edge prüft nur abgeleitet |
-| **TAG Range**          | reservierter, lückenfreier numerischer TAG-Bereich                | stabile`rangeId`                                                                       | `start`, `end`, `length`, `active`, `groupId`                                              | TCP                             |
-| **TAG Group**          | logische Standardgruppierung mehrerer Ranges                       | `groupId`                                                                              | Bezeichnung, Standard-Feature-Zuweisung, Status                                                      | TCP                             |
-| **Feature Definition** | wiederverwendbare, schema-validierte Routing-/App-Funktion         | `featureId`                                                                            | Typ, aktiv, sichere URL-/App-Vorlage, typspezifische Attribute                                       | TCP                             |
-| **Feature Assignment** | Prioritätsabhängige Zuordnung von Features                       | Scope + referenzierte`featureId`                                                       | Scope`tag`, `range`, `group`; sortierte Feature-Liste; Modus zukünftig explizit               | TCP                             |
-| **Routing Projection** | minimaler Edge-Lookup ohne private Daten                           | KV-Key und Publikationsrevision                                                          | Range-Index, Gruppenregel, Range-Regel, direkte TAG-Regel, Feature-Dokument                          | abgeleitet aus TCP              |
+| Objekt                       | Fachliche Aufgabe                                                  | Primärschlüssel / stabile Identität                                                   | Wesentliche Attribute                                                                  | Autorität                      |
+| ---------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------- |
+| **TAG**                | verwaltetes physisches oder selbstgedrucktes TAG als Kernaggregate | interne`tagId`-Referenz; fachlich eindeutig durch öffentliche ID und kanonischen Wert | Lifecycle-Status, Ausgabedatum, Range-/Gruppenkontext, Aktivierungs- und Ablaufzeit    | TCP                             |
+| **TAG Identity**       | kryptografisch und öffentlich relevante TAG-Identität            | `tagId` plus `(length, decodedValue)`                                                | kanonische Base36-`tagId`, `length`, vollständiger linearer `decodedValue`      | TCP; Edge prüft nur abgeleitet |
+| **TAG Range**          | reservierter, lückenfreier numerischer TAG-Bereich                | stabile`rangeId`                                                                       | `start`, `end`, `length`, `active`, `groupId`                                | TCP                             |
+| **TAG Group**          | logische Standardgruppierung mehrerer Ranges                       | `groupId`                                                                              | Bezeichnung, Standard-Feature-Zuweisung, Status                                        | TCP                             |
+| **Feature Definition** | wiederverwendbare, schema-validierte Routing-/App-Funktion         | `featureId`                                                                            | Typ, aktiv, sichere URL-/App-Vorlage, typspezifische Attribute                         | TCP                             |
+| **Feature Assignment** | Prioritätsabhängige Zuordnung von Features                       | Scope + referenzierte`featureId`                                                       | Scope`tag`, `range`, `group`; sortierte Feature-Liste; Modus zukünftig explizit | TCP                             |
+| **Routing Projection** | minimaler Edge-Lookup ohne private Daten                           | KV-Key und Publikationsrevision                                                          | Range-Index, Gruppenregel, Range-Regel, direkte TAG-Regel, Feature-Dokument            | abgeleitet aus TCP              |
 
 #### Identitätsinvarianten
 
@@ -101,10 +101,10 @@ Die Darstellung abstrahiert optionale Features wie Lost & Found, Chat, Guestbook
 Die unterstützten Zahlenräume sind:
 
 | Länge `L` | Inklusive Untergrenze | Exklusive Obergrenze |
-| --- | --- | --- |
-| 6 | `36^4` | `36^6` |
-| 8 | `36^6` | `36^8` |
-| 10 | `36^8` | `36^10` |
+| ------------ | --------------------- | -------------------- |
+| 6            | `36^4`              | `36^6`             |
+| 8            | `36^6`              | `36^8`             |
+| 10           | `36^8`              | `36^10`            |
 
 ### 3.2 Produkt, Lifecycle, Besitz und Mandant
 

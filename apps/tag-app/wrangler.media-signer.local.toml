@@ -1,0 +1,7 @@
+# Local-only Wrangler configuration for the Docker test environment.
+# The signer remains fail-closed; this service proves the local service binding.
+name = "myqr24-media-signer-local"
+main = "workers/media-signer.ts"
+compatibility_date = "2026-10-03"
+
+# APP_MEDIA_SIGNER_KEY_S01 is read from apps/tag-app/.dev.vars (ignored).

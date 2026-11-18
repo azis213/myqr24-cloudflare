@@ -2,6 +2,7 @@
 
 **Version:** `v1`  
 **Status:** `implemented-local`  
+**Content-Projektion:** `myqr24-tag-content-v2` (operativ, ohne D1-Revisionstabellen)
 **Owner:** TAG Application API Worker  
 **Consumer:** React-PWA; Media-Signer nur per Service Binding
 
@@ -22,13 +23,14 @@ POST /api/get-image-url
 
 Public- und PIN-Bootstrap prüfen `mode`, `accessVersion`, `revision`, `nonce`, `exp`, `sig` gegen D1 und das serverseitige `APP_BOOTSTRAP_SECRET_S01`. Erfolgreiche Antworten setzen einen zufälligen 256-Bit-Token ausschließlich als `HttpOnly; Secure; SameSite=Strict; Path=/api` Cookie. D1 speichert nur den Tokenhash, Scope, Access-Version, Ablauf und Widerruf.
 
-`GET content` liefert ausschließlich die im serverseitig abgeleiteten Scope zulässige View aus:
+`GET content` löst `tagId` über den eindeutigen Base36-Index in `tag_content` auf und liest ausschließlich die serverseitig abgeleiteten, sichtbaren Tag-/Elementdateien:
 
 ```text
-content/v1/tags/{tagId}/{contentRevision}.json
+content/v1/tags/{tagNumericId}/tag-rev{revision}.json
+content/v1/tags/{tagNumericId}/elements/{contentElementId}/element-rev{revision}.json
 ```
 
-Das JSON enthält typisierte Blöcke und anonyme `contentId`s, aber keine R2-Keys, Medien-URLs, PINs, Hashes, Tokens, Owner-, Pool- oder POI-Nachweisdaten.
+Die Base36-ID ist nur Such-/Anzeigeinformation und nicht Bestandteil des R2-Keys. Das JSON enthält typisierte Blöcke, Element-Payloads und numerische `contentId`s als Dezimalstrings, aber keine R2-Keys, Medien-URLs, PINs, Hashes, Tokens, Owner-, Pool- oder POI-Nachweisdaten. Elemente und Items werden zusätzlich gegen die Session-Sichtbarkeit gefiltert.
 
 ## 3. PIN und Throttle
 
@@ -38,6 +40,6 @@ Fünf Fehlversuche pro `(tagId, clientSignal)` setzen eine serverseitige Sperre 
 
 ## 4. Medien
 
-`POST /api/get-image-url` akzeptiert nur `tagId`, anonyme `contentId` und erlaubte Variante. Die API prüft Session, Status, Access-Version, Contentrevision und Scope, bevor sie den Media-Signer per Service Binding anspricht. Der Media-Signer erhält den zusätzlichen serverseitigen Schlüssel `APP_MEDIA_SIGNER_KEY_S01` und soll später eine 60-sekündige, objektgebundene R2-Presigned-URL erzeugen. Die lokale Implementierung bleibt fail-closed, bis S3-kompatible R2-Signiercredentials im W3D-Gate bereitstehen.
+`POST /api/get-image-url` akzeptiert nur `tagId`, eine numerische `contentId` als Dezimalstring und eine erlaubte Variante. Die API prüft Session, Status, Access-Version, Contentrevision, Element-/Item-Sichtbarkeit und Item-Status, bevor sie den Media-Signer per Service Binding anspricht. Der Signer erhält ausschließlich den serverseitig abgeleiteten `objectKey`, `contentType` und `expiresIn`; niemals einen clientgewählten Bucket, Pfad oder Key. Zusätzlich authentifiziert er den Aufruf über `APP_MEDIA_SIGNER_KEY_S01`. Die lokale Implementierung bleibt fail-closed, bis S3-kompatible R2-Signiercredentials im W3D-Gate bereitstehen.
 
 Presigned URLs, Sessiontoken und Content-JSON werden nicht im Service Worker oder persistentem Browser-Speicher abgelegt. Alle API-Antworten nutzen `Cache-Control: no-store`.

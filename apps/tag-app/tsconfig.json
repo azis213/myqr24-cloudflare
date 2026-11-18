@@ -17,5 +17,5 @@
     "jsx": "react-jsx",
     "types": ["@cloudflare/workers-types"]
   },
-  "include": ["src", "workers", "vite.config.ts"]
+  "include": ["src", "workers", "test", "vite.config.ts"]
 }

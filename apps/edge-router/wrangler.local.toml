@@ -1,0 +1,18 @@
+# Local-only Wrangler configuration for the Docker test environment.
+# It uses the same local D1 database and KV/R2 state as the Application API.
+name = "myqr24-edge-routing-local"
+main = "src/index.ts"
+compatibility_date = "2026-09-30"
+
+[vars]
+SCAN_ENVIRONMENT = "staging"
+PAGES_URL_TEMPLATE = "https://app.localhost/tag/{tagId}"
+
+[[kv_namespaces]]
+binding = "TAG_CONFIG"
+id = "00000000000000000000000000000001"
+
+[[d1_databases]]
+binding = "TAG_ROUTING"
+database_name = "66666666-7777-4888-8999-aaaaaaaaaaaa"
+database_id = "66666666-7777-4888-8999-aaaaaaaaaaaa"

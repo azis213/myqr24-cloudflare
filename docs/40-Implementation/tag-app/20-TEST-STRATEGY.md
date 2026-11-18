@@ -40,7 +40,17 @@ npm run build
 
 Der Workspace führt Router- und TAG-App-Tests getrennt aus. Für gezielte App-Prüfungen werden die im Root-Package definierten `test:app`- und `build:app`-Befehle verwendet, sobald sie vorhanden sind; bis dahin können die gleichwertigen Befehle im Verzeichnis `apps/tag-app` ausgeführt werden.
 
-Aktuell deckt `apps/tag-app/src/services/publicTagViewService.test.ts` den öffentlichen Adapter ab. Die Testfälle sind in [`21-TEST-CASES.md`](21-TEST-CASES.md) referenziert.
+Aktuell deckt `apps/tag-app/src/services/publicTagViewService.test.ts` den öffentlichen Adapter ab. `apps/tag-app/test/app-api.test.ts` prüft die Hono Application API einschließlich Public-/PIN-Session, D1-gesteuerter Tag-/Elementdateien, Medien-Service-Binding, Widerruf, Routinggrenzen, Request-Validierung, Security-Header und neutraler Fehler. `apps/tag-app/test/database-schema.test.mjs` führt die D1-Migrationen gegen SQLite aus und prüft numerische TAG-PKs, 52-Bit-Items, relationale Element-/Item-Zuordnung, globale Wiederverwendung, Datei-Eindeutigkeit und Variantenmetadaten. `content-id.test.ts` und `content-paths.test.ts` sichern ID-Packing und serverseitige R2-Pfadableitung. Die Testfälle sind in [`21-TEST-CASES.md`](21-TEST-CASES.md) referenziert.
+
+### 4.1 Docker-Cloudflare-Smoke
+
+Die vollständige lokale Cloudflare-Runtime wird mit folgendem Befehl gestartet:
+
+```powershell
+.\test\00-Test-Scripts\start-cloudflare-test-env.ps1
+```
+
+Der Lauf prüft Public-Session, D1/R2-Content, Item-Mitgliedschaft, fail-closed Media Signer und den Edge-Router-`302`. Der lokale Seed läuft ausschließlich über die D1-/R2-Bindungen des lokalen Workers; die Produktionskonfiguration bleibt unverändert. Ein Datenchaos-Reset ist über `reset-cloudflare-test-data.ps1` möglich.
 
 ## 5. Aktueller Staging-MVP
 
@@ -96,6 +106,7 @@ Vor einer API-gestützten Story sind folgende Tests verbindlich:
 - keine Berechtigung aus UI-Flags, Pfaden oder manipulierten Client-Parametern;
 - serverseitige Authentisierung, Autorisierung, CSRF- und Rate-Limit-Tests für schreibende Flows;
 - keine Tokens, Sessions, Chat-Daten, Rohstandorte oder private Medien im Cache Storage.
+- Content-Items eines `global`-Scopes erscheinen nur bei einer expliziten Zuordnung zum angefragten TAG; `global` begründet weder Öffentlichkeit noch eine Downloadberechtigung.
 
 ## 8. Feature-spezifische Testschwerpunkte
 

@@ -97,6 +97,8 @@ services:
       ]
     networks:
       - local_test
+    ports:
+      - "127.0.0.1:${LOCAL_CODEC_PORT:-8788}:8788"
     volumes:
       - ../../apps/edge-router:/workspace/edge-router
       - codec_node_modules:/workspace/edge-router/node_modules
@@ -142,6 +144,85 @@ services:
       - ../../apps/tag-app:/workspace/tag-app
       - tag_app_node_modules:/workspace/tag-app/node_modules
 
+  tag-media-signer:
+    profiles:
+      - cloudflare
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    working_dir: /workspace/tag-app
+    environment:
+      MINIFLARE_REGISTRY_PATH: /data/registry
+      WRANGLER_REGISTRY_PATH: /data/registry
+      WRANGLER_SEND_METRICS: "false"
+    depends_on:
+      tag-app-api:
+        condition: service_started
+    network_mode: "service:tag-app-api"
+    command:
+      [
+        "sh",
+        "-c",
+        "npm install --no-audit --no-fund --package-lock=false && npx wrangler dev --local --config wrangler.media-signer.local.toml --ip 0.0.0.0 --port 8789 --persist-to /data/tag-media-signer --show-interactive-dev-session=false",
+      ]
+    volumes:
+      - ../../apps/tag-app:/workspace/tag-app
+      - tag_media_signer_node_modules:/workspace/tag-app/node_modules
+      - cloudflare_state:/data
+
+  tag-app-api:
+    profiles:
+      - cloudflare
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    working_dir: /workspace/tag-app
+    environment:
+      MINIFLARE_REGISTRY_PATH: /data/registry
+      WRANGLER_REGISTRY_PATH: /data/registry
+      WRANGLER_SEND_METRICS: "false"
+    command:
+      [
+        "sh",
+        "-c",
+        "npm install --no-audit --no-fund --package-lock=false && npx wrangler dev --local --config wrangler.app-api.local.toml --ip 0.0.0.0 --port 8787 --persist-to /data/tag-app-api --show-interactive-dev-session=false",
+      ]
+    ports:
+      - "${LOCAL_TAG_APP_API_PORT:-8787}:8787"
+    volumes:
+      - ../../apps/tag-app:/workspace/tag-app
+      - tag_app_api_node_modules:/workspace/tag-app/node_modules
+      - cloudflare_state:/data
+      - ./seed:/seed:ro
+
+  edge-router:
+    profiles:
+      - cloudflare
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    working_dir: /workspace/edge-router
+    environment:
+      MINIFLARE_REGISTRY_PATH: /data/registry
+      WRANGLER_REGISTRY_PATH: /data/registry
+      WRANGLER_SEND_METRICS: "false"
+    command:
+      [
+        "sh",
+        "-c",
+        "npm install --no-audit --no-fund --package-lock=false && npx wrangler dev --local --config wrangler.local.toml --ip 0.0.0.0 --port 8786 --persist-to /data/edge-router --show-interactive-dev-session=false",
+      ]
+    ports:
+      - "${LOCAL_EDGE_ROUTER_PORT:-8786}:8786"
+    networks:
+      - local_test
+    volumes:
+      - ../../apps/edge-router:/workspace/edge-router
+      - edge_router_node_modules:/workspace/edge-router/node_modules
+      - ../../apps/tag-app/database:/workspace/tag-app-database:ro
+      - cloudflare_state:/data
+      - ./seed:/seed:ro
+
   tag-app-pwa:
     profiles:
       - pwa
@@ -172,3 +253,7 @@ volumes:
   codec_node_modules:
   tag_app_node_modules:
   tag_app_pwa_node_modules:
+  tag_app_api_node_modules:
+  tag_media_signer_node_modules:
+  edge_router_node_modules:
+  cloudflare_state:

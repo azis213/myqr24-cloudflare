@@ -110,7 +110,7 @@ Die Details zur Scan-Domain, DNS, Worker-Route und der noch kontrolliert aussteh
 
 `public/_redirects` liefert `/tag/*` wieder als React-App-Shell aus. Der Edge Router übergibt bei einem internen Scan kurzlebig signierte Bootstrapparameter (`mode`, Access- und Contentrevision, Nonce, Ablauf). React verwendet sie nur als UI-Hinweis und lässt sie durch die Access-API erneut prüfen, bevor Content geladen wird.
 
-Content-JSONs liegen privat unter `content/v1/tags/{tagId}/{revision}.json`. Die PWA erhält sie erst nach einer `HttpOnly`-Session. R2-Keys, PINs, Pepper, Ownerdaten und Presigned URLs erscheinen nicht im App-Bootstrap oder dauerhaftem Browser-Speicher.
+Content-JSONs liegen privat unter einem aus dem numerischen TAG-PK abgeleiteten Pfad, z. B. `content/v1/tags/{tagNumericId}/tag-rev{revision}.json` und `content/v1/tags/{tagNumericId}/elements/{contentElementId}/element-rev{revision}.json`. Die Base36-ID ist nur Such-/Anzeigeinformation und nicht Teil des Storage-Keys. Die PWA erhält die Inhalte erst nach einer `HttpOnly`-Session. R2-Keys, PINs, Pepper, Ownerdaten und Presigned URLs erscheinen nicht im App-Bootstrap oder dauerhaftem Browser-Speicher.
 
 ---
 
