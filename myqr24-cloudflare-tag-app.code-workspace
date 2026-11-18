@@ -7,12 +7,12 @@
 	],
 	"settings": {
 		"files.exclude": {
-			"apps/tag-control-center": true,
-			"apps/tag-control-plane": true,
+			"apps/tag-control-center": false,
+			"apps/tag-control-plane": false,
 
 			"docs/40-Implementation/edge-router": false,
-			"docs/40-Implementation/tag-control-center": true,
-			"docs/40-Implementation/tag-control-plane": true,
+			"docs/40-Implementation/tag-control-center": false,
+			"docs/40-Implementation/tag-control-plane": false,
 			"docs/80-Deployment": true,
 			"docs/90-Session-Change-Summaries": true
 		}
