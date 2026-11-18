@@ -12,11 +12,27 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@tiptap/core": "3.34.0",
+    "@tiptap/extension-bold": "3.34.0",
+    "@tiptap/extension-bullet-list": "3.34.0",
+    "@tiptap/extension-document": "3.34.0",
+    "@tiptap/extension-hard-break": "3.34.0",
+    "@tiptap/extension-italic": "3.34.0",
+    "@tiptap/extension-link": "3.34.0",
+    "@tiptap/extension-list-item": "3.34.0",
+    "@tiptap/extension-ordered-list": "3.34.0",
+    "@tiptap/extension-paragraph": "3.34.0",
+    "@tiptap/extension-text": "3.34.0",
+    "@tiptap/extension-underline": "3.34.0",
+    "@tiptap/pm": "3.34.0",
+    "@tiptap/react": "3.34.0",
+    "markdown-it": "14.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
+    "@types/markdown-it": "14.1.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.7.0",

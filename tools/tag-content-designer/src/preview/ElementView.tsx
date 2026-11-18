@@ -1,7 +1,8 @@
 import { ELEMENT_CATALOG } from "../domain/catalog";
 import { resolveContent } from "../domain/bindings";
 import type { ElementStyle, RichTextContent, TemplateElement, TemplateSlot } from "../domain/types";
-import { InlineTextEditor } from "./InlineTextEditor";
+import type { PaletteContext } from "../rich/palette";
+import { RichTextField } from "../rich/RichTextField";
 import { RichText } from "./RichText";
 
 const INLINE_TEXT_TYPES = ["text", "callout", "hero", "finder-notice", "finder-form", "contact-channel"];
@@ -9,6 +10,8 @@ const INLINE_TEXT_TYPES = ["text", "callout", "hero", "finder-notice", "finder-f
 export interface ElementEditing {
   onContentChange: (element: TemplateElement, content: RichTextContent) => void;
   onStyleChange: (element: TemplateElement, patch: Partial<ElementStyle>) => void;
+  /** Farbangebot der Formatierleiste (Theme, Standard, eigene Farben). */
+  palette: PaletteContext;
 }
 
 
@@ -52,10 +55,11 @@ export function ElementView({
 
   const textBlock = () =>
     canEditInline && editing ? (
-      <InlineTextEditor
+      <RichTextField
         content={content}
         style={element.style}
         placeholder="Text eingeben …"
+        palette={editing.palette}
         onContentChange={(next) => editing.onContentChange(element, next)}
         onStyleChange={(patch) => editing.onStyleChange(element, patch)}
       />

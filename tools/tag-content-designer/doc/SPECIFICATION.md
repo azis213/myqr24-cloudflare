@@ -49,6 +49,7 @@ Regeln:
   "shell": { },
   "layout": { },
   "editability": { },
+  "palette": { "custom": ["#123456"] },
   "elements": [ ]
 }
 ```
@@ -59,6 +60,7 @@ Regeln:
 | `shell` | `presentation`, `features`, `theme` (Farben, Typografie, Layout), `navigation`, `statusBar` |
 | `layout` | `mode: grid-flow`, `columns: 12`, `gap`, `container`, `responsive` (`autoReflow`, `minColumnWidth`, `preferredColumns`) |
 | `editability` | Whitelist der später im User-Designer änderbaren Pfade + `limits` |
+| `palette` | eigene Farben der Formatierleiste (`custom`, max. 24 × `#rrggbb`) – Teil der Konfiguration |
 | `elements` | geordnete Elemente mit `elementId`, `elementType`, `displayOrder`, `visibility`, `placement`, `style`, `payload`, `content`, `actions`, `slots` |
 
 ### 3.1 Elemente
@@ -74,19 +76,64 @@ Zusätzlich verfügbar: `hero`, `callout`, `external-link`, `divider`, `finder-n
 - **Aktionen** (`upload`, `download`, `delete`) sind Anträge: `principals` (`scanner`, `guest`, `owner`), `maxItemsPerPrincipal`, `maxFileSizeMb`, `afterUpload: quarantine`, `guestScope: ownOnly`.
 - Ein Template kann Rechte **einschränken**, nie erweitern.
 
-### 3.3 Text
+### 3.3 Text (Runs-Modell)
 
-Text ist ein **Runs-Modell**, kein HTML und kein Markdown:
+Text ist ein **Runs-Modell**, kein HTML und kein Markdown. Zeichen- und Absatzformatierung werden als geschlossene Tokens gespeichert. Jede Zeile kann Überschrift sein (Ebene 1–5); Tabellen sind eigene Blöcke:
 
 ```json
-{ "heading": "Titel", "paragraphs": [ { "runs": [ { "text": "Hallo", "marks": [ { "type": "bold" } ] } ] } ] }
+{
+  "paragraphs": [
+    { "heading": 2, "runs": [{ "text": "Bestand" }] },
+    {
+      "runs": [
+        { "text": "Bitte beachten: " },
+        { "text": "wichtig", "marks": [{ "type": "bold" }], "color": "#b3261e", "background": "#fff3cd",
+          "fontSize": 18, "fontFamily": "serif", "link": { "href": "https://example.org" } }
+      ],
+      "align": "center",
+      "lineHeight": 1.5,
+      "indent": 1,
+      "list": { "kind": "bullet", "level": 0 }
+    },
+    {
+      "type": "table",
+      "columns": [{}, { "align": "end" }],
+      "rows": [
+        { "header": true, "cells": [{ "text": "Fach" }, { "text": "Standort" }] },
+        { "cells": [{ "text": "Roman" }, { "text": "A-12" }] }
+      ]
+    }
+  ]
+}
 ```
 
-Erlaubte Marks: `bold`, `italic`, `underline`. Der Renderer baut daraus React-Elemente; `dangerouslySetInnerHTML` ist ausgeschlossen.
+| Feld | Werte | Bedeutung |
+| --- | --- | --- |
+| `run.marks[].type` | `bold`, `italic`, `underline` | Zeichenauszeichnung |
+| `run.color` | `#rrggbb` | Zeichenfarbe |
+| `run.background` | `#rrggbb` | Markierung (Hintergrund des markierten Textes) |
+| `run.fontSize` | `12, 14, 16, 18, 20, 24, 28, 32` | Schriftgröße in px |
+| `run.fontFamily` | `sans`, `serif`, `mono` | gemappte Font-Stacks, keine freien Namen |
+| `run.link.href` | `https://…` oder `mailto:…` | Allowlist, `rel="noopener noreferrer nofollow"` |
+| `paragraph.heading` | `1…5` | Zeile ist Überschrift (nicht zusammen mit `list`) |
+| `paragraph.align` | `start`, `center`, `end` | Ausrichtung |
+| `paragraph.lineHeight` | `1, 1.15, 1.3, 1.5, 1.75, 2` | Zeilenabstand |
+| `paragraph.indent` | `0…3` | Einrückung ohne Liste |
+| `paragraph.list` | `kind: bullet\|ordered`, `level: 0…3` | Aufzählung/Nummerierung |
+| `block.type = "table"` | `columns[]`, `rows[]` | Tabelle; Zellen sind **reiner Text** |
 
-**Direktes Editieren:** Textfelder sind in der Vorschau selbst editierbar (`contentEditable`). Beim Fokus erscheint **darüber** eine Formatierungsleiste mit Fett/Kursiv/Unterstrichen sowie einer Vorder- und Hintergrundfarbe. Die Leiste schreibt ausschließlich in das Runs-Modell (Marks) bzw. in `style.textColor` / `style.background.color`; der Weg DOM → Modell ist `parseContentDom`, der Weg Modell → DOM ist `renderContentToDom` (beide ohne HTML-Strings). Farben wirken bewusst **am Element**, nicht als Inline-Span – so bleibt das Modell frei von CSS.
+Regeln:
 
-**Modellgrenze:** `fontSize` und `link` sind im Runs-Modell derzeit nicht vorgesehen. Textgröße entsteht über Überschriftenebene und Theme-Typografie, Links über das Element `external-link`.
+- **Kein HTML im Artefakt.** Der Export enthält ausschließlich Tokens; `style`-/`class`-Strings gibt es nicht.
+- **HTML ist Text.** Tippt jemand `<b>Hallo</b>`, erscheint das wörtlich und wird nie interpretiert (kein `innerHTML`, kein `dangerouslySetInnerHTML`; per Architektur-Test erzwungen).
+- **Paste ist ein Konverter:** Eingefügtes HTML wird auf die Tokens abgebildet (nur erlaubte Werte); Unbekanntes wird verworfen. Aktive Bestandteile (`<script>`, `on*`, `javascript:`) werden vorher entfernt. Eingefügtes **Markdown** wird über `markdown-it` (`html: false`) gelesen und ebenfalls auf Tokens abgebildet.
+- **`javascript:` ist verboten** – als Link-Ziel ein Fehler, als Text ein Fehler (Defense in Depth).
+- Farben nur `#rrggbb`; Schriftgrößen nur aus der Skala; Ausrichtung/Zeilenabstand nur aus den Enums.
+- **Weicher Zeilenumbruch** (`Shift+Enter`) bleibt im selben Absatz und wird als `"\n"` im Run-Text gespeichert (kein zusätzlicher Block, keine neue Zeile mit Absatzabstand).
+- Absätze/Blöcke je Element: höchstens 16 (Listeneinträge und Tabellen zählen mit), Text je Absatz höchstens 2048 Zeichen.
+- **Tabellen:** max. 6 Spalten, 20 Zeilen, 200 Zeichen je Zelle, 2 Tabellen je Textfeld; Ausrichtung je Spalte; Kopfzeile markiert. Zellen sind reiner Text (keine Marks) – bewusste Grenze.
+- **Eigene Farben** der Formatierleiste liegen in `palette.custom` (max. 24, `#rrggbb`) und werden mit der Konfiguration gespeichert.
+- **`heading` auf Inhaltsebene** (`content.heading`) gehört zu schemaVersion 1; die Migration überführt es in einen Absatz mit `heading: 3` (siehe §6).
 
 
 ---
@@ -156,7 +203,11 @@ Ladepipeline: lesen → `schema` prüfen → `schemaVersion` vergleichen → Mig
 
 Bei blockierenden Fehlern öffnet das Tool die Datei im **Reparaturmodus** (lesend), damit das störende Element gelöscht werden kann. Es gibt keinen stillen „Best effort"-Import.
 
-Migrationsstufen liegen in `src/domain/migrate.ts`; aktuell existiert nur `schemaVersion 1`.
+Migrationsstufen liegen in `src/domain/migrate.ts`:
+
+| Stufe | Inhalt |
+| --- | --- |
+| `1 → 2` | `content.heading` (eine Überschrift am Feldanfang) wird zum ersten Absatz mit `heading: 3`; Feld wird entfernt. Danach sind Überschriften Absatz-Attribute und damit beliebig positionierbar (H1–H5). |
 
 ---
 
@@ -166,11 +217,11 @@ Migrationsstufen liegen in `src/domain/migrate.ts`; aktuell existiert nur `schem
 | --- | --- |
 | **L1 strukturell** | Pflichtfelder, Typen, Enums, Muster, Längen, Limits |
 | **L2 semantisch** | eindeutige `elementId`/`displayOrder`/`slotId`, Typ↔TAG-Typ-Kompatibilität, `min <= max`, bekannte Binding-Quellen, Platzierungsbereiche |
-| **L3 Policy** | kein HTML, kein `javascript:`/`data:`/`url(...)`/`on*=`-Muster, keine Storage-Keys, Farben nur `#rrggbb` oder Palettentoken, Gesamtgröße ≤ 48 KiB |
+| **L3 Policy** | kein gespeichertes HTML (Markup im Text ist nur eine Warnung, weil es als Text erscheint), kein `javascript:`/`data:`/`url(...)`/`on*=`-Muster, keine Storage-Keys, Farben nur `#rrggbb` oder Palettentoken, Schriftgrößen/Abstände nur aus den Skalen, Links nur `https:`/`mailto:`, Gesamtgröße ≤ 48 KiB |
 
 Fehler blockieren `Save`/`Save as`; Warnungen nicht. Jeder Befund hat `code`, `path`, `message` und optional `hint`.
 
-Wichtige Codes (Auszug): `SCHEMA_UNKNOWN`, `SCHEMA_TOO_NEW`, `MIGRATION_STEP_MISSING`, `ELEMENT_ID_DUPLICATE`, `ELEMENT_ORDER_DUPLICATE`, `ELEMENT_TYPE_NOT_ALLOWED`, `SLOT_RANGE_INVALID`, `BINDING_SOURCE_UNKNOWN`, `POLICY_HTML_MARKUP`, `POLICY_SCRIPT_URL`, `THEME_COLOR_INVALID`, `LIMIT_DOCUMENT_BYTES`, `ACTIONS_OWNERSHIP_UNPROVEN` (Warnung).
+Wichtige Codes (Auszug): `SCHEMA_UNKNOWN`, `SCHEMA_TOO_NEW`, `MIGRATION_STEP_MISSING`, `ELEMENT_ID_DUPLICATE`, `ELEMENT_ORDER_DUPLICATE`, `ELEMENT_TYPE_NOT_ALLOWED`, `SLOT_RANGE_INVALID`, `BINDING_SOURCE_UNKNOWN`, `POLICY_HTML_MARKUP` (Warnung), `POLICY_SCRIPT_URL`, `THEME_COLOR_INVALID`, `CONTENT_RUN_COLOR_INVALID`, `CONTENT_RUN_FONT_SIZE_INVALID`, `CONTENT_RUN_FONT_FAMILY_INVALID`, `CONTENT_RUN_LINK_INVALID`, `CONTENT_PARAGRAPH_ALIGN_INVALID`, `CONTENT_PARAGRAPH_LINE_HEIGHT_INVALID`, `CONTENT_PARAGRAPH_INDENT_INVALID`, `CONTENT_LIST_INVALID`, `LIMIT_DOCUMENT_BYTES`, `ACTIONS_OWNERSHIP_UNPROVEN` (Warnung).
 
 Bekannte, dokumentierte Abweichung: `guestScope: ownOnly` ist derzeit eine **Warnung**, kein Blocker, weil die tag-api noch keine Eigentumsbindung besitzt (Refinement `D-23`).
 
@@ -185,20 +236,81 @@ Bekannte, dokumentierte Abweichung: `guestScope: ownOnly` ist derzeit eine **War
 - Element-Overrides: Hintergrund, Text-/Überschriftenfarbe, Innenabstand.
 - Vorschau zeigt Platzhalter für Medien (Slot-Hinweise), niemals echte Inhalte.
 
-### 8.1 Direktes Editieren und Formatierleiste
+### 8.1 Direktes Editieren und RTF-Leiste
 
-- Text, Hinweis, Titelbereich, Fundhinweis, Fundformular und Kontaktweg sind in der Vorschau direkt editierbar; Galerie- und Dokumenten-Überschriften bleiben bis zur nächsten Iteration lesend.
-- Fokus im Textfeld → Formatierleiste **oberhalb** des Feldes: `B`, `I`, `U`, Textfarbe, Hintergrundfarbe, Zurücksetzen.
-- Marks wirken auf die **Auswahl** (Browser-Kommando), Farben auf das **Element** (`style.textColor`, `style.background.color`); die rechte Spalte zeigt den Text zur Kontrolle (inkl. Auszeichnungen), bearbeitet wird ausschließlich in der Vorschau – so kann kein zweiter Editor die Inline-Marks überschreiben.
-- Eingefügter Text wird auf Klartext reduziert (`onPaste`), fremdes HTML gelangt nie ins Modell.
-- Die Leiste klaut dem Feld nicht den Fokus (`mousedown` wird abgefangen), damit die Auswahl erhalten bleibt.
-- Das DOM ist nur während der Eingabe die Quelle der Wahrheit; bei Modelländerungen von außen wird neu gerendert, solange das Feld nicht fokussiert ist (kein Caret-Sprung).
-- Tipp-Bursts werden im Undo-Stack gebündelt (800 ms), strukturelle Änderungen bleiben einzeln rückgängig.
+- Text, Hinweis, Titelbereich, Fundhinweis, Fundformular und Kontaktweg sind in der Vorschau direkt editierbar; Galerie- und Dokumenten-Überschriften bleiben lesend.
+- Fokus im Textfeld → Leiste **oberhalb** des Feldes, in Gruppen:
+
+| Gruppe | Funktionen |
+| --- | --- |
+| Absatzstil | **Text** oder **Überschrift 1–5** (`#`-Kürzel, `Strg+Alt+1…5`, `Strg+Alt+0` = Text) |
+| Schrift | Familie (`sans`/`serif`/`mono`), **Größe als Zahlenfeld mit ▲/▼** durch die Skala 12–32 px – wirken nur auf den markierten Text |
+| Zeichen | **B**, *I*, U̲ (`Strg+B/I/U`) als Symbolknöpfe |
+| Farben | **A** mit Farbbalken (Zeichenfarbe), **Marker** (Text-Markierung), **Farbeimer** (Box-Hintergrund) – jeweils mit Farbmenü |
+| Absatz | linksbündig, zentriert, rechtsbündig, Zeilenabstand (6 Stufen) |
+| Listen | Aufzählung (`Strg+Shift+8`), Nummerierung (`Strg+Shift+7`), einrücken, ausrücken (Symbolknöpfe) |
+| Link | setzen/ändern (`Strg+K`, Inline-Feld mit Validierung), entfernen |
+| Reset | Zeichen- und Absatzformatierung entfernen |
+| Markdown | **MD** öffnet den Ein-/Ausgabe-Dialog (§8.5) |
+
+**Auswahlregel (Schriftgröße & Co.):** Formatiert wird ausschließlich der **markierte Text**. Steht der Cursor ohne Auswahl, wird nur die nächste Eingabe vorformatiert (Word-Verhalten) – bestehender Text ändert sich nie. Hat ein Klick in die Leiste die Auswahl „gestohlen", wird die zuletzt markierte Spanne wiederhergestellt; eine alte Auswahl wird sonst nie reaktiviert.
+
+**Farbmenü** (Word-nah, je Farbknopf):
+
+| Abschnitt | Inhalt |
+| --- | --- |
+| Theme | Farben des TAG-Rahmens (`background`, `surface`, `text`, `mutedText`, `heading`, `accent`, `accentText`, `border`, `danger`, `success`) |
+| Standard | 24 feste Farben (Graustufen + kräftige/gedeckte Töne) |
+| Eigene Farben | selbst gespeicherte Farben; **＋ Eigene** fügt die aktuelle Farbe hinzu, **×** entfernt sie wieder |
+| RGB | freier Farbwähler + Hex-Feld (wie zuvor), „✓" übernimmt, „＋ Eigene" speichert zusätzlich |
+
+- Eigene Farben landen in `palette.custom` im Dokument und werden mit `Save`/`Save as` in der Konfigurationsdatei gespeichert.
+- Die zuletzt bearbeitete Konfiguration wird zusätzlich lokal als **„letzte Konfiguration"** gehalten und beim Start/Reload geladen (siehe §8.4).
+- Die Leiste bleibt beim Bedienen offen (Fokus wird am gesamten Editor-Block erkannt), damit der Farbwähler die Auswahl nicht zerstört.
+- Schriftgröße/-familie und Farben wirken auch dann auf den markierten Text, wenn der Klick ins Auswahlfeld dem Editor den Fokus genommen hat (die letzte markierte Spanne wird wiederhergestellt).
+- Rechts bleibt der Text als **bearbeitbare JSON-Kontrolle** (§9); bearbeitet wird sonst ausschließlich in der Vorschau.
+- Tipp-Bursts werden im Undo-Stack gebündelt (350 ms Commit + `coalesce`), strukturelle Änderungen bleiben einzeln rückgängig.
+- Im Feld gilt die Undo-Historie des Editors; außerhalb (`Strg+Z`) die Dokument-Historie des Tools.
 
 ### 8.2 Reihenfolge
 
 - Sortiert wird in der Vorschau nach `placement.order[breakpoint] ?? displayOrder`. `moveElementInDoc` tauscht daher **beides** – `displayOrder` und `placement.order` für alle Breakpoints –, damit die neue Reihenfolge sofort sichtbar ist.
 - Ausgeblendete Elemente (`hidden`, z. B. `theme-assets`) sind von der Sortierung ausgenommen und bleiben verankert.
+
+### 8.3 Listen, Einrückung und Absätze
+
+- Listen werden **flach** gespeichert (`paragraph.list.kind` + `level`) und beim Rendern zu verschachtelten `<ul>/<ol>` gruppiert (`groupBlocks`). Ein Sprung von Ebene 0 auf 3 wird auf 1 normalisiert; die Gruppierung ist deterministisch.
+- Ein Absatz gehört zu höchstens einer Liste; ein Wechsel der Listenart oder ein Absatz ohne `list` beendet die Liste.
+- Einrückung ohne Liste läuft über `paragraph.indent` (0–3) und wird als `padding-left` gerendert; in Listen übernehmen `sinkListItem`/`liftListItem` die Ein-/Ausrückung.
+- Ausrichtung, Zeilenabstand und Einrückung sind Absatzattribute – sie wirken auf alle Absätze der Auswahl.
+- **Shift+Enter** erzeugt einen weichen Umbruch im **selben** Absatz (`hardBreak` im Editor, `"\n"` im Modell); die Vorschau rendert ihn mit `white-space: pre-wrap`.
+
+### 8.4 Letzte Konfiguration (Session)
+
+- Bei jeder Änderung wird das Dokument entprellt (800 ms) lokal als **kanonisches JSON** unter `myqr24.tcd.session.v1` abgelegt.
+- Beim Start bzw. nach einem Reload wird dieser Stand geladen, migriert und geprüft; **blockierende** Befunde oder unlesbare Daten fallen auf die ausgelieferte Vorlage zurück.
+- Die Statuszeile weist darauf hin („Letzte Konfiguration geladen (zuletzt verwendet · Datum, Zeit)").
+- Der lokale Stand ersetzt **nicht** das Speichern in der Konfigurationsdatei: `Save`/`Save as` schreiben weiterhin `.tagcontent.json` (inkl. `palette.custom`).
+- Panels merken sich ihre Breiten getrennt (`myqr24.tcd.leftWidth`, `myqr24.tcd.rightWidth`).
+
+### 8.5 Markdown: Kürzel, Paste, Ein-/Ausgabe
+
+Markdown ist **Eingabe- und Ausgabeformat**, nie Speicherformat (`D-40`). Das Modell bleibt JSON; Markdown erzeugt und liest Tokens.
+
+| Kürzel / Eingabe | Ergebnis |
+| --- | --- |
+| `# ` … `##### ` am Zeilenanfang | Überschrift 1–5 (`###### ` bleibt Text) |
+| `- ` / `* `, `1. ` | Aufzählung / Nummerierung (auch verschachtelt) |
+| `**fett**`, `*kursiv*` / `_kursiv_` | Marks `bold`, `italic` |
+| `[Text](https://…)` | Link (nur `https`/`mailto`; andere Protokolle bleiben Text) |
+| Tabellen (`\| A \| B \|` + Ausrichtungszeile `\|:--\|--:\|`) | Tabellenblock mit Kopfzeile und Spaltenausrichtung |
+| Einfügen von Markdown-Text | automatisch, wenn der eingefügte Klartext nach Markdown aussieht (`#`, `- `, `1. `, `**`, Tabelle …) – über `markdown-it` (`html: false`) in Tokens übersetzt |
+| **MD**-Knopf | Dialog „Markdown einfügen oder exportieren" (Vorschau, Warnhinweise, Kopieren) |
+
+- HTML im Markdown wird **nie interpretiert**, sondern als Text übernommen (`html: false`).
+- Nicht abbildbare Auszeichnungen (Code, Durchstreichen, Bilder, Trennlinien, Zitate) werden zu Text bzw. verworfen – der Dialog nennt die Punkte.
+- Der Export enthält nur Struktur; Farben, Markierungen und Schriftgrößen sind nicht Teil von Markdown (Hinweis im Dialog).
+- „Übernehmen" **ersetzt** den Feldinhalt (per Undo rückgängig zu machen); es gibt keinen dauerhaften Markdown-Modus.
 
 
 
@@ -211,11 +323,11 @@ Bekannte, dokumentierte Abweichung: `guestScope: ownOnly` ist derzeit eine **War
 | Kopfzeile | TAG-Typ + „Neu", Vorlagenauswahl, Load/Save/Save as/Download, Undo/Redo, Breakpoint-Umschaltung |
 | Bibliotheksleiste | Name, `libraryVersion`, Anzahl Bausteine, Load/Save/Save as/Default |
 | Links | Elementliste (sortieren, löschen, hinzufügen), JSON-Ansicht mit Größe und Hash; **Breite per Ziehgriff verstellbar** (220–680 px, in `localStorage` gemerkt) |
-| Mitte | Live-Vorschau in Handy-/Tablet-/Desktopbreite, klickbare Elemente, **direkt editierbarer Text mit Formatierleiste** |
-| Rechts | Inspektor: Template-Rahmen, Farben, Layout, Element-Eigenschaften, Verhalten, Slots; Text nur als **Kontrollansicht** (bearbeitet wird in der Vorschau) |
+| Mitte | Live-Vorschau in Handy-/Tablet-/Desktopbreite, klickbare Elemente, **RTF-Textfelder mit Leiste** (Zeichen, Absatz, Listen, Schrift, Farben, Link) |
+| Rechts | Inspektor: Template-Rahmen, Farben, Layout, Element-Eigenschaften, Verhalten, Slots; **Breite per Ziehgriff verstellbar** (280–760 px, in `localStorage` gemerkt); Textkontrolle als **bearbeitbares JSON** (scrollbar, prüft beim Verlassen/„Übernehmen") |
 | Unten | Validierungsliste mit Sprung zum betroffenen Element |
 
-Tastenkürzel: `Strg+O` Load, `Strg+S` Save, `Strg+Shift+S` Save as, `Strg+Z`/`Strg+Shift+Z` Undo/Redo (im Textfeld bleibt das native Text-Undo aktiv).
+Tastenkürzel: `Strg+O` Load, `Strg+S` Save, `Strg+Shift+S` Save as, `Strg+Z`/`Strg+Shift+Z` Undo/Redo (im Textfeld bleibt das native Text-Undo aktiv), `Shift+Enter` weicher Umbruch, `Strg+B/I/U`, `Strg+K` Link.
 
 
 ---
@@ -233,19 +345,36 @@ Tastenkürzel: `Strg+O` Load, `Strg+S` Save, `Strg+Shift+S` Save as, `Strg+Z`/`S
 | `layout.test.ts` | Spalten bei 360/768/1280, Span-Klemmung, Sortierung, ausgeblendete Elemente |
 | `bindings.test.ts` | erlaubte Quellen, Auflösung, Fallback, Flatten |
 | `store.test.ts` | Reihenfolge sofort in der Vorschau sichtbar, `placement.order` je Breakpoint, Randfälle, Undo-Bündelung von Tipp-Bursts |
-| `inlineText.test.ts` | DOM → Runs (Fett/Kursiv/Unterstrichen, verschachtelt), Absätze an `<br>`/Blockelementen, Roundtrip Modell → DOM → Modell, Escaping |
-| `InlineTextEditor.test.tsx` | Leiste erscheint erst mit Fokus, Tippen erzeugt Runs, Fokus ohne Änderung bleibt ohne Dispatch, Farbwähler schreibt Element-Override, Zurücksetzen |
-| `App.test.tsx` | End-to-End: Aufbau der Arbeitsfläche, Sortieren wirkt sofort in der Vorschau, Formatierleiste beim Klick ins Textfeld, Änderung landet im JSON |
+| `richtext.test.ts` | Link-Allowlist, Zusammenfassen von Runs mit allen Attributen, `groupBlocks` (Verschachtelung, Ebenen-Normalisierung), Präsentations-Mapping |
+| `parseCss.test.ts` | Paste-Konvertierung: Hex/rgb → `#rrggbb`, px/pt/rem → Größenskala, Font-Stacks → Tokens, Ausrichtung, Zeilenabstand |
+| `mapping.test.ts` | Modell → Editor-Dokument → Modell (Roundtrip), Marks/Attribute, Listen mit Ebenen, **weiche Zeilenumbrüche**, unsichere Links verworfen, kanonische Idempotenz |
+| `schema.test.ts` | Schema enthält nur unsere Nodes/Marks (inkl. `hardBreak`), Überschrift ohne Marks, Listen + Einrücken, Absatz-Attribute, `richStyle`, `javascript:`-Links verworfen |
+| `RichTextField.test.tsx` | Modell-Anzeige, Leiste erst bei Fokus, B/I/U, Ausrichtung, Zeilenabstand, Listen, Schriftgröße/-familie auf der Auswahl (auch nach Fokuswechsel), Farbmenü (Theme/Standard/Eigene/RGB, hinzufügen/entfernen), Box-Hintergrund, Link-Validierung, weicher Umbruch, Commit bei Blur, Formatierung entfernen |
+| `RichText.test.tsx` | Vorschau-Renderer: Listen/Ausrichtung/Einrückung, Link ohne Navigation, HTML-Markup nur als Text, unsichere Links verworfen |
+| `paste.test.ts` | Sanitizer entfernt Script/Style/iframe/`on*`/`javascript:` und lässt normale Formatierung stehen |
+| `architecture.test.ts` | Quellscan: kein `innerHTML`/`dangerouslySetInnerHTML`/`getHTML()`/`eval`; Mapping enthält keine HTML-Pfade |
+| `session.test.ts` | „Letzte Konfiguration": kanonisch speichern, unverändert laden, unbrauchbare Stände verwerfen, Speicher leeren |
+| `markdown.test.ts` | Markdown → Modell (Überschriften 1–5/6, Marks, Links inkl. Ablehnung, Listen, Tabellen mit Ausrichtung, HTML nur als Text) und Modell → Markdown (Struktur, Maskierung, Warnungen, Stabiler Roundtrip) |
+| `Inspector.test.tsx` | Textkontrolle als JSON: Anzeige des Runs-Modells, Übernahme gültiger Änderungen, Abweisung von kaputtem JSON und Regelverstößen |
+| `App.test.tsx` | End-to-End: Aufbau der Arbeitsfläche, Sortieren wirkt sofort in der Vorschau, Leiste mit allen Gruppen (inkl. Farbmenüs, Absatzstil, Größenfeld) beim Fokus |
 
-Nachweisstand: **64 Tests grün** (10 Dateien), `tsc --noEmit` fehlerfrei, `vite build` erfolgreich.
+Nachweisstand: **158 Tests grün** (19 Dateien), `tsc --noEmit` fehlerfrei, `vite build` erfolgreich (815 kB JS / 15 kB CSS; gzip 272 kB / 3,9 kB).
 
 ---
 
 ## 11. Grenzen der ersten Version
 
-- Galerie- und Dokumenten-Überschriften sind noch nicht inline editierbar (nur Elemente mit `content`-Block);
-- Textgröße und Inline-Links sind nicht Teil des Runs-Modells (Größe über Überschriften/Theme, Links über `external-link`);
-- keine Slot-Anlage/-Löschung in der UI (nur `max` änderbar);
+- Die **Überschrift** ist jetzt frei formatierbar (auch Fett/Farbe/Größe); die Auszeichnung folgt der Absatzebene 1–5.
+- Keine Tabellenformatierung in Zellen (nur Text), keine Spaltenbreiten, kein Zeilen-/Spalten-Merge, keine Fußnoten, keine Bilder im Fließtext; Listen bis Ebene 3, Einrückung bis 3 Stufen.
+- Eingefügte Formatierung wird auf die geschlossenen Tokens abgebildet – exotische Werte (z. B. `40 px`, `Comic Sans`) werden verworfen, nicht gerundet.
+- Links nur `https:`/`mailto:`; keine relativen Ziele, keine Anchor-Links.
+- **Markdown ist kein Speicherformat**: Export/Austausch nur strukturell (ohne Farben/Größen), Import ersetzt den Feldinhalt; kein dauerhafter Markdown-Modus, keine Markdown-Dateien als Quelle.
+- Im Editor gilt die Editor-Historie, außerhalb die Dokument-Historie (kein gemeinsamer Undo-Stapel).
+- Eigene Farben: max. 24; sie sind Teil der Konfigurationsdatei, hängen aber nicht am Theme.
+- „Letzte Konfiguration" liegt im `localStorage` des Browsers (kein Schreiben in `public/`); für Weitergabe/Versionierung dient `Save`. Wird der Browser-Speicher geleert, startet das Tool mit der ausgelieferten Vorlage.
+- Die JSON-Textkontrolle prüft dieselben Regeln wie die Gesamtvalidierung; sie ersetzt nicht das Editieren in der Vorschau (dort gilt die Formatierleiste).
+- **Bezüge auf andere Elemente** (Galerie/Dokumente als Chip im Text) sind noch nicht umgesetzt: v1 deckt Texte, Überschriften, Listen, Links und Tabellen ab. Der Weg ist in der Refinement-Datei als `D-43` vorbereitet (typisierte Referenz, v1 nur Slots).
+- Keine Slot-Anlage/-Löschung in der UI (nur `max` änderbar);
 - keine Bearbeitung von `actions` über die UI (im JSON vorhanden und validiert);
 - keine Theme-Voreinstellungen/Theme-Bibliothek;
 - kein Drag-and-drop-Sortieren (Pfeiltasten; Tastatur-/DnD-Sortierung nach `TCD-US-004` folgt);
@@ -255,11 +384,28 @@ Nachweisstand: **64 Tests grün** (10 Dateien), `tsc --noEmit` fehlerfrei, `vite
 
 ---
 
-## 12. Verweise
+## 12. Editor-Technologie (Tiptap/ProseMirror)
+
+| Punkt | Festlegung |
+| --- | --- |
+| Bibliothek | `@tiptap/react`, `@tiptap/core`, `@tiptap/pm` und 8 Extension-Pakete, **exakt 3.34.0** |
+| Lizenz | MIT (Tiptap + ProseMirror), siehe [`../THIRD-PARTY.md`](../THIRD-PARTY.md) |
+| Schema | `doc > (richHeading \| paragraph \| bulletList \| orderedList \| richTable)+`; `richHeading.level` 1–5; `richTable > richTableRow+ > richTableCell+` (Zellen `text*`); Marks `bold`, `italic`, `underline`, `link`, `richStyle` (Farbe/Markierung/Größe/Familie); `hardBreak` für weiche Umbrüche |
+| Markdown | `markdown-it` 14 (`html: false`) als Tokenizer für Paste/Dialog; eigene Serialisierung für den Export (`src/rich/markdown.ts`) |
+| Brücke | `src/rich/mapping.ts`: `contentToDoc` (Modell → Editor) und `docToContent` (Editor → Modell) – der **einzige** Weg; kein direkter DOM-Zugriff |
+| Invariante | `docToContent(contentToDoc(x))` ist kanonisch gleich `x` (Roundtrip-Test, unsichere/ungültige Werte werden gedroppt) |
+| Speicherung | Editor-JSON wird **nie** gespeichert; `getHTML()` ist per Architektur-Test verboten |
+| Paste | `transformPastedHTML` (Sanitizer) + Schema-Parser; Ergebnis sind Tokens |
+| Bündel | Tabellen-, Drop- und Gapcursor von Tiptap sind **nicht** im Build (Tabellen sind eigene, schlanke Nodes); Gesamtgröße 815 kB JS (272 kB gzip), offline ohne CDN |
+
+---
+
+## 13. Verweise
 
 - Refinement: [`../../../docs/00-Refinement/tag-content-designer/tag-content-designer-refinement.md`](../../../docs/00-Refinement/tag-content-designer/tag-content-designer-refinement.md)
 - TAG-Content-Projektion: [`../../../docs/10-Architecture/30-Data-Architecture/40-TAG-APP-DATA-MODEL.md`](../../../docs/10-Architecture/30-Data-Architecture/40-TAG-APP-DATA-MODEL.md)
 - Access-Vertrag: [`../../../docs/10-Architecture/35-Contracts/tag-app-access-v1.md`](../../../docs/10-Architecture/35-Contracts/tag-app-access-v1.md)
 - TAG-App: [`../../../apps/tag-app/`](../../../apps/tag-app/)
 - Label-Designer (Vorbild): [`../../tag-designer/`](../../tag-designer/)
+
 

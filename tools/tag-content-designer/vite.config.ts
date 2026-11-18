@@ -13,9 +13,15 @@ export default defineConfig({
     port: 4180,
     strictPort: true,
   },
+  build: {
+    // Der RTF-Editor (ProseMirror/Tiptap) ist bewusst enthalten; das Tool läuft offline
+    // ohne CDN. Tabellen/Drop-/Gapcursor werden nicht gebündelt (siehe SPECIFICATION §12).
+    chunkSizeWarningLimit: 800,
+  },
   test: {
     include: ["src/**/*.test.{ts,tsx}"],
     environment: "node",
+    setupFiles: ["./src/test/setup.ts"],
   },
 });
 

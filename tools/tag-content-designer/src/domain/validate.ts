@@ -1,20 +1,28 @@
 import { isKnownBindingSource } from "./bindings";
 import { ELEMENT_CATALOG, FEATURES, PRESENTATIONS, TAG_TYPES, TAG_TYPE_FEATURES } from "./catalog";
 import { error, warning, type ValidationIssue } from "./errors";
+import { isFontFamily, isFontSize, isHeadingLevel, isHexColor, isLineHeight, isListKind, isTableBlock, isTextAlign, normalizeHref } from "./richtext";
 import { canonicalByteLength } from "./serialize";
 import {
   INSTANCE_SCHEMA,
   MAX_DOCUMENT_BYTES,
+  MAX_CUSTOM_COLORS,
   MAX_ELEMENTS,
   MAX_HEADING_LENGTH,
+  MAX_INDENT,
   MAX_ITEMS_PER_SLOT,
+  MAX_LIST_LEVEL,
   MAX_PARAGRAPHS,
   MAX_SLOTS_PER_ELEMENT,
+  MAX_TABLE_CELL_LENGTH,
+  MAX_TABLE_COLUMNS,
+  MAX_TABLE_ROWS,
+  MAX_TABLES,
   MAX_TEXT_LENGTH,
   SCHEMA_VERSION,
   TEMPLATE_SCHEMA,
 } from "./types";
-import type { TagType } from "./types";
+import type { ContentBlock, TagType } from "./types";
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -43,16 +51,32 @@ const PRINCIPALS = ["scanner", "guest", "owner"];
 const ACCEPTS = ["image", "document", "audio"];
 const MARKS = ["bold", "italic", "underline"];
 
-const FORBIDDEN_PATTERNS: Array<{ code: string; regex: RegExp; message: string }> = [
-  { code: "POLICY_HTML_MARKUP", regex: /<\s*\/?[a-z!]/i, message: "HTML-Markup ist im Template unzulässig." },
-  { code: "POLICY_SCRIPT_URL", regex: /javascript:/i, message: "javascript:-URLs sind unzulässig." },
-  { code: "POLICY_DATA_URL", regex: /\bdata:/i, message: "data:-URLs sind unzulässig." },
-  { code: "POLICY_CSS_URL", regex: /url\s*\(/i, message: "CSS-url(...) ist unzulässig." },
-  { code: "POLICY_EVENT_HANDLER", regex: /\son[a-z]+\s*=/i, message: "Inline-Event-Handler sind unzulässig." },
+const FORBIDDEN_PATTERNS: Array<{ code: string; regex: RegExp; message: string; severity: "error" | "warning" }> = [
+  {
+    code: "POLICY_HTML_MARKUP",
+    regex: /<\s*\/?[a-z!]/i,
+    message: "Der Text enthält HTML-ähnliches Markup und wird als reiner Text angezeigt.",
+    severity: "warning",
+  },
+  {
+    code: "POLICY_SCRIPT_URL",
+    regex: /javascript:/i,
+    message: "javascript:-URLs sind unzulässig.",
+    severity: "error",
+  },
+  { code: "POLICY_DATA_URL", regex: /\bdata:/i, message: "data:-URLs sind unzulässig.", severity: "error" },
+  { code: "POLICY_CSS_URL", regex: /url\s*\(/i, message: "CSS-url(...) ist unzulässig.", severity: "error" },
+  {
+    code: "POLICY_EVENT_HANDLER",
+    regex: /\son[a-z]+\s*=/i,
+    message: "Inline-Event-Handler sind unzulässig.",
+    severity: "error",
+  },
   {
     code: "POLICY_STORAGE_KEY",
     regex: /(object_key|objectKey|r2_key|r2Key)/,
     message: "Storage-Keys dürfen nicht im Template stehen.",
+    severity: "error",
   },
 ];
 
@@ -64,11 +88,16 @@ function scanStrings(value: unknown, path: string, issues: ValidationIssue[], de
   if (depth > 8) return;
   if (typeof value === "string") {
     for (const pattern of FORBIDDEN_PATTERNS) {
-      if (pattern.regex.test(value)) {
-        issues.push(
-          error(pattern.code, path, pattern.message, "Bitte auf reinen Text bzw. erlaubte Werte reduzieren."),
-        );
-      }
+      if (!pattern.regex.test(value)) continue;
+      const hint =
+        pattern.severity === "warning"
+          ? "Der Text ist unbedenklich, wird aber wörtlich angezeigt. Für Formatierung die Leiste nutzen."
+          : "Bitte auf reinen Text bzw. erlaubte Werte reduzieren.";
+      issues.push(
+        pattern.severity === "warning"
+          ? warning(pattern.code, path, pattern.message, hint)
+          : error(pattern.code, path, pattern.message, hint),
+      );
     }
     return;
   }
@@ -127,6 +156,7 @@ export function validateDocument(input: unknown): ValidationIssue[] {
   }
 
   if (doc.editability !== undefined) validateEditability(doc.editability, "editability", issues);
+  if (doc.palette !== undefined) validatePalette(doc.palette, issues);
 
   scanStrings(doc, "", issues);
 
@@ -420,15 +450,123 @@ function validateActions(actions: unknown, path: string, issues: ValidationIssue
 }
 
 
+function validatePalette(input: unknown, issues: ValidationIssue[]): void {
+  if (!isObject(input)) {
+    issues.push(error("PALETTE_INVALID", "palette", "palette muss ein Objekt sein."));
+    return;
+  }
+  const custom = input.custom;
+  if (custom === undefined) return;
+  if (!Array.isArray(custom)) {
+    issues.push(error("PALETTE_INVALID", "palette.custom", "palette.custom muss ein Array sein."));
+    return;
+  }
+  if (custom.length > MAX_CUSTOM_COLORS) {
+    issues.push(
+      error(
+        "PALETTE_LIMIT",
+        "palette.custom",
+        `Höchstens ${MAX_CUSTOM_COLORS} eigene Farben.`,
+        "Nicht mehr benötigte Farben im Farbmenü entfernen.",
+      ),
+    );
+  }
+  custom.forEach((entry, index) => {
+    if (!isHexColor(entry)) {
+      issues.push(
+        error("PALETTE_INVALID", `palette.custom[${index}]`, "Eigene Farben müssen als #rrggbb gespeichert werden."),
+      );
+    }
+  });
+}
+
+/** Prüft einen einzelnen `content`-Block (z. B. beim Bearbeiten der JSON-Kontrolle). */
+export function validateRichText(content: unknown, path = "content"): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  validateContent(content, path, issues);
+  return issues;
+}
+
+/**
+ * Tabellenblock: Spalten/Zeilen/Zelllängen und Ausrichtung prüfen.
+ * Zellen sind reiner Text – damit bleibt der Renderer frei von Formatierungs-Sonderfällen.
+ */
+function validateTableBlock(table: Record<string, unknown>, path: string, issues: ValidationIssue[]): void {
+  const columns = table.columns;
+  const rows = table.rows;
+  if (!Array.isArray(columns) || columns.length === 0 || columns.length > MAX_TABLE_COLUMNS) {
+    issues.push(
+      error("TABLE_COLUMNS_INVALID", `${path}.columns`, `Eine Tabelle braucht 1 bis ${MAX_TABLE_COLUMNS} Spalten.`),
+    );
+    return;
+  }
+  columns.forEach((column, index) => {
+    const align = isObject(column) ? column.align : undefined;
+    if (align !== undefined && !isTextAlign(align)) {
+      issues.push(
+        error("TABLE_ALIGN_INVALID", `${path}.columns[${index}].align`, "Spaltenausrichtung muss start, center oder end sein."),
+      );
+    }
+  });
+  if (!Array.isArray(rows) || rows.length === 0 || rows.length > MAX_TABLE_ROWS) {
+    issues.push(error("TABLE_ROWS_INVALID", `${path}.rows`, `Eine Tabelle braucht 1 bis ${MAX_TABLE_ROWS} Zeilen.`));
+    return;
+  }
+  rows.forEach((row, rowIndex) => {
+    const rowPath = `${path}.rows[${rowIndex}]`;
+    if (!isObject(row) || !Array.isArray(row.cells)) {
+      issues.push(error("TABLE_ROW_INVALID", rowPath, "Zeile braucht ein cells-Array."));
+      return;
+    }
+    if (row.cells.length !== columns.length) {
+      issues.push(
+        error(
+          "TABLE_ROW_LENGTH",
+          `${rowPath}.cells`,
+          `Jede Zeile braucht genau ${columns.length} Zellen.`,
+          "Spaltenzahl der Tabelle anpassen oder leere Zellen ergänzen.",
+        ),
+      );
+    }
+    row.cells.forEach((cell, cellIndex) => {
+      const cellPath = `${rowPath}.cells[${cellIndex}]`;
+      if (!isObject(cell) || typeof cell.text !== "string") {
+        issues.push(error("TABLE_CELL_INVALID", cellPath, "Zelle braucht einen Text."));
+        return;
+      }
+      if (cell.text.length > MAX_TABLE_CELL_LENGTH) {
+        issues.push(
+          error(
+            "TABLE_CELL_TOO_LONG",
+            `${cellPath}.text`,
+            `Zellen dürfen höchstens ${MAX_TABLE_CELL_LENGTH} Zeichen enthalten.`,
+          ),
+        );
+      }
+    });
+  });
+}
+
 function validateContent(content: unknown, path: string, issues: ValidationIssue[]): void {
   if (!isObject(content)) {
     issues.push(error("CONTENT_INVALID", path, "content muss ein Objekt sein."));
     return;
   }
-  if (content.heading !== undefined && (typeof content.heading !== "string" || content.heading.length > MAX_HEADING_LENGTH)) {
-    issues.push(
-      error("CONTENT_HEADING_INVALID", `${path}.heading`, `heading darf höchstens ${MAX_HEADING_LENGTH} Zeichen haben.`),
-    );
+  if (content.heading !== undefined) {
+    if (typeof content.heading !== "string" || content.heading.length > MAX_HEADING_LENGTH) {
+      issues.push(
+        error("CONTENT_HEADING_INVALID", `${path}.heading`, `heading darf höchstens ${MAX_HEADING_LENGTH} Zeichen haben.`),
+      );
+    } else {
+      issues.push(
+        warning(
+          "CONTENT_HEADING_DEPRECATED",
+          `${path}.heading`,
+          "Das Feld heading gehört zu schemaVersion 1 und wird beim Laden in einen Absatz mit Überschrift überführt.",
+          "Nach dem Laden/Speichern verschwindet der Hinweis.",
+        ),
+      );
+    }
   }
   const paragraphs = content.paragraphs;
   if (paragraphs === undefined) return;
@@ -441,11 +579,89 @@ function validateContent(content: unknown, path: string, issues: ValidationIssue
       error("CONTENT_PARAGRAPHS_LIMIT", `${path}.paragraphs`, `Höchstens ${MAX_PARAGRAPHS} Absätze pro Element.`),
     );
   }
+  const tableCount = (paragraphs as unknown[]).filter((entry) => isTableBlock(entry as ContentBlock | undefined)).length;
+  if (tableCount > MAX_TABLES) {
+    issues.push(
+      error(
+        "CONTENT_TABLES_LIMIT",
+        `${path}.paragraphs`,
+        `Höchstens ${MAX_TABLES} Tabellen pro Textfeld.`,
+        "Weitere Tabellen in ein eigenes Element auslagern.",
+      ),
+    );
+  }
   paragraphs.forEach((paragraph, paragraphIndex) => {
     const paragraphPath = `${path}.paragraphs[${paragraphIndex}]`;
+    if (isTableBlock(paragraph as ContentBlock | undefined)) {
+      validateTableBlock(paragraph as unknown as Record<string, unknown>, paragraphPath, issues);
+      return;
+    }
     if (!isObject(paragraph) || !Array.isArray(paragraph.runs)) {
       issues.push(error("CONTENT_PARAGRAPH_INVALID", paragraphPath, "Absatz braucht ein runs-Array."));
       return;
+    }
+    if (paragraph.align !== undefined && !isTextAlign(paragraph.align)) {
+      issues.push(error("CONTENT_PARAGRAPH_ALIGN_INVALID", `${paragraphPath}.align`, "align muss start, center oder end sein."));
+    }
+    if (paragraph.lineHeight !== undefined && !isLineHeight(paragraph.lineHeight)) {
+      issues.push(
+        error(
+          "CONTENT_PARAGRAPH_LINE_HEIGHT_INVALID",
+          `${paragraphPath}.lineHeight`,
+          "lineHeight muss aus der Skala 1, 1.15, 1.3, 1.5, 1.75, 2 stammen.",
+        ),
+      );
+    }
+    if (
+      paragraph.indent !== undefined &&
+      (!Number.isInteger(paragraph.indent) || (paragraph.indent as number) < 0 || (paragraph.indent as number) > MAX_INDENT)
+    ) {
+      issues.push(
+        error(
+          "CONTENT_PARAGRAPH_INDENT_INVALID",
+          `${paragraphPath}.indent`,
+          `indent muss eine ganze Zahl von 0 bis ${MAX_INDENT} sein.`,
+        ),
+      );
+    }
+    if (paragraph.heading !== undefined && !isHeadingLevel(paragraph.heading)) {
+      issues.push(
+        error(
+          "PARAGRAPH_HEADING_INVALID",
+          `${paragraphPath}.heading`,
+          "heading muss eine Überschriftenebene von 1 bis 5 sein.",
+          "Ebenen 6+ sind nicht vorgesehen; stattdessen Ebene 5 oder einen Absatz verwenden.",
+        ),
+      );
+    }
+    if (paragraph.heading !== undefined && paragraph.list !== undefined) {
+      issues.push(
+        error(
+          "PARAGRAPH_HEADING_LIST_CONFLICT",
+          paragraphPath,
+          "Ein Absatz kann nicht gleichzeitig Überschrift und Listeneintrag sein.",
+          "Entweder die Überschriftenebene oder die Liste entfernen.",
+        ),
+      );
+    }
+    if (paragraph.list !== undefined) {
+      const list = paragraph.list;
+      const level = isObject(list) ? list.level : undefined;
+      if (
+        !isObject(list) ||
+        !isListKind(list.kind) ||
+        !Number.isInteger(level) ||
+        (level as number) < 0 ||
+        (level as number) > MAX_LIST_LEVEL
+      ) {
+        issues.push(
+          error(
+            "CONTENT_LIST_INVALID",
+            `${paragraphPath}.list`,
+            `list braucht kind (bullet/ordered) und level von 0 bis ${MAX_LIST_LEVEL}.`,
+          ),
+        );
+      }
     }
     let length = 0;
     paragraph.runs.forEach((run, runIndex) => {
@@ -455,6 +671,43 @@ function validateContent(content: unknown, path: string, issues: ValidationIssue
         return;
       }
       length += run.text.length;
+      for (const key of ["color", "background"]) {
+        if (run[key] !== undefined && !isHexColor(run[key])) {
+          issues.push(
+            error(
+              "CONTENT_RUN_COLOR_INVALID",
+              `${runPath}.${key}`,
+              "Zeichen- und Markierungsfarbe müssen als #rrggbb angegeben werden.",
+            ),
+          );
+        }
+      }
+      if (run.fontSize !== undefined && !isFontSize(run.fontSize)) {
+        issues.push(
+          error(
+            "CONTENT_RUN_FONT_SIZE_INVALID",
+            `${runPath}.fontSize`,
+            "fontSize muss aus der Skala 12, 14, 16, 18, 20, 24, 28, 32 stammen.",
+          ),
+        );
+      }
+      if (run.fontFamily !== undefined && !isFontFamily(run.fontFamily)) {
+        issues.push(
+          error("CONTENT_RUN_FONT_FAMILY_INVALID", `${runPath}.fontFamily`, "fontFamily muss sans, serif oder mono sein."),
+        );
+      }
+      if (run.link !== undefined) {
+        const href = isObject(run.link) ? run.link.href : undefined;
+        if (normalizeHref(href) === null) {
+          issues.push(
+            error(
+              "CONTENT_RUN_LINK_INVALID",
+              `${runPath}.link`,
+              "Link muss mit https:// oder mailto: beginnen und frei von Steuerzeichen sein.",
+            ),
+          );
+        }
+      }
       if (run.marks !== undefined) {
         if (!Array.isArray(run.marks)) {
           issues.push(error("CONTENT_MARKS_INVALID", `${runPath}.marks`, "marks muss ein Array sein."));

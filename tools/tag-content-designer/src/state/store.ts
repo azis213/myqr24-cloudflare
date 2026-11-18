@@ -50,6 +50,15 @@ export function updatePlacementInDoc(
   };
 }
 
+export function setCustomColorsInDoc(doc: TagContentDocument, colors: string[]): TagContentDocument {
+  const custom = [...new Set(colors.map((entry) => entry.toLowerCase()))];
+  if (custom.length === 0) {
+    const { palette: _removed, ...rest } = doc;
+    return rest;
+  }
+  return { ...doc, palette: { custom } };
+}
+
 export function addElementToDoc(
   doc: TagContentDocument,
   type: ElementType,

@@ -8,12 +8,34 @@ describe("migrateDocument", () => {
     const result = migrateDocument(vaultTemplate);
     expect(result.migrated).toBe(false);
     expect(result.changes).toHaveLength(0);
+    expect(result.from).toBe(2);
+    expect(result.to).toBe(2);
+  });
+
+  it("überführt schemaVersion 1 (content.heading) in den Absatzfluss", () => {
+    const legacy = structuredClone(vaultTemplate) as unknown as Record<string, unknown>;
+    legacy.schemaVersion = 1;
+    const elements = legacy.elements as Array<Record<string, unknown>>;
+    elements[0].content = { heading: "Willkommen", paragraphs: [{ runs: [{ text: "Text" }] }] };
+
+    const result = migrateDocument(legacy);
+    expect(result.migrated).toBe(true);
     expect(result.from).toBe(1);
-    expect(result.to).toBe(1);
+    expect(result.to).toBe(2);
+    expect(result.changes.length).toBeGreaterThan(0);
+
+    const content = (result.document.elements as Array<Record<string, unknown>>)[0].content as {
+      heading?: string;
+      paragraphs: Array<{ heading?: number; runs: Array<{ text: string }> }>;
+    };
+    expect(content.heading).toBeUndefined();
+    expect(content.paragraphs[0].heading).toBe(3);
+    expect(content.paragraphs[0].runs[0].text).toBe("Willkommen");
+    expect(content.paragraphs[1].runs[0].text).toBe("Text");
   });
 
   it("lehnt neuere Versionen erklärend ab", () => {
-    const doc = { ...structuredClone(vaultTemplate), schemaVersion: 2 };
+    const doc = { ...structuredClone(vaultTemplate), schemaVersion: 3 };
     expect(() => migrateDocument(doc)).toThrowError(DocumentError);
     try {
       migrateDocument(doc);
@@ -35,8 +57,8 @@ describe("migrateDocument", () => {
   it("führt kumulative Stufen aus und protokolliert Änderungen", () => {
     const steps: MigrationStep[] = [
       {
-        from: 1,
-        to: 2,
+        from: 2,
+        to: 3,
         description: "Beispielstufe",
         apply: (document) => ({
           document: { ...document, migratedFlag: true },
@@ -44,9 +66,9 @@ describe("migrateDocument", () => {
         }),
       },
     ];
-    const result = migrateDocument(vaultTemplate, steps, 2);
+    const result = migrateDocument(vaultTemplate, steps, 3);
     expect(result.migrated).toBe(true);
-    expect(result.to).toBe(2);
+    expect(result.to).toBe(3);
     expect(result.changes).toEqual(["migratedFlag ergänzt"]);
     expect((result.document as { migratedFlag?: boolean }).migratedFlag).toBe(true);
   });

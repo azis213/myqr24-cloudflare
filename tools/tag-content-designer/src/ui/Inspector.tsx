@@ -1,6 +1,7 @@
-import type { Breakpoint, Presentation, TagContentDocument, TemplateElement } from "../domain/types";
+import { useEffect, useState } from "react";
+import type { Breakpoint, Presentation, RichTextContent, TagContentDocument, TemplateElement } from "../domain/types";
 import { PRESENTATIONS, TAG_TYPE_LABELS } from "../domain/catalog";
-import { RichText } from "../preview/RichText";
+import { validateRichText } from "../domain/validate";
 import { updateElementInDoc, updatePlacementInDoc, updateShellInDoc, updateThemeColorsInDoc } from "../state/store";
 
 export interface InspectorProps {
@@ -211,24 +212,102 @@ function ElementInspector({
   );
 }
 
-function TextSummary({ element }: { element: TemplateElement }) {
-  const content = element.content;
-  const paragraphs = content?.paragraphs ?? [];
-  const hasText = (content?.heading ?? "").length > 0 || paragraphs.length > 0;
+/**
+ * Textkontrolle als **bearbeitbares JSON**: zeigt das Runs-Modell des Textfelds, prüft beim
+ * Verlassen/„Übernehmen" mit denselben Regeln wie die Gesamtvalidierung und speichert nur
+ * fehlerfreie Inhalte. Der Block ist scrollbar, damit lange Texte die Spalte nicht sprengen.
+ */
+function TextJsonEditor({
+  doc,
+  element,
+  onChange,
+}: {
+  doc: TagContentDocument;
+  element: TemplateElement;
+  onChange: (doc: TagContentDocument) => void;
+}) {
+  const serialised = JSON.stringify(element.content ?? { paragraphs: [] }, null, 2);
+  const [draft, setDraft] = useState(serialised);
+  const [error, setError] = useState<string | null>(null);
+
+  // Externe Änderungen (Vorschau, Undo, Laden) übernehmen, solange der Nutzer nichts tippt.
+  useEffect(() => {
+    setDraft(serialised);
+    setError(null);
+  }, [serialised, element.elementId]);
+
+  const apply = (text: string) => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch (parseError) {
+      setError(`Kein gültiges JSON: ${(parseError as Error).message}`);
+      return;
+    }
+    const blocking = validateRichText(parsed, "content").filter((issue) => issue.blocking);
+    if (blocking.length > 0) {
+      setError(`${blocking[0].path}: ${blocking[0].message}`);
+      return;
+    }
+    const next = parsed as RichTextContent;
+    onChange(updateElementInDoc(doc, element.elementId, { content: next }));
+    setError(null);
+    setDraft(JSON.stringify(next, null, 2));
+  };
+
+  const format = () => {
+    try {
+      setDraft(JSON.stringify(JSON.parse(draft), null, 2));
+      setError(null);
+    } catch (parseError) {
+      setError(`Kein gültiges JSON: ${(parseError as Error).message}`);
+    }
+  };
+
   return (
     <div className="inspector">
-      <h3>Text (Kontrolle)</h3>
-      {hasText ? (
-        <div className="text-summary">
-          <RichText content={content} />
-        </div>
-      ) : (
-        <p className="hint">Noch kein Text hinterlegt.</p>
-      )}
+      <h3>Text (JSON)</h3>
       <p className="hint">
-        Bearbeitet wird direkt in der Vorschau: Klick ins Textfeld, Formatierleiste erscheint darüber
-        (Fett, Kursiv, Unterstrich, Vorder-/Hintergrundfarbe).
+        Runs-Modell des Textfelds – hier direkt anpassbar. Geprüft wird beim Verlassen des Feldes oder mit
+        „Übernehmen"; nur fehlerfreie Inhalte werden gespeichert.
       </p>
+      <textarea
+        className="json-text"
+        aria-label="Text-JSON"
+        spellCheck={false}
+        rows={14}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => apply(draft)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+            event.preventDefault();
+            apply(draft);
+          }
+        }}
+      />
+      {error ? (
+        <p className="error-hint" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="group">
+        <button type="button" onClick={() => apply(draft)}>
+          Übernehmen
+        </button>
+        <button type="button" onClick={format}>
+          Formatieren
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(serialised);
+            setError(null);
+          }}
+        >
+          Zurücksetzen
+        </button>
+      </div>
     </div>
   );
 }
@@ -405,7 +484,7 @@ export function Inspector({ doc, selectedId, breakpoint, onChange }: InspectorPr
   return (
     <>
       <ElementInspector doc={doc} element={element} breakpoint={breakpoint} onChange={onChange} />
-      {textual ? <TextSummary element={element} /> : null}
+      {textual ? <TextJsonEditor doc={doc} element={element} onChange={onChange} /> : null}
       <PayloadEditor doc={doc} element={element} onChange={onChange} />
       <SlotEditor doc={doc} element={element} onChange={onChange} />
     </>

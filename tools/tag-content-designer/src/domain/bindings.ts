@@ -1,4 +1,6 @@
-import type { RichTextContent, TemplateElement } from "./types";
+import { DEFAULT_HEADING_LEVEL } from "./types";
+import { isTableBlock } from "./richtext";
+import type { Paragraph, RichTextContent, TemplateElement } from "./types";
 
 export interface BindingContext {
   tagName?: string;
@@ -25,6 +27,18 @@ function bindingValue(source: string, literal: string | undefined, context: Bind
   }
 }
 
+/** Setzt den Text der ersten Überschrift; legt sie an, wenn noch keine existiert. */
+function applyHeadingBinding(content: RichTextContent, text: string): void {
+  const blocks = content.paragraphs ?? [];
+  const first = blocks[0];
+  if (first && !isTableBlock(first) && first.heading !== undefined) {
+    blocks[0] = { ...first, runs: [{ text }] } as Paragraph;
+  } else {
+    blocks.unshift({ heading: DEFAULT_HEADING_LEVEL, runs: [{ text }] });
+  }
+  content.paragraphs = blocks;
+}
+
 /**
  * Loest `bindings` gegen den Kontext auf. Bindings sind Autorenwerkzeuge:
  * beim Flatten entsteht daraus `content`; in der Instanz existieren keine Bindings mehr.
@@ -39,7 +53,7 @@ export function resolveContent(element: TemplateElement, context: BindingContext
     const binding = bindings[field];
     if (!binding) continue;
     const value = bindingValue(binding.from, binding.value, context);
-    if (typeof value === "string" && value.length > 0) content.heading = value;
+    if (typeof value === "string" && value.length > 0) applyHeadingBinding(content, value);
   }
   const subtitle = bindings.subtitle;
   if (subtitle) {

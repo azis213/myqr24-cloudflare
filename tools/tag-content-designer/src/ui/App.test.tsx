@@ -37,16 +37,35 @@ describe("App", () => {
     expect(badges()).toEqual(["Text", "Galerie", "Hinweis", "Dokumentenliste"]);
   });
 
-  it("öffnet die Formatierleiste beim Klick ins Textfeld und übernimmt Änderungen", () => {
+  it("öffnet die Formatierleiste beim Fokus und bietet alle Funktionen", () => {
     const { container } = setup();
-    const surface = container.querySelector(".inline-surface") as HTMLElement;
-    fireEvent.focus(surface);
-    expect(container.querySelector(".formatbar")).not.toBeNull();
+    const surface = container.querySelector(".rte-surface") as HTMLElement;
+    const holder = container.querySelector(".rte-toolbar-holder") as HTMLElement;
+    expect(surface).not.toBeNull();
+    expect(holder.hasAttribute("hidden")).toBe(true);
 
-    surface.innerHTML = '<h2 class="rt-heading">Willkommen</h2><p>Direkt bearbeitet.</p>';
-    fireEvent.input(surface);
+    fireEvent.focus(surface);
+    expect(holder.hasAttribute("hidden")).toBe(false);
+
+    const labels = Array.from(container.querySelectorAll(".rte-toolbar .fb-btn")).map((button) =>
+      button.getAttribute("aria-label"),
+    );
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "Fett (Strg+B)",
+        "Kursiv (Strg+I)",
+        "Unterstrichen (Strg+U)",
+        "Aufzählung (Strg+Shift+8)",
+        "Nummerierte Liste (Strg+Shift+7)",
+        "Zeichenfarbe",
+        "Text-Markierung",
+        "Box-Hintergrund",
+      ]),
+    );
+    const toolbar = container.querySelector(".rte-toolbar") as HTMLElement;
+    expect(toolbar.querySelectorAll("select")).toHaveLength(3);
 
     const json = container.querySelector(".json") as HTMLTextAreaElement;
-    expect(json.value).toContain("Direkt bearbeitet.");
+    expect(json.value).toContain("Willkommen");
   });
 });

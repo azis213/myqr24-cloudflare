@@ -1,3 +1,4 @@
+import { SCHEMA_VERSION, TEMPLATE_SCHEMA } from "./types";
 import type {
   ElementType,
   Feature,
@@ -275,8 +276,8 @@ export function createDocument(options: {
   const { templateId, tagType, name } = options;
   const presentation = options.presentation ?? "standard";
   return {
-    schema: "myqr24-tag-content-template-v1",
-    schemaVersion: 1,
+    schema: TEMPLATE_SCHEMA,
+    schemaVersion: SCHEMA_VERSION,
     template: {
       templateId,
       templateVersion: options.templateVersion ?? 1,

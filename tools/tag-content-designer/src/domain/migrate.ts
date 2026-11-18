@@ -19,9 +19,42 @@ export interface MigrationResult {
 /**
  * Kumulative Migrationskette. Jede Stufe ist eine pure Funktion
  * (kein Netzwerk, keine Zeit, kein Zufall) und wird der Reihe nach ausgeführt.
- * Aktuell existiert nur schemaVersion 1; Stufen werden hier ergänzt.
  */
-export const MIGRATIONS: MigrationStep[] = [];
+export const MIGRATIONS: MigrationStep[] = [
+  {
+    from: 1,
+    to: 2,
+    description: "Überschrift in den Absatzfluss überführen (paragraph.heading)",
+    apply: (document) => {
+      const changes: string[] = [];
+      const elements = document.elements;
+      if (!Array.isArray(elements)) return { document, changes };
+
+      const migrated = elements.map((entry, index) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+        const element = entry as Record<string, unknown>;
+        const content = element.content;
+        if (!content || typeof content !== "object" || Array.isArray(content)) return entry;
+        const rich = content as Record<string, unknown>;
+        if (typeof rich.heading !== "string") return entry;
+
+        const text = rich.heading.trim();
+        const paragraphs = Array.isArray(rich.paragraphs) ? [...rich.paragraphs] : [];
+        delete rich.heading;
+        if (text.length > 0) {
+          paragraphs.unshift({ heading: 3, runs: [{ text }] });
+        }
+        rich.paragraphs = paragraphs;
+        changes.push(
+          `elements[${index}].content.heading → Überschrift 3 im Absatzfluss${text.length === 0 ? " (leer, entfernt)" : ""}`,
+        );
+        return { ...element, content: rich };
+      });
+
+      return { document: { ...document, elements: migrated }, changes };
+    },
+  },
+];
 
 export function migrateDocument(
   input: unknown,

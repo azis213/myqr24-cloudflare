@@ -1,6 +1,6 @@
 import { ELEMENT_CATALOG } from "./catalog";
 import { error, type ValidationIssue } from "./errors";
-import { LIBRARY_SCHEMA, SCHEMA_VERSION } from "./types";
+import { LIBRARY_SCHEMA, LIBRARY_SCHEMA_VERSION } from "./types";
 import type { ElementLibrary, ElementTemplate } from "./types";
 
 export type LibraryChangeAction = "added" | "replaced" | "unchanged" | "ignored-older";
@@ -34,9 +34,9 @@ export function validateLibrary(input: unknown): ValidationIssue[] {
       ),
     );
   }
-  if (input.schemaVersion !== SCHEMA_VERSION) {
+  if (input.schemaVersion !== LIBRARY_SCHEMA_VERSION) {
     issues.push(
-      error("LIBRARY_SCHEMA_VERSION_UNSUPPORTED", "schemaVersion", `Erwartet wird schemaVersion ${SCHEMA_VERSION}.`),
+      error("LIBRARY_SCHEMA_VERSION_UNSUPPORTED", "schemaVersion", `Erwartet wird schemaVersion ${LIBRARY_SCHEMA_VERSION}.`),
     );
   }
   if (!Number.isInteger(input.libraryVersion) || (input.libraryVersion as number) < 1) {
@@ -116,7 +116,7 @@ export function isElementLibrary(value: unknown): value is ElementLibrary {
 }
 
 export function emptyLibrary(): ElementLibrary {
-  return { schema: LIBRARY_SCHEMA, schemaVersion: SCHEMA_VERSION, libraryVersion: 1, elements: [] };
+  return { schema: LIBRARY_SCHEMA, schemaVersion: LIBRARY_SCHEMA_VERSION, libraryVersion: 1, elements: [] };
 }
 
 /** Merge: neue ID ergänzen, höhere Version ersetzen, gleiche Version unverändert, ältere ignorieren. */

@@ -1,30 +1,112 @@
-import type { CSSProperties } from "react";
-import type { RichTextContent, TextRun } from "../domain/types";
+import type { CSSProperties, ReactNode } from "react";
+import {
+  clampHeadingLevel,
+  groupBlocks,
+  linkAttributes,
+  normalizeHref,
+  paragraphPresentation,
+  runPresentation,
+  type BlockNode,
+  type ListItemNode,
+} from "../domain/richtext";
+import type { ListKind, Paragraph, RichTextContent, TableBlock, TextRun } from "../domain/types";
 
-function runStyle(run: TextRun): CSSProperties {
-  const style: CSSProperties = {};
-  for (const mark of run.marks ?? []) {
-    if (mark.type === "bold") style.fontWeight = 700;
-    if (mark.type === "italic") style.fontStyle = "italic";
-    if (mark.type === "underline") style.textDecoration = "underline";
+function Run({ run }: { run: TextRun }) {
+  const style = runPresentation(run) as CSSProperties;
+  const href = normalizeHref(run.link?.href);
+  if (!href) return <span style={style}>{run.text}</span>;
+  return (
+    <a {...linkAttributes(href)} style={style} title={href} onClick={(event) => event.preventDefault()}>
+      {run.text}
+    </a>
+  );
+}
+
+/** Absatz oder – bei `heading` – eine Überschrift 1–5 mit denselben Absatz-Attributen. */
+function ParagraphView({ paragraph }: { paragraph: Paragraph }) {
+  const style = paragraphPresentation(paragraph) as CSSProperties;
+  const runs: ReactNode =
+    paragraph.runs.length === 0 ? <br /> : paragraph.runs.map((run, index) => <Run key={index} run={run} />);
+  if (paragraph.heading !== undefined) {
+    const level = clampHeadingLevel(paragraph.heading);
+    const Tag = `h${level}` as "h1";
+    return (
+      <Tag className={`rt-heading rt-heading-${level}`} data-level={level} style={style}>
+        {runs}
+      </Tag>
+    );
   }
-  return style;
+  return (
+    <p className="rt-paragraph" style={style}>
+      {runs}
+    </p>
+  );
+}
+
+function ListView({ kind, items }: { kind: ListKind; items: ListItemNode[] }) {
+  const children = items.map((item, index) => (
+    <li key={index} className="rt-list-item">
+      {item.paragraphs.map((paragraph, paragraphIndex) => (
+        <ParagraphView key={`p${paragraphIndex}`} paragraph={paragraph} />
+      ))}
+      {item.children.map((child, childIndex) => (
+        <BlockView key={`c${childIndex}`} block={child} />
+      ))}
+    </li>
+  ));
+  return kind === "ordered" ? (
+    <ol className="rt-list rt-list-ordered">{children}</ol>
+  ) : (
+    <ul className="rt-list rt-list-bullet">{children}</ul>
+  );
+}
+
+function TableView({ table }: { table: TableBlock }) {
+  return (
+    <table className="rt-table">
+      <tbody>
+        {table.rows.map((row, rowIndex) => (
+          <tr key={rowIndex}>
+            {table.columns.map((column, columnIndex) => {
+              const cell = row.cells[columnIndex] ?? { text: "" };
+              const style: CSSProperties = column.align && column.align !== "start" ? { textAlign: column.align } : {};
+              return row.header ? (
+                <th key={columnIndex} className="rt-cell" style={style}>
+                  {cell.text}
+                </th>
+              ) : (
+                <td key={columnIndex} className="rt-cell" style={style}>
+                  {cell.text}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function BlockView({ block }: { block: BlockNode }) {
+  if (block.type === "table") return <TableView table={block.table} />;
+  return block.type === "list" ? <ListView kind={block.kind} items={block.items} /> : <ParagraphView paragraph={block.paragraph} />;
 }
 
 export function RichText({ content }: { content?: RichTextContent }) {
   if (!content) return null;
+  const blocks = groupBlocks(content.paragraphs ?? []);
   return (
     <div className="rt">
-      {content.heading ? <h2 className="rt-heading">{content.heading}</h2> : null}
-      {(content.paragraphs ?? []).map((paragraph, paragraphIndex) => (
-        <p className="rt-paragraph" key={paragraphIndex}>
-          {paragraph.runs.map((run, runIndex) => (
-            <span key={runIndex} style={runStyle(run)}>
-              {run.text}
-            </span>
-          ))}
-        </p>
+      {/* Altbestand (schemaVersion 1): Feld `heading` wird als Überschrift 3 gerendert. */}
+      {content.heading ? (
+        <h3 className="rt-heading rt-heading-3" data-level={3}>
+          {content.heading}
+        </h3>
+      ) : null}
+      {blocks.map((block, index) => (
+        <BlockView key={index} block={block} />
       ))}
     </div>
   );
 }
+

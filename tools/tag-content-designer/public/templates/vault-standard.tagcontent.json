@@ -1,6 +1,6 @@
 {
   "schema": "myqr24-tag-content-template-v1",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "template": {
     "templateId": "tct_vault_standard",
     "templateVersion": 1,
@@ -93,8 +93,8 @@
       "style": { "background": { "type": "solid", "color": "surface" }, "padding": "md" },
       "payload": { "headingLevel": "h2", "align": "start", "maxParagraphs": 8 },
       "content": {
-        "heading": "Willkommen",
         "paragraphs": [
+          { "heading": 3, "runs": [{ "text": "Willkommen" }] },
           {
             "runs": [
               { "text": "Diese Ansicht gehört zu einem myQR24 TAG. " },
@@ -115,8 +115,8 @@
       },
       "payload": { "tone": "info" },
       "content": {
-        "heading": "Hinweis",
         "paragraphs": [
+          { "heading": 3, "runs": [{ "text": "Hinweis" }] },
           { "runs": [{ "text": "Private Inhalte werden in dieser öffentlichen Ansicht nicht angezeigt." }] }
         ]
       }
@@ -137,7 +137,7 @@
         "lightbox": true,
         "maxImages": 48
       },
-      "content": { "heading": "Eindrücke" },
+      "content": { "paragraphs": [{ "heading": 3, "runs": [{ "text": "Eindrücke" }] }] },
       "actions": {
         "upload": {
           "enabled": true,
@@ -174,7 +174,7 @@
         "order": { "mobile": 40, "tablet": 40, "desktop": 40 }
       },
       "payload": { "view": "list", "showMeta": true, "sort": "date-desc", "maxItems": 32 },
-      "content": { "heading": "Dokumente" },
+      "content": { "paragraphs": [{ "heading": 3, "runs": [{ "text": "Dokumente" }] }] },
       "actions": {
         "upload": { "enabled": false },
         "download": { "enabled": true, "principals": ["guest", "owner"] }

@@ -1,14 +1,27 @@
 export const TEMPLATE_SCHEMA = "myqr24-tag-content-template-v1" as const;
 export const INSTANCE_SCHEMA = "myqr24-tag-content-instance-v1" as const;
 export const LIBRARY_SCHEMA = "myqr24-tag-element-library-v1" as const;
-export const SCHEMA_VERSION = 1;
+/**
+ * Version des Bibliotheksformats – unabhängig von der Dokument-Version, weil sich
+ * die Element-Bibliothek bei Schema-Wechseln des Dokuments nicht mitändert.
+ */
+export const LIBRARY_SCHEMA_VERSION = 1;
+/** 2: Überschriften liegen als Absatz-Attribut (`paragraph.heading`) im Absatzfluss. */
+export const SCHEMA_VERSION = 2;
 export const MAX_DOCUMENT_BYTES = 48 * 1024;
 export const MAX_ELEMENTS = 24;
 export const MAX_SLOTS_PER_ELEMENT = 16;
 export const MAX_ITEMS_PER_SLOT = 64;
-export const MAX_PARAGRAPHS = 8;
+export const MAX_PARAGRAPHS = 16;
 export const MAX_TEXT_LENGTH = 2048;
 export const MAX_HEADING_LENGTH = 120;
+/** Tabellen: bewusst klein gehalten (Zellen sind reiner Text). */
+export const MAX_TABLE_COLUMNS = 6;
+export const MAX_TABLE_ROWS = 20;
+export const MAX_TABLE_CELL_LENGTH = 200;
+export const MAX_TABLES = 2;
+/** Obergrenze für selbst angelegte Farben (Palette der Formatierleiste). */
+export const MAX_CUSTOM_COLORS = 24;
 
 export type TagType = "vault" | "lost-found" | "event" | "exhibit" | "maintenance";
 export type Visibility = "public" | "shared" | "private" | "ownerOnly";
@@ -40,22 +53,79 @@ export type Principal = "scanner" | "guest" | "owner";
 export type SlotAccept = "image" | "document" | "audio";
 export type MarkName = "bold" | "italic" | "underline";
 
+/** Geschlossene Skalen für Zeichen- und Absatzformatierung (kein freies CSS). */
+export const FONT_SIZE_SCALE = [12, 14, 16, 18, 20, 24, 28, 32] as const;
+export type FontSize = (typeof FONT_SIZE_SCALE)[number];
+export const FONT_FAMILIES = ["sans", "serif", "mono"] as const;
+export type FontFamily = (typeof FONT_FAMILIES)[number];
+export const TEXT_ALIGNS = ["start", "center", "end"] as const;
+export type TextAlign = (typeof TEXT_ALIGNS)[number];
+export const LINE_HEIGHT_SCALE = [1, 1.15, 1.3, 1.5, 1.75, 2] as const;
+export type LineHeight = (typeof LINE_HEIGHT_SCALE)[number];
+export const LIST_KINDS = ["bullet", "ordered"] as const;
+export type ListKind = (typeof LIST_KINDS)[number];
+export const MAX_LIST_LEVEL = 3;
+export const MAX_INDENT = 3;
+/** Überschriftenebenen; jede Textzeile kann eine Überschrift sein. */
+export const HEADING_LEVELS = [1, 2, 3, 4, 5] as const;
+export type HeadingLevel = (typeof HEADING_LEVELS)[number];
+/** Standardebene für migrierte/neue Überschriften (entspricht der bisherigen Optik). */
+export const DEFAULT_HEADING_LEVEL: HeadingLevel = 3;
+
 export interface Mark {
   type: MarkName;
+}
+
+export interface RunLink {
+  /** Nur `https://…` oder `mailto:…`; wird validiert. */
+  href: string;
 }
 
 export interface TextRun {
   text: string;
   marks?: Mark[];
+  /** Zeichenfarbe, `#rrggbb`. */
+  color?: string;
+  /** Hintergrundfarbe des markierten Textes, `#rrggbb`. */
+  background?: string;
+  fontSize?: FontSize;
+  fontFamily?: FontFamily;
+  link?: RunLink;
 }
 
 export interface Paragraph {
   runs: TextRun[];
+  align?: TextAlign;
+  lineHeight?: LineHeight;
+  /** Einrückung ohne Liste, 0–3. */
+  indent?: number;
+  /** Aufzählung/Nummerierung; `level` 0–3. Nicht zusammen mit `heading`. */
+  list?: { kind: ListKind; level: number };
+  /** Zeile ist eine Überschrift 1–5. Nicht zusammen mit `list`. */
+  heading?: HeadingLevel;
 }
 
+/** Tabellenzelle: reiner Text (keine Marks) – hält Modell, Renderer und Validierung schlank. */
+export interface TableCell {
+  text: string;
+}
+
+export interface TableBlock {
+  type: "table";
+  columns: Array<{ align?: TextAlign }>;
+  rows: Array<{ header?: boolean; cells: TableCell[] }>;
+}
+
+/** Geordneter Inhalt eines Textfelds: Absätze (inkl. Überschriften) und Tabellen. */
+export type ContentBlock = Paragraph | TableBlock;
+
 export interface RichTextContent {
+  /**
+   * @deprecated Überschriften stehen seit schemaVersion 2 als `paragraph.heading` im Absatzfluss.
+   * Das Feld bleibt nur als Eingang für ältere Dateien (Migration) und wird beim Laden überführt.
+   */
   heading?: string;
-  paragraphs?: Paragraph[];
+  paragraphs?: ContentBlock[];
 }
 
 export interface TemplateSlot {
@@ -196,6 +266,11 @@ export interface TagContentDocument {
   elements: TemplateElement[];
   editability?: Editability;
   derivedFrom?: { templateId: string; templateVersion: number };
+  /**
+   * Eigene Farben der Formatierleiste. Gehört zur Konfiguration, damit sie mit dem
+   * Template gespeichert und in der „letzten Konfiguration" wiedergefunden werden.
+   */
+  palette?: { custom: string[] };
 }
 
 export interface ElementTemplate {

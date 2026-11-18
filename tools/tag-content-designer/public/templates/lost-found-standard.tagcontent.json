@@ -1,6 +1,6 @@
 {
   "schema": "myqr24-tag-content-template-v1",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "template": {
     "templateId": "tct_lost_found_standard",
     "templateVersion": 1,
@@ -77,8 +77,8 @@
       },
       "payload": { "urgency": "high" },
       "content": {
-        "heading": "Sie haben diesen Gegenstand gefunden?",
         "paragraphs": [
+          { "heading": 3, "runs": [{ "text": "Sie haben diesen Gegenstand gefunden?" }] },
           {
             "runs": [
               { "text": "Vielen Dank. Bitte nutzen Sie die Funktion " },
@@ -100,8 +100,10 @@
       },
       "payload": { "headingLevel": "h2", "align": "start", "maxParagraphs": 4 },
       "content": {
-        "heading": "Zum Gegenstand",
-        "paragraphs": [{ "runs": [{ "text": "Dieses TAG kennzeichnet einen persönlichen Gegenstand." }] }]
+        "paragraphs": [
+          { "heading": 3, "runs": [{ "text": "Zum Gegenstand" }] },
+          { "runs": [{ "text": "Dieses TAG kennzeichnet einen persönlichen Gegenstand." }] }
+        ]
       }
     },
     {
@@ -115,8 +117,8 @@
       },
       "payload": { "channel": "server-mediated" },
       "content": {
-        "heading": "Fund melden",
         "paragraphs": [
+          { "heading": 3, "runs": [{ "text": "Fund melden" }] },
           { "runs": [{ "text": "Ihre Angaben werden ausschließlich zur Kontaktaufnahme verwendet." }] }
         ]
       },
@@ -134,7 +136,7 @@
         "order": { "mobile": 40, "tablet": 40, "desktop": 40 }
       },
       "payload": { "method": "form" },
-      "content": { "heading": "Kontakt", "paragraphs": [{ "runs": [{ "text": "Der Kontakt erfolgt über eine serverseitige Vermittlung." }] }] }
+      "content": { "paragraphs": [{ "heading": 3, "runs": [{ "text": "Kontakt" }] }, { "runs": [{ "text": "Der Kontakt erfolgt über eine serverseitige Vermittlung." }] }] }
     }
   ]
 }

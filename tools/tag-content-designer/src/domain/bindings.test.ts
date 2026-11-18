@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { TemplateElement } from "./types";
+import { isTableBlock } from "./richtext";
+import type { Paragraph, TemplateElement } from "./types";
 import { flattenBindings, isKnownBindingSource, resolveContent } from "./bindings";
 
 const element = (overrides: Partial<TemplateElement> = {}): TemplateElement => ({
@@ -8,9 +9,17 @@ const element = (overrides: Partial<TemplateElement> = {}): TemplateElement => (
   displayOrder: 10,
   visibility: "public",
   payload: {},
-  content: { heading: "Vorlage", paragraphs: [{ runs: [{ text: "Text" }] }] },
+  content: { paragraphs: [{ heading: 3, runs: [{ text: "Vorlage" }] }, { runs: [{ text: "Text" }] }] },
   ...overrides,
 });
+
+/** Text der ersten Überschrift im Absatzfluss (oder undefined). */
+const headingText = (content: ReturnType<typeof resolveContent>): string | undefined =>
+  (content.paragraphs ?? [])
+    .filter((block): block is Paragraph => !isTableBlock(block))
+    .find((block) => block.heading !== undefined)
+    ?.runs.map((run) => run.text)
+    .join("");
 
 describe("bindings", () => {
   it("kennt nur die drei erlaubten Quellen", () => {
@@ -20,17 +29,19 @@ describe("bindings", () => {
     expect(isKnownBindingSource("owner.contactChannel")).toBe(false);
   });
 
-  it("löst tag.displayName auf", () => {
+  it("löst tag.displayName in die erste Überschrift auf", () => {
     const resolved = resolveContent(
       element({ bindings: { heading: { from: "tag.displayName" } } }),
       { tagName: "Reisekoffer" },
     );
-    expect(resolved.heading).toBe("Reisekoffer");
+    expect(headingText(resolved)).toBe("Reisekoffer");
+    // Bindings legen keine Legacy-`heading`-Zeile an.
+    expect(resolved.heading).toBeUndefined();
   });
 
   it("fällt ohne Kontext auf den Vorlagentext zurück", () => {
     const resolved = resolveContent(element({ bindings: { heading: { from: "tag.displayName" } } }), {});
-    expect(resolved.heading).toBe("Vorlage");
+    expect(headingText(resolved)).toBe("Vorlage");
   });
 
   it("nutzt literal-Werte", () => {
@@ -38,7 +49,7 @@ describe("bindings", () => {
       element({ bindings: { heading: { from: "literal", value: "Festes Literal" } } }),
       { tagName: "ignoriert" },
     );
-    expect(resolved.heading).toBe("Festes Literal");
+    expect(headingText(resolved)).toBe("Festes Literal");
   });
 
   it("entfernt Bindings beim Flatten", () => {
@@ -46,6 +57,6 @@ describe("bindings", () => {
       elements: [element({ bindings: { heading: { from: "tag.displayName" } } })],
     });
     expect(flattened[0].bindings).toBeUndefined();
-    expect(flattened[0].content?.heading).toBe("Vorlage");
+    expect(headingText(flattened[0].content ?? {})).toBe("Vorlage");
   });
 });

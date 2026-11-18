@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { createDocument } from "./domain/catalog";
 import { emptyLibrary } from "./domain/library";
 import type { ElementLibrary, TagContentDocument } from "./domain/types";
+import { describeSession, loadSession } from "./state/session";
 import { App } from "./ui/App";
 import "./styles.css";
 
@@ -25,13 +26,28 @@ async function boot(): Promise<void> {
       fetch("/elements/default.tagelements.json"),
     ]);
     if (!documentResponse.ok || !libraryResponse.ok) throw new Error("Default-Dateien konnten nicht geladen werden.");
-    const initialDoc = (await documentResponse.json()) as TagContentDocument;
+    const bundled = (await documentResponse.json()) as TagContentDocument;
     const initialLibrary = (await libraryResponse.json()) as ElementLibrary;
-    root.render(<App initialDoc={initialDoc} initialLibrary={initialLibrary} bundledTemplates={bundledTemplates} />);
-  } catch {
-    const fallback = createDocument({ templateId: "tct_fallback_vault", tagType: "vault", name: "Fallback-Template" });
+    // „Letzte Konfiguration" hat Vorrang vor der ausgelieferten Vorlage.
+    const session = loadSession();
     root.render(
-      <App initialDoc={fallback} initialLibrary={emptyLibrary()} bundledTemplates={bundledTemplates} />,
+      <App
+        initialDoc={session?.doc ?? bundled}
+        initialLibrary={initialLibrary}
+        bundledTemplates={bundledTemplates}
+        initialSource={session ? describeSession(session.savedAt) : null}
+      />,
+    );
+  } catch {
+    const session = loadSession();
+    const fallback = session?.doc ?? createDocument({ templateId: "tct_fallback_vault", tagType: "vault", name: "Fallback-Template" });
+    root.render(
+      <App
+        initialDoc={fallback}
+        initialLibrary={emptyLibrary()}
+        bundledTemplates={bundledTemplates}
+        initialSource={session ? describeSession(session.savedAt) : null}
+      />,
     );
   }
 }

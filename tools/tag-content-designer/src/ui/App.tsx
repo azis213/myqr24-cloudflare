@@ -26,7 +26,9 @@ import {
   writeToHandle,
   type FileHandleLike,
 } from "../state/fileAccess";
-import { addElementToDoc, moveElementInDoc, removeElementFromDoc, updateElementInDoc, useEditor } from "../state/store";
+import { addElementToDoc, moveElementInDoc, removeElementFromDoc, setCustomColorsInDoc, updateElementInDoc, useEditor } from "../state/store";
+import { saveSession } from "../state/session";
+import { addCustomColor, removeCustomColor, type PaletteContext } from "../rich/palette";
 import { Inspector } from "./Inspector";
 import { JsonPanel, Outline, ValidationPanel } from "./Panels";
 
@@ -47,15 +49,20 @@ export function App({
   initialDoc,
   initialLibrary,
   bundledTemplates,
+  initialSource,
 }: {
   initialDoc: TagContentDocument;
   initialLibrary: ElementLibrary;
   bundledTemplates: Array<{ id: string; label: string; path: string }>;
+  /** Hinweis, woher der Startzustand kommt (z. B. „zuletzt verwendet · …"). */
+  initialSource?: string | null;
 }) {
   const { state, dispatch, issues, blocking, errors, warnings } = useEditor(initialDoc, initialLibrary);
   const [templateHandle, setTemplateHandle] = useState<FileHandleLike | null>(null);
   const [libraryHandle, setLibraryHandle] = useState<FileHandleLike | null>(null);
-  const [message, setMessage] = useState<string>("Bereit.");
+  const [message, setMessage] = useState<string>(
+    initialSource ? `Letzte Konfiguration geladen (${initialSource}).` : "Bereit.",
+  );
   const [error, setError] = useState<string | null>(null);
   const [newTagType, setNewTagType] = useState<TagType>("vault");
 
@@ -79,6 +86,45 @@ export function App({
       /* Komfort, kein Muss */
     }
   }, [leftWidth]);
+
+  const [rightWidth, setRightWidth] = useState<number>(() => {
+    try {
+      const stored = Number(window.localStorage.getItem("myqr24.tcd.rightWidth"));
+      if (Number.isFinite(stored) && stored >= 280 && stored <= 760) return stored;
+    } catch {
+      /* localStorage kann blockiert sein */
+    }
+    return 380;
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("myqr24.tcd.rightWidth", String(Math.round(rightWidth)));
+    } catch {
+      /* Komfort, kein Muss */
+    }
+  }, [rightWidth]);
+
+  const beginResizeRight = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = rightWidth;
+      const onMove = (moveEvent: PointerEvent) => {
+        // Nach links ziehen vergrößert die rechte Spalte.
+        setRightWidth(Math.min(760, Math.max(280, startWidth - (moveEvent.clientX - startX))));
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        document.body.classList.remove("is-resizing");
+      };
+      document.body.classList.add("is-resizing");
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [rightWidth],
+  );
 
   const beginResize = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -119,6 +165,25 @@ export function App({
     (element: TemplateElement, patch: Partial<ElementStyle>) => {
       applyDoc(updateElementInDoc(doc, element.elementId, { style: { ...element.style, ...patch } }), true);
     },
+    [applyDoc, doc],
+  );
+
+  // „Letzte Konfiguration": entprellt lokal sichern, beim Start/Reload wieder einlesen (main.tsx).
+  useEffect(() => {
+    const timer = window.setTimeout(() => saveSession(doc), 800);
+    return () => window.clearTimeout(timer);
+  }, [doc]);
+
+  /** Farbangebot der Formatierleiste; eigene Farben liegen in der Konfiguration (`doc.palette`). */
+  const palette = useMemo<PaletteContext>(
+    () => ({
+      themeColors: doc.shell.theme.colors,
+      custom: doc.palette?.custom ?? [],
+      onAddCustom: (hex) =>
+        applyDoc(setCustomColorsInDoc(doc, addCustomColor(doc.palette?.custom ?? [], hex)), true),
+      onRemoveCustom: (hex) =>
+        applyDoc(setCustomColorsInDoc(doc, removeCustomColor(doc.palette?.custom ?? [], hex)), true),
+    }),
     [applyDoc, doc],
   );
 
@@ -464,7 +529,10 @@ export function App({
         {message} · {errors} Fehler · {warnings} Warnungen
       </p>
 
-      <main className="workspace" style={{ ["--left-width" as string]: `${leftWidth}px` }}>
+      <main
+        className="workspace"
+        style={{ ["--left-width" as string]: `${leftWidth}px`, ["--right-width" as string]: `${rightWidth}px` }}
+      >
         <aside className="left">
           <Outline
             doc={doc}
@@ -499,10 +567,21 @@ export function App({
               widthPx={PREVIEW_WIDTHS[state.breakpoint]}
               selectedId={state.selectedId}
               onSelect={(elementId) => dispatch({ type: "select", elementId })}
-              editing={{ onContentChange: handleContentChange, onStyleChange: handleElementStyleChange }}
+              editing={{ onContentChange: handleContentChange, onStyleChange: handleElementStyleChange, palette }}
             />
           </div>
         </section>
+
+        <div
+          className="splitter splitter-right"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Breite der rechten Spalte ändern"
+          title="Ziehen, um die rechte Spalte zu vergrößern"
+          onPointerDown={beginResizeRight}
+        >
+          <span className="splitter-grip" aria-hidden="true" />
+        </div>
 
         <aside className="right">
           <Inspector
