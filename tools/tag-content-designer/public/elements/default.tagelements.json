@@ -1,0 +1,72 @@
+{
+  "schema": "myqr24-tag-element-library-v1",
+  "schemaVersion": 1,
+  "libraryVersion": 1,
+  "updatedAt": "2026-11-18T00:00:00.000Z",
+  "elements": [
+    {
+      "elementTemplateId": "tet_gallery_grid",
+      "elementTemplateVersion": 1,
+      "elementType": "gallery",
+      "label": "Galerie – Raster mit Picker",
+      "style": { "background": { "type": "solid", "color": "surface" }, "padding": "md" },
+      "payload": {
+        "name": "Galerie",
+        "picker": { "axis": "horizontal", "thumbSize": "md", "showCounter": true },
+        "viewer": { "sizeMode": "medium", "swipe": true, "loop": false, "showCaptions": true },
+        "lightbox": true,
+        "maxImages": 48
+      },
+      "slots": [
+        {
+          "slotId": "images",
+          "accepts": ["image"],
+          "min": 0,
+          "max": 48,
+          "required": false,
+          "presentation": { "fit": "cover", "caption": "optional" }
+        }
+      ],
+      "actions": {
+        "upload": {
+          "enabled": true,
+          "principals": ["guest", "owner"],
+          "acceptedTypes": ["image"],
+          "maxItemsPerPrincipal": 3,
+          "maxFileSizeMb": 10,
+          "afterUpload": "quarantine"
+        },
+        "download": { "enabled": true, "principals": ["scanner", "guest", "owner"] },
+        "delete": { "enabled": true, "principals": ["owner", "guest"], "guestScope": "ownOnly" }
+      },
+      "editability": {
+        "allow": ["content.heading", "payload.picker.axis", "payload.viewer.sizeMode", "slots.images.max"]
+      }
+    },
+    {
+      "elementTemplateId": "tet_documents_list",
+      "elementTemplateVersion": 1,
+      "elementType": "documents",
+      "label": "Dokumente – Liste mit Metadaten",
+      "style": { "padding": "md" },
+      "payload": { "view": "list", "showMeta": true, "sort": "date-desc", "maxItems": 32 },
+      "slots": [
+        { "slotId": "documents", "accepts": ["document"], "min": 0, "max": 32, "required": false }
+      ],
+      "actions": {
+        "download": { "enabled": true, "principals": ["scanner", "guest", "owner"] }
+      }
+    },
+    {
+      "elementTemplateId": "tet_maintenance_history",
+      "elementTemplateVersion": 1,
+      "elementType": "maintenance-history",
+      "label": "Wartungshistorie (optional)",
+      "style": { "padding": "md" },
+      "payload": { "groupBy": "year", "showTotals": false, "dateFormat": "de-DE" },
+      "slots": [
+        { "slotId": "entries", "accepts": ["document", "image"], "min": 0, "max": 64, "required": false }
+      ]
+    }
+  ]
+}

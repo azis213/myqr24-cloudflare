@@ -40,6 +40,10 @@
 | Golden Files | sind **exakt** die Dateien, die das Tool als Default/Tests verwendet (gleiche Bytes, gleiche Struktur) |
 | OP-03 / OP-04 | Gast-Identität und Wartungshistorie vollständig ausformuliert, aber für die erste Implementierung **optional** |
 
+### Umsetzungsstand v0.1
+
+Die erste Version ist unter [`../../../tools/tag-content-designer/`](../../../tools/tag-content-designer/) umgesetzt; die aus dem Refinement abgeleitete Tool-Spezifikation liegt in [`../../../tools/tag-content-designer/doc/SPECIFICATION.md`](../../../tools/tag-content-designer/doc/SPECIFICATION.md). Nachweis: 64 Vitest-Tests grün, `tsc --noEmit` fehlerfrei, `vite build` erfolgreich. Enthalten sind unter anderem: verstellbare linke Leiste, direktes Editieren in der Vorschau mit Formatierleiste (Fett/Kursiv/Unterstrich, Vorder-/Hintergrundfarbe als Element-Override) und sofort sichtbare Reihenfolgeänderungen. Bewusst noch offen: Inline-Editieren von Galerie-/Dokumenten-Überschriften, Textgröße/Inline-Links, Drag-and-drop-Sortierung, Slot-Anlage, `actions`-Editor, PDF-Seiten, Upload/Delete, Template-Verwaltung.
+
 ---
 
 ## 1. Auftrag und Fragestellung
@@ -1279,9 +1283,9 @@ tools/tag-content-designer/
 | --- | --- |
 | **Kopfzeile** | Projektname, Vorlage wählen, Neu, **Load**, **Save** (gleiche Datei), **Save as** (neue Datei), Rückgängig/Wiederholen, Geräteumschaltung (mobil/tablet/desktop), Statusanzeige „gültig / n Fehler" |
 | **Bibliotheksleiste** | Element-Bibliothek: Anzeige `libraryVersion`, **Load**, **Save**, **Save as**, Zurücksetzen auf Default |
-| **Linke Spalte** | Vorlagenbibliothek und Elementbibliothek (nur Typen, die der gewählte `tagType` erlaubt), plus Gliederung der vorhandenen Elemente |
-| **Mitte** | Live-Vorschau als TAG-Ansicht mit Gerätebreite, Platzhaltermedien, klickbaren Elementen und optionalem Raster |
-| **Rechte Spalte** | Kontextinspektor: Shell (Präsentation, Theme, Features, Navigation) oder Element (Typ, Reihenfolge, Sichtbarkeit, `payload`, `copy`, `bindings`, Slots) |
+| **Linke Spalte** | Vorlagenbibliothek und Elementbibliothek (nur Typen, die der gewählte `tagType` erlaubt), plus Gliederung der vorhandenen Elemente; **Breite per Ziehgriff verstellbar** (ca. 220–680 px), damit lange Elementnamen und JSON lesbar bleiben |
+| **Mitte** | Live-Vorschau als TAG-Ansicht mit Gerätebreite, Platzhaltermedien, klickbaren Elementen und optionalem Raster; **Texte sind hier direkt editierbar** (Formatierleiste erscheint beim Fokus) |
+| **Rechte Spalte** | Kontextinspektor: Shell (Präsentation, Theme, Features, Navigation) oder Element (Typ, Reihenfolge, Sichtbarkeit, `payload`, `copy`, `bindings`, Slots). **Texte sind hier nur Kontrollansicht** – bearbeitet und formatiert wird in der Vorschau, damit kein zweiter Editor die Inline-Marks überschreibt |
 | **Unten** | Validierungsleiste mit Fehler-/Warnzähler, JSON-Ansicht und Hash |
 | **Statusleiste** | Dateiname (bzw. „nicht gespeichert"), `templateId@version`, Schema-Version, Elementanzahl, geschätzte Größe, Autosave-Zeitpunkt |
 
@@ -1292,6 +1296,9 @@ Bewusste Bedienregeln:
 3. Nicht erlaubte Elementtypen werden im Katalog **ausgeblendet**, nicht deaktiviert angezeigt, um Fehlbedienung zu vermeiden.
 4. Warnungen sind sichtbar, blockieren aber den Export nicht; Fehler blockieren ihn.
 5. Jede Änderung ist rückgängig zu machen (Undo-Stack mindestens 50 Schritte).
+6. **Direktes Editieren:** Textfelder sind in der Vorschau selbst editierbar; beim Fokus erscheint **oberhalb** eine Formatierleiste (Fett, Kursiv, Unterstrich, Vorder-/Hintergrundfarbe). Farben wirken als Element-Override, nicht als Inline-Stil; die rechte Spalte bleibt als Kontroll- und Feinansicht erhalten.
+7. **Sofortsichtbarkeit:** Jede Strukturänderung – insbesondere die Reihenfolge – ist ohne Neuladen in der Vorschau sichtbar; Vorschau ist immer die Mitte der Arbeitsfläche und wird nicht von Panels verdrängt.
+8. **Kein Caret-Sprung:** Während der Eingabe ist das DOM die Quelle der Wahrheit; das Modell wird nachgezogen, ohne den Cursor zu versetzen. Tipp-Bursts werden zu einem Undo-Schritt gebündelt.
 
 ### 7.5 Vorschau und Renderer-Parität (`D-09`)
 
@@ -1752,6 +1759,8 @@ Präfix `TCD-` (Tag Content Designer), damit keine Kollision mit `APP-`, `CP-`, 
 **Akzeptanzkriterien**
 - Sortieren per Drag-and-drop und per Tastatur möglich.
 - `displayOrder` wird beim Export deterministisch neu vergeben.
+- Die neue Reihenfolge ist **sofort** in der Vorschau sichtbar: Da die Vorschau nach `placement.order[breakpoint] ?? displayOrder` sortiert, wird die Platzierung beim Sortieren für alle Breakpoints mitgeschrieben.
+- Interne, ausgeblendete Elemente (`hidden`, z. B. `theme-assets`) sind von der Sortierung ausgenommen und bleiben verankert.
 - Jedes Element gehört höchstens einer Navigationsgruppe an; ungültige Zuordnungen sind Fehler.
 
 ### TCD-US-005 — Slots für Medien und Dokumente definieren
@@ -1819,11 +1828,14 @@ Präfix `TCD-` (Tag Content Designer), damit keine Kollision mit `APP-`, `CP-`, 
 - Ungültige Werte (Span 0, Order negativ) sind Fehler.
 
 ### TCD-US-013 — Texte formatieren
-**Priorität:** P0 · **Als** Editor · **möchte ich** Texte mit Fett, Kursiv, Unterstrich, Farbe, Größe und Link auszeichnen, **damit** Überschriften und Hinweise lesbar gegliedert sind.
+**Priorität:** P0 · **Als** Editor · **möchte ich** Texte direkt in der Vorschau mit Fett, Kursiv, Unterstrich und Farben auszeichnen, **damit** Überschriften und Hinweise lesbar gegliedert sind.
 **Akzeptanzkriterien**
-- Der Formatierer erzeugt ausschließlich Runs mit erlaubten Marks.
+- Textfelder sind in der Vorschau direkt editierbar; ein Klick ins Feld setzt den Cursor dorthin.
+- Bei Fokus erscheint **oberhalb** des Feldes eine Formatierleiste; sie nimmt dem Feld den Fokus nicht weg, damit die Auswahl erhalten bleibt.
+- Fett/Kursiv/Unterstrich wirken auf die Auswahl und werden als Runs mit erlaubten Marks gespeichert.
+- Vorder- und Hintergrundfarbe werden über die Leiste gesetzt und als Element-Override (`style.textColor`, `style.background.color`) gespeichert – nicht als Inline-Stil.
 - HTML-Eingabe wird abgelehnt oder in reine Runs umgewandelt, nie gespeichert.
-- Farben/Größen nur aus Palette bzw. Skala.
+- Während der Eingabe entsteht kein Caret-Sprung; Tipp-Bursts bilden einen Undo-Schritt.
 - Text wird nie abgeschnitten; das zeigt die Vorschau bei allen drei Breiten.
 
 ### TCD-US-014 — Farben, Buttons und Überschriften gestalten
