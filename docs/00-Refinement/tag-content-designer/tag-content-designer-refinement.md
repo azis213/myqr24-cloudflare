@@ -1,7 +1,7 @@
 # Refinement: TAG-Content-Designer – Templates für TAG-Content
 
 **Status:** unverbindliches Refinement
-**Revision:** 7
+**Revision:** 11
 **Stand:** 2026-11-18
 **Geltungsbereich:** `tools/tag-content-designer` (Master), späterer TAG-Content-User-Designer, TAG-App-Rendering, tag-api-Contentprojektion, TCP-/TCC-Integration
 **Verbindlichkeit:** gemäß [`../README.md`](../README.md) ausdrücklich **keine** Anforderung, kein Contract und keine Umsetzungsgrundlage
@@ -10,7 +10,17 @@
 
 **Revision 5 (RTF):** Das Textfeld wird ein echtes RTF-Feld auf Basis von **Tiptap 3 / ProseMirror mit eigenem Schema** (`D-34`). Neu sind Zeichenfarbe, Markierung, Schriftgröße/-familie je Auswahl, Ausrichtung, Zeilenabstand, Aufzählungen/Nummerierungen mit Einrückung (`D-35`) sowie Inline-Links. HTML bleibt aus dem Artefakt verbannt: Markup im Text erscheint als Text, eingefügte Formatierung wird konvertiert, `javascript:` bleibt verboten (`D-36`).
 
+**Revision 6 (RTF-Feinschliff):** Weiche Zeilenumbrüche im selben Absatz (`Shift+Enter`), Word-nahe Symbolknöpfe mit Farbmenü (Theme-Palette, Standard-Palette, **eigene Farben**, RGB-Wähler) und eine lokal gehaltene **„letzte Konfiguration"** (`D-37`, `D-38`). Die rechte Textkontrolle zeigt das Runs-Modell als bearbeitbares, scrollbares JSON; die rechte Spalte ist per Ziehgriff verstellbar.
+
 **Revision 7 (Überschriften & Markdown):** Überschriften werden Absatz-Attribut (`paragraph.heading`, Ebene 1–5, `D-39`) – jede Zeile kann Überschrift sein, das bisherige Feld `content.heading` wird per Migration überführt (`D-41`, `schemaVersion 2`). Dazu ein Absatzstil-Feld, das Größen-Zahlenfeld mit Pfeilen (wirkt nur auf die Auswahl), Markdown als **Ein-/Ausgabeformat** (`D-40`: Kürzel, Paste, Dialog/Export; kein Speicherformat) und Tabellen als eigener Block (`D-42`).
+
+**Revision 11 (Tabellen-Feinschliff):** Neue Tabellen starten mit einem **aktiven Gitterrahmen** aus dem aktuellen Menüzustand (`D-54`). Die Gitter-Toolbox bekommt **Spaltenoperationen** – „Spalte links einfügen" und „Spalte entfernen" arbeiten auf der **Cursor-Spalte** (`D-55`); eine sichtbare Spaltenmarkierung/CellSelection bleibt bewusst außen vor, die Spaltenformatierung läuft über das Ziel `Spalte`.
+
+**Revision 10 (Zell-Runs und Textfarben):** Tabellenzellen tragen **Runs wie Absätze** – Textfarbe, Text-Hintergrund, fett/kursiv/unterstrichen und Links sind damit auch in Zellen möglich (`D-51`); Zellfläche (`cell.background`), Schriftfarbe (`run.color`) und Textmarkierung (`run.background`) bleiben im JSON **drei getrennte Ebenen** (`D-52`). Dafür steigt das Dokumentformat auf **schemaVersion 3** (`D-53`). Die Gitter-Toolbox bekommt Textfarbe/Text-Hintergrund und ein ruhigeres Layout (Labels brechen nicht um, Farblabels oben bündig).
+
+**Revision 9 (Tabellen-Gitter):** Tabellen bekommen einen **globalen Gitterrahmen** (Farbe/Stil/Stärke) und **Zellhintergründe** über eine Gitter-Toolbox in der Leiste (`D-47`); `Enter` am Tabellenende fügt eine Zeile hinzu, `Enter` in der Zelle einen weichen Umbruch (`D-48`). Im Editor sind Zellen immer mit Hilfslinien sichtbar, die Vorschau zeigt nur gespeicherte Rahmen (`D-49`). Das Dokumentlimit steigt auf **128 kB**, damit zwei volle Tabellen mit Rahmen/Hintergründen Platz haben (`D-50`).
+
+**Revision 8 (Toolbar-Feinschliff):** Panels für Markdown **und JSON** direkt unter dem Feld (`D-44`, JSON lesend), Tabelle mit 2 Spalten per Knopf und `Tab`-Erweiterung (Spalte bis 6, danach Zeile – `D-45`), lesbares Größen-Zahlenfeld mit nativen Pfeilen, Ist-Anzeige von Schrift/Größe (`Standard` ohne Mark) und eine sichtbare Merk-Auswahl beim Bedienen der Leiste (`D-46`).
 
 ### Was Revision 2 gegenüber Revision 1 ändert
 
@@ -46,7 +56,7 @@
 
 ### Umsetzungsstand v0.1
 
-Die erste Version ist unter [`../../../tools/tag-content-designer/`](../../../tools/tag-content-designer/) umgesetzt; die aus dem Refinement abgeleitete Tool-Spezifikation liegt in [`../../../tools/tag-content-designer/doc/SPECIFICATION.md`](../../../tools/tag-content-designer/doc/SPECIFICATION.md). Nachweis: 158 Vitest-Tests grün, `tsc --noEmit` fehlerfrei, `vite build` erfolgreich. Enthalten sind unter anderem: verstellbare linke **und** rechte Spalte, Überschriften 1–5 mit Absatzstil-Feld und `#`-Kürzel, Markdown als Ein-/Ausgabe (Kürzel, Paste, Dialog/Export), Tabellen mit Kopfzeile und Ausrichtung, RTF-Textfelder (Tiptap/ProseMirror mit eigenem Schema) inklusive Zeichenformatierung, Farbmenüs mit Theme-/Standard-/eigenen Farben und RGB-Wähler, Schriftgröße/-familie je Auswahl, weiche Zeilenumbrüche, Ausrichtung, Zeilenabstand, Aufzählungen, Einrückung und Links, HTML ausschließlich als Text, bearbeitbare JSON-Textkontrolle, „letzte Konfiguration" beim Start sowie sofort sichtbare Reihenfolgeänderungen. Bewusst noch offen: Inline-Editieren von Galerie-/Dokumenten-Überschriften, Drag-and-drop-Sortierung, Slot-Anlage, `actions`-Editor, Element-Bezüge im Text (`D-43`), PDF-Seiten, Upload/Delete, Template-Verwaltung.
+Die erste Version ist unter [`../../../tools/tag-content-designer/`](../../../tools/tag-content-designer/) umgesetzt; die aus dem Refinement abgeleitete Tool-Spezifikation liegt in [`../../../tools/tag-content-designer/doc/SPECIFICATION.md`](../../../tools/tag-content-designer/doc/SPECIFICATION.md). Nachweis: 183 Vitest-Tests grün, `tsc --noEmit` fehlerfrei, `vite build` erfolgreich. Enthalten sind unter anderem: verstellbare linke **und** rechte Spalte, Überschriften 1–5 mit Absatzstil-Feld und `#`-Kürzel, Markdown als Ein-/Ausgabe (Kürzel, Paste, Dialog/Export), Tabellen mit Kopfzeile, Ausrichtung, Tab-/Enter-Bedienung und Gitter-Toolbox (Standardrahmen beim Einfügen, Zellhintergrund, Textfarbe/Text-Hintergrund in Zellen, Spaltenoperationen, Formate), JSON-Panel direkt im Feld, RTF-Textfelder (Tiptap/ProseMirror mit eigenem Schema) inklusive Zeichenformatierung, Farbmenüs mit Theme-/Standard-/eigenen Farben und RGB-Wähler, Schriftgröße/-familie je Auswahl, weiche Zeilenumbrüche, Ausrichtung, Zeilenabstand, Aufzählungen, Einrückung und Links, HTML ausschließlich als Text, bearbeitbare JSON-Textkontrolle, „letzte Konfiguration" beim Start sowie sofort sichtbare Reihenfolgeänderungen. Bewusst noch offen: Inline-Editieren von Galerie-/Dokumenten-Überschriften, Drag-and-drop-Sortierung, Slot-Anlage, `actions`-Editor, Element-Bezüge im Text (`D-43`), PDF-Seiten, Upload/Delete, Template-Verwaltung.
 
 ---
 
@@ -817,6 +827,16 @@ Alternativ wäre ein Markdown-Subset möglich; es wurde verworfen, weil es einen
 **Letzte Konfiguration (`D-38`):** Der zuletzt bearbeitete Stand wird entprellt (800 ms) als kanonisches JSON im `localStorage` (`myqr24.tcd.session.v1`) gesichert und beim Start/Reload wieder geladen – inklusive `palette.custom`. Unlesbare oder blockierende Stände fallen auf die ausgelieferte Vorlage zurück. Ein Schreiben in `public/` ist im Browser nicht möglich; für Weitergabe und Versionierung bleibt `Save` der Weg. Panel-Breiten werden getrennt gemerkt (`myqr24.tcd.leftWidth`, `myqr24.tcd.rightWidth`).
 
 **Überschriften und Markdown (`D-39`–`D-42`):** Überschriften sind Absatz-Attribute (`heading: 1…5`) und damit beliebig positionierbar; `content.heading` aus schemaVersion 1 wird migriert. Die Leiste hat dafür ein **Absatzstil-Feld**, `#`-Kürzel und `Strg+Alt+1…5`; eine leere Überschrift wird per `Backspace` wieder Absatz (behebt den Fehler „gelöschte Überschrift lässt sich nicht neu anlegen"). Markdown ist **Ein-/Ausgabeformat**: Tipp-Kürzel, Paste über `markdown-it` (`html: false`) und ein Dialog, der den Export zeigt und beim Übernehmen den Feldinhalt ersetzt. Tabellen sind ein eigener Block mit Text-Zellen (max. 6 × 20), Kopfzeile und Spaltenausrichtung; erzeugt werden sie über Markdown (`` | a | b | `` plus Ausrichtungszeile).
+
+**Toolbar-Panels und Tabellen (`D-44`–`D-46`):** Unter dem Feld öffnen **MD** und **JSON** je ein Panel; sie sind exklusiv (gleicher Knopf oder jede Formatierung schließt, „Schließen" bleibt) und das JSON-Panel ist **lesend** (Kopieren), damit die Leiste die einzige Schreibstelle bleibt. Der Tabellen-Knopf fügt zwei Spalten ein (Kopf + Daten); `Tab` läuft zur nächsten Zelle, hängt am Tabellenende eine Spalte an (bis 6) und danach eine Zeile (bis 20, Word-Verhalten), `Shift+Tab` rückwärts. Die Leiste zeigt Schrift und Größe als **Ist-Werte** (`Standard` + effektive Basisgröße, gestrichelter Rahmen ohne Mark) und hält die Markierung beim Bedienen sichtbar: eine Merk-Dekoration (`.rte-remembered`) markiert die Spanne, bis der Nutzer wieder in den Text klickt.
+
+**Tabellen-Gitter (`D-47`–`D-49`):** Die Gitter-Toolbox setzt einen **globalen** Rahmen (Farbe/Stil/Stärke) und **Zellhintergründe** für Zelle/Zeile/Spalte/Auswahl/ganze Tabelle; Formate (`Standard`, `Kopfzeile`, `Zebra`, `Kräftig`, `Rahmenlos`) materialisieren die Tokens in einem Undo-Schritt. Zell-Tokens sind `background` (Zelle) und `border` (Tabelle); der Renderer gibt den Rahmen über CSS-Variablen (`--rt-border-*`) an die Zellen weiter, sodass Vorschau und Editor identisch aussehen. Im Editor bleiben Zellen zusätzlich mit **gestrichelten Hilfslinien** sichtbar (kein Token); die Vorschau ist Druckansicht. `Enter` am Tabellenende hängt eine Zeile an, `Enter` in der Zelle erzeugt einen weichen Umbruch (`\n`, `pre-wrap`), weil Zellen keine Absätze kennen.
+
+**Dokumentbudget (`D-50`):** `MAX_DOCUMENT_BYTES` steigt auf **128 kB**; ein Test hält zwei volle Tabellen (6 × 20) mit Rahmen und Zellhintergründen inklusive Text im Budget, ein zweiter prüft die Ablehnung darüber.
+
+**Zell-Runs und Textfarben (`D-51`–`D-53`):** Tabellenzellen nutzen dasselbe Run-Modell wie Absätze (`cell.runs`), aber ohne Absätze/Listen; der Editor erlaubt dort `inline*` mit allen Marks, das Mapping verwendet `runToNodes`/`runsFromInline` wieder. Die Gitter-Toolbox bietet „Zellhintergrund" (Ziel-Feld), „Textfarbe" und „Text-Hintergrund" (Auswahl, sonst ganzer Zellinhalt) getrennt an, sodass im JSON `cells[i].background`, `cells[i].runs[j].color` und `cells[i].runs[j].background` drei Ebenen bleiben. `schemaVersion 3` migriert `cell.text` → `cell.runs`; Markdown exportiert Marks/Links in Zellen (Pipes maskiert) und warnt für Farben.
+
+**Tabellen-Feinschliff (`D-54`–`D-55`):** `insertTable` setzt den aktuellen Menürahmen, damit neue Tabellen sofort sichtbar gerahmt sind. „Spalte links einfügen" (`insertColumnAt`) und „Spalte entfernen" (`deleteColumnAt`) arbeiten auf der Cursor-Spalte, wachsen über alle Zeilen, erhalten das `header`-Flag und halten die Grenzen ein (max. 6 Spalten, letzte Spalte bleibt mit Hinweis). Spalten formatieren läuft über das Ziel `Spalte` (Cursor-Spalte) – ohne mehrzeilige Textauswahl und ohne zusätzliches CellSelection-Modell.
 
 **Textkontrolle:** Rechts steht das Runs-Modell des Textfelds als bearbeitbares JSON (scrollbar). Es wird beim Verlassen bzw. mit „Übernehmen" geparst und mit denselben Regeln wie die Gesamtvalidierung geprüft; nur fehlerfreie Inhalte werden übernommen. Damit lassen sich Fälle abbilden, die die Leiste (noch) nicht anbietet – ohne HTML und ohne Umgehung der Whitelists.
 
@@ -2215,8 +2235,20 @@ Alle Testdaten sind synthetisch, enthalten keine personenbezogenen Daten, keine 
 | `D-41` | Wie wird `content.heading` überführt? | Altdaten, Determinismus | `schemaVersion 2` + Migrationsstufe `1 → 2`: erster Absatz mit `heading: 3`; Goldens migriert | Architektur | **entschieden (Rev. 7)** |
 | `D-42` | Tabellen: welches Modell? | Aufwand, Sicherheit, Markdown-Paste | eigener Block `{type:"table"}` mit Text-Zellen, max. 6 × 20, Ausrichtung je Spalte; keine Marks in Zellen | Produkt | **entschieden (Rev. 7)** |
 | `D-43` | Galerie-/Dokumentenbezüge im Text | Contract (TCC/TCP), Zyklen | typisierter Include-Block, v1 nur `slotId`; `elementId` erst mit Renderer-Entscheidung | Architektur | **offen** |
+| `D-44` | Markdown/JSON direkt im Textfeld? | Schneller Blick, eine Schreibstelle | **Panels unter dem Feld**: Markdown wie bisher (ein-/ausgeben), JSON nur **lesend** (kopieren); exklusiv, Schließen per Knopf/Toggle/Formatierung | Produkt | **entschieden (Rev. 8)** |
+| `D-45` | Tabellen ohne Tiptap-Table-Paket bedienbar? | Aufwand vs. Word-Verhalten | Einfüge-Knopf (2 Spalten), `Tab` → nächste Zelle, am Ende neue Spalte (bis 6), danach neue Zeile (bis 20), `Shift+Tab` rückwärts | Produkt | **entschieden (Rev. 8)** |
+| `D-46` | Auswahl beim Klick in die Leiste | Word-Verhalten, kein „Reaktivieren" alter Spannen | Merk-Spanne im Ref + sichtbare Dekoration, solange der Editor nicht fokussiert ist; Klick in den Text löscht sie | Architektur | **entschieden (Rev. 8)** |
+| `D-47` | Tabellen-Gitter: Einzelkanten oder globaler Rahmen? | CSS-Konflikte bei `border-collapse`, JSON-Größe, Bedienkomplexität | **globaler Rahmen** (Farbe/Stil/Stärke) + **Zellhintergrund**; keine Einzelkanten je Zelle | Produkt + Architektur | **entschieden (Rev. 9)** |
+| `D-48` | `Enter` in Tabellen | Word-Verhalten, Zellen ohne Absätze | am Tabellenende neue Zeile; in der Zelle weicher Umbruch (`\n`) | Produkt | **entschieden (Rev. 9)** |
+| `D-49` | Hilfslinien vs. Druck | Lesbarkeit im Editor, saubere Vorschau | Editor immer mit gestrichelten Hilfslinien, Vorschau nur mit gespeicherten Rahmen | Produkt | **entschieden (Rev. 9)** |
+| `D-50` | Dokumentlimit | Budget für Tabellen mit Rahmen/Hintergründen | **128 kB** statt 48 kB; Text-/Tabellenlimits unverändert | Architektur | **entschieden (Rev. 9)** |
+| `D-51` | Zeichenformatierung in Zellen | Nutzerwunsch „Textfarbe in Zelle", Konsistenz zum Fließtext | Zellen tragen **Runs** (Marks, Farbe, Markierung, Link); keine Absätze/Listen in Zellen | Produkt + Architektur | **entschieden (Rev. 10)** |
+| `D-52` | Zell- vs. Text-Hintergrund | Beides ist ein `#rrggbb`, aber fachlich verschieden | `cell.background` = Fläche, `run.background` = Textmarkierung, `run.color` = Schrift; getrennte Tokens und getrennte Menüzeilen | Produkt | **entschieden (Rev. 10)** |
+| `D-53` | `cell.text` → `cell.runs` | Modellwechsel ist nicht rückwärtskompatibel | **schemaVersion 3** mit kumulativer Migration `2 → 3` (`text` → `runs`, leer → `runs: []`) | Architektur | **entschieden (Rev. 10)** |
+| `D-54` | Rahmen beim Einfügen | Neue Tabellen waren im Editor nur an Hilfslinien erkennbar | `insertTable` setzt den aktuellen Menürahmen (Default Theme-Rahmenfarbe, durchgezogen, 1 px) | Produkt | **entschieden (Rev. 11)** |
+| `D-55` | Spaltenoperationen und -auswahl | Freie Spaltenmarkierung bräuchte ein CellSelection-Modell | „Spalte links einfügen"/„Spalte entfernen" auf der **Cursor-Spalte**; keine sichtbare Achsenmarkierung, Spaltenformatierung über Ziel `Spalte` | Produkt | **entschieden (Rev. 11)** |
 
-**Entscheidungsstand:** In Revision 2 sind `D-01`, `D-02`, `D-04`, `D-07`, `D-08`, `D-15`, `D-16`, `D-21`, `D-25`, `D-26` entschieden sowie „keine Geräte-UUID" festgehalten. Revision 3 ergänzt `D-28`, `D-29` und `D-31`; Revision 4 ergänzt `D-32` und `D-33`; Revision 5 ergänzt `D-34`, `D-35` und `D-36` (RTF-Editor, flaches Listenmodell, HTML-Politik); Revision 6 ergänzt `D-37` und `D-38` (eigene Farben in der Konfiguration, letzte Konfiguration lokal); Revision 7 ergänzt `D-39` bis `D-42` (Überschriften im Absatzfluss, Markdown als Ein-/Ausgabe, Schema 2, Tabellenmodell). Offen bleiben `D-43` (Element-Bezüge im Text) sowie insbesondere `D-03` (Renderer-Eingang), `D-17` (PDF-Seiten), `D-18` (Wartungsdaten), `D-19`/`D-24` (Contract v3 mit Capabilities), `D-22`/`D-23` (Upload/Delete und Eigentum) und `D-30` (Template-Verwaltung). Diese offenen Punkte sind in Abschnitt 19 als Detailierungspunkte geführt.
+**Entscheidungsstand:** In Revision 2 sind `D-01`, `D-02`, `D-04`, `D-07`, `D-08`, `D-15`, `D-16`, `D-21`, `D-25`, `D-26` entschieden sowie „keine Geräte-UUID" festgehalten. Revision 3 ergänzt `D-28`, `D-29` und `D-31`; Revision 4 ergänzt `D-32` und `D-33`; Revision 5 ergänzt `D-34`, `D-35` und `D-36` (RTF-Editor, flaches Listenmodell, HTML-Politik); Revision 6 ergänzt `D-37` und `D-38` (eigene Farben in der Konfiguration, letzte Konfiguration lokal); Revision 7 ergänzt `D-39` bis `D-42` (Überschriften im Absatzfluss, Markdown als Ein-/Ausgabe, Schema 2, Tabellenmodell); Revision 8 ergänzt `D-44` bis `D-46` (MD-/JSON-Panels, Tabellen-Bedienung, Merk-Auswahl); Revision 9 ergänzt `D-47` bis `D-50` (Gitterrahmen + Zellhintergrund, Enter-Verhalten, Hilfslinien, 128 kB); Revision 10 ergänzt `D-51` bis `D-53` (Zell-Runs/Textfarben, drei getrennte Farbebenen, schemaVersion 3); Revision 11 ergänzt `D-54` und `D-55` (Rahmen beim Einfügen, Spaltenoperationen auf der Cursor-Spalte). Offen bleiben `D-43` (Element-Bezüge im Text) sowie insbesondere `D-03` (Renderer-Eingang), `D-17` (PDF-Seiten), `D-18` (Wartungsdaten), `D-19`/`D-24` (Contract v3 mit Capabilities), `D-22`/`D-23` (Upload/Delete und Eigentum) und `D-30` (Template-Verwaltung). Diese offenen Punkte sind in Abschnitt 19 als Detailierungspunkte geführt.
 
 ---
 
@@ -2713,6 +2745,14 @@ Heute ist das Tool bewusst eine **Datei-Werkbank**: laden, bearbeiten, speichern
 Damit ist sichergestellt, dass die im Offline-Tool erzeugten Dateien und die später verwalteten Vorlagen **dasselbe Format** haben und keine zweite Wahrheit entsteht.
 
 **Nächster sinnvoller Detailierungsschritt:** `OP-01` (PDF-Seiten) und `OP-02` (Löschen eigener Uploads) zuerst, weil beide direkt die Elemente `document` und `gallery` betreffen und ohne sie zwei der fünf Pflicht-Elemente nur eingeschränkt nutzbar sind.
+
+
+
+
+
+
+
+
 
 
 

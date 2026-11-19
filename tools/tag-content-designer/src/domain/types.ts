@@ -6,20 +6,36 @@ export const LIBRARY_SCHEMA = "myqr24-tag-element-library-v1" as const;
  * die Element-Bibliothek bei Schema-Wechseln des Dokuments nicht mitändert.
  */
 export const LIBRARY_SCHEMA_VERSION = 1;
-/** 2: Überschriften liegen als Absatz-Attribut (`paragraph.heading`) im Absatzfluss. */
-export const SCHEMA_VERSION = 2;
-export const MAX_DOCUMENT_BYTES = 48 * 1024;
+/** 2: Überschriften liegen als Absatz-Attribut (`paragraph.heading`) im Absatzfluss.
+ *  3: Tabellenzellen tragen Runs (Farbe/Markierung/Marks/Links) statt reinem Text. */
+export const SCHEMA_VERSION = 3;
+/** Gesamtbudget der kanonischen Datei: Platz für Text und Tabellen mit Rahmen/Hintergründen. */
+export const MAX_DOCUMENT_BYTES = 128 * 1024;
 export const MAX_ELEMENTS = 24;
 export const MAX_SLOTS_PER_ELEMENT = 16;
 export const MAX_ITEMS_PER_SLOT = 64;
 export const MAX_PARAGRAPHS = 16;
 export const MAX_TEXT_LENGTH = 2048;
 export const MAX_HEADING_LENGTH = 120;
-/** Tabellen: bewusst klein gehalten (Zellen sind reiner Text). */
+/** Tabellen: bewusst klein gehalten (Zellen sind Inline-Text ohne Absätze). */
 export const MAX_TABLE_COLUMNS = 6;
 export const MAX_TABLE_ROWS = 20;
+/** Zeichen je Zelle über alle Runs (inkl. weicher Umbrüche). */
 export const MAX_TABLE_CELL_LENGTH = 200;
 export const MAX_TABLES = 2;
+
+/** Gitter: ein Rahmen für die ganze Tabelle (keine Einzelkanten – siehe SPEC §3.3). */
+export const TABLE_BORDER_STYLES = ["solid", "dashed", "dotted", "double"] as const;
+export type TableBorderStyle = (typeof TABLE_BORDER_STYLES)[number];
+export const TABLE_BORDER_WIDTHS = [1, 2] as const;
+export type TableBorderWidth = (typeof TABLE_BORDER_WIDTHS)[number];
+
+export interface TableBorder {
+  /** `#rrggbb` */
+  color: string;
+  style: TableBorderStyle;
+  width: TableBorderWidth;
+}
 /** Obergrenze für selbst angelegte Farben (Palette der Formatierleiste). */
 export const MAX_CUSTOM_COLORS = 24;
 
@@ -105,15 +121,19 @@ export interface Paragraph {
   heading?: HeadingLevel;
 }
 
-/** Tabellenzelle: reiner Text (keine Marks) – hält Modell, Renderer und Validierung schlank. */
+/** Tabellenzelle: Inline-Runs wie im Absatz (ohne Absätze/Listen) plus Zellhintergrund. */
 export interface TableCell {
-  text: string;
+  runs: TextRun[];
+  /** Hintergrundfarbe der Zelle `#rrggbb` (nicht zu verwechseln mit `TextRun.background`). */
+  background?: string;
 }
 
 export interface TableBlock {
   type: "table";
   columns: Array<{ align?: TextAlign }>;
   rows: Array<{ header?: boolean; cells: TableCell[] }>;
+  /** Gitterrahmen für die ganze Tabelle; fehlt er, bleibt die Tabelle rahmenlos. */
+  border?: TableBorder;
 }
 
 /** Geordneter Inhalt eines Textfelds: Absätze (inkl. Überschriften) und Tabellen. */
@@ -292,3 +312,4 @@ export interface ElementLibrary {
   updatedAt?: string;
   elements: ElementTemplate[];
 }
+

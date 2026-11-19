@@ -8,8 +8,42 @@ describe("migrateDocument", () => {
     const result = migrateDocument(vaultTemplate);
     expect(result.migrated).toBe(false);
     expect(result.changes).toHaveLength(0);
+    expect(result.from).toBe(3);
+    expect(result.to).toBe(3);
+  });
+
+  it("stellt Tabellenzellen von schemaVersion 2 auf Runs um", () => {
+    const legacy = structuredClone(vaultTemplate) as unknown as Record<string, unknown>;
+    legacy.schemaVersion = 2;
+    const elements = legacy.elements as Array<Record<string, unknown>>;
+    elements[0].content = {
+      paragraphs: [
+        {
+          type: "table",
+          columns: [{}, {}],
+          rows: [
+            { header: true, cells: [{ text: "A" }, { text: "" }] },
+            { cells: [{ text: "Zeile 1\nZeile 2", background: "#fff3cd" }, { text: "B" }] },
+          ],
+        },
+      ],
+    };
+
+    const result = migrateDocument(legacy);
+    expect(result.migrated).toBe(true);
     expect(result.from).toBe(2);
-    expect(result.to).toBe(2);
+    expect(result.to).toBe(3);
+    expect(result.changes.join(" ")).toContain("cells[0].text → runs");
+
+    const content = (result.document.elements as Array<Record<string, unknown>>)[0].content as {
+      paragraphs: Array<{ rows: Array<{ cells: Array<{ runs?: Array<{ text: string }>; text?: string; background?: string }> }> }>;
+    };
+    const cells = content.paragraphs[0].rows.flatMap((row) => row.cells);
+    expect(cells.every((cell) => cell.text === undefined && Array.isArray(cell.runs))).toBe(true);
+    expect(cells[0].runs).toEqual([{ text: "A" }]);
+    expect(cells[1].runs).toEqual([]);
+    expect(cells[2].runs).toEqual([{ text: "Zeile 1\nZeile 2" }]);
+    expect(cells[2].background).toBe("#fff3cd");
   });
 
   it("überführt schemaVersion 1 (content.heading) in den Absatzfluss", () => {
@@ -21,7 +55,7 @@ describe("migrateDocument", () => {
     const result = migrateDocument(legacy);
     expect(result.migrated).toBe(true);
     expect(result.from).toBe(1);
-    expect(result.to).toBe(2);
+    expect(result.to).toBe(3);
     expect(result.changes.length).toBeGreaterThan(0);
 
     const content = (result.document.elements as Array<Record<string, unknown>>)[0].content as {
@@ -35,7 +69,7 @@ describe("migrateDocument", () => {
   });
 
   it("lehnt neuere Versionen erklärend ab", () => {
-    const doc = { ...structuredClone(vaultTemplate), schemaVersion: 3 };
+    const doc = { ...structuredClone(vaultTemplate), schemaVersion: 4 };
     expect(() => migrateDocument(doc)).toThrowError(DocumentError);
     try {
       migrateDocument(doc);
@@ -47,7 +81,7 @@ describe("migrateDocument", () => {
   it("bricht ab, wenn eine Migrationsstufe fehlt", () => {
     const doc = { ...structuredClone(vaultTemplate), schemaVersion: 1 };
     try {
-      migrateDocument(doc, [], 3);
+      migrateDocument(doc, [], 4);
       throw new Error("Migration hätte fehlschlagen müssen");
     } catch (error) {
       expect((error as DocumentError).code).toBe("MIGRATION_STEP_MISSING");
@@ -57,8 +91,8 @@ describe("migrateDocument", () => {
   it("führt kumulative Stufen aus und protokolliert Änderungen", () => {
     const steps: MigrationStep[] = [
       {
-        from: 2,
-        to: 3,
+        from: 3,
+        to: 4,
         description: "Beispielstufe",
         apply: (document) => ({
           document: { ...document, migratedFlag: true },
@@ -66,9 +100,9 @@ describe("migrateDocument", () => {
         }),
       },
     ];
-    const result = migrateDocument(vaultTemplate, steps, 3);
+    const result = migrateDocument(vaultTemplate, steps, 4);
     expect(result.migrated).toBe(true);
-    expect(result.to).toBe(3);
+    expect(result.to).toBe(4);
     expect(result.changes).toEqual(["migratedFlag ergänzt"]);
     expect((result.document as { migratedFlag?: boolean }).migratedFlag).toBe(true);
   });
@@ -82,3 +116,4 @@ describe("migrateDocument", () => {
     }
   });
 });
+

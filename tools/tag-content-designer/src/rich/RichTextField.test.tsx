@@ -164,9 +164,11 @@ describe("RichTextField", () => {
     instance().commands.selectAll();
 
     const size = container.querySelector('input[aria-label="Schriftgröße"]') as HTMLInputElement;
-    fireEvent.click(container.querySelector('button[aria-label="Schriftgröße erhöhen"]') as HTMLButtonElement);
+    // Ohne Mark zeigt das Feld die Basisgröße des Editors.
+    expect(size.value).toBe("16");
+    fireEvent.keyDown(size, { key: "ArrowUp" });
     expect(size.value).toBe("18");
-    fireEvent.click(container.querySelector('button[aria-label="Schriftgröße verringern"]') as HTMLButtonElement);
+    fireEvent.keyDown(size, { key: "ArrowDown" });
     expect(size.value).toBe("16");
 
     // Freie Werte werden auf den nächsten Skalenwert geschnappt.
@@ -179,8 +181,9 @@ describe("RichTextField", () => {
   it("ändert ohne Auswahl keinen bestehenden Text", () => {
     const { container, surface, instance } = setup({ paragraphs: [{ runs: [{ text: "Erster" }] }, { runs: [{ text: "Zweiter" }] }] });
     fireEvent.focus(surface);
-    // Nur den zweiten Absatz komplett markieren, dann Auswahl aufheben (Cursor in Absatz 1).
+    // Nur den zweiten Absatz markieren, dann per Klick in den Text den Merker löschen.
     instance().commands.setTextSelection({ from: 10, to: 16 });
+    fireEvent.mouseDown(surface);
     instance().commands.setTextSelection({ from: 2, to: 2 });
     expect(instance().state.selection.empty).toBe(true);
 
@@ -302,7 +305,7 @@ describe("RichTextField", () => {
   it("öffnet den Markdown-Dialog und ersetzt den Inhalt", () => {
     const { container, surface, onContentChange } = setup({ paragraphs: [{ runs: [{ text: "Alt" }] }] });
     fireEvent.focus(surface);
-    fireEvent.click(buttonByTitle(container, "Markdown einfügen oder exportieren"));
+    fireEvent.click(buttonByTitle(container, "Markdown einfügen oder exportieren (Panel)"));
 
     const dialog = container.querySelector('[role="dialog"][aria-label="Markdown einfügen oder exportieren"]') as HTMLElement;
     expect(dialog).not.toBeNull();
@@ -318,6 +321,328 @@ describe("RichTextField", () => {
     expect((content.paragraphs?.[1] as Paragraph).runs[0]).toMatchObject({ text: "fett", marks: [{ type: "bold" }] });
     expect((content.paragraphs?.[2] as { type?: string }).type).toBe("table");
     expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("zeigt Schrift und Größe als Ist-Werte (Standard statt leer)", () => {
+    const { container, surface, instance } = setup({ paragraphs: [{ runs: [{ text: "Text" }] }] });
+    fireEvent.focus(surface);
+    instance().commands.setTextSelection({ from: 2, to: 2 });
+
+    const family = container.querySelector('select[aria-label="Schriftfamilie"]') as HTMLSelectElement;
+    const size = container.querySelector('input[aria-label="Schriftgröße"]') as HTMLInputElement;
+    expect(family.value).toBe("");
+    expect(family.selectedOptions[0].textContent).toBe("Standard");
+    expect(size.value).toBe("16");
+    expect(size.closest(".fb-sizefield")?.className).toContain("is-inherited");
+
+    // Formatierter Text zeigt seine Werte, das Feld ist nicht mehr „geerbt".
+    instance().commands.selectAll();
+    fireEvent.change(family, { target: { value: "serif" } });
+    fireEvent.change(size, { target: { value: "24" } });
+    fireEvent.blur(size);
+    instance().commands.setTextSelection({ from: 2, to: 2 });
+    expect(family.value).toBe("serif");
+    expect(size.value).toBe("24");
+    expect(size.closest(".fb-sizefield")?.className).not.toContain("is-inherited");
+  });
+
+  it("öffnet JSON im Panel, schließt bei erneutem Klick und bei Formatierung", () => {
+    const { container, surface, instance } = setup({ paragraphs: [{ heading: 2, runs: [{ text: "Titel" }] }] });
+    fireEvent.focus(surface);
+    const jsonButton = buttonByTitle(container, "JSON des Textes anzeigen (Panel)");
+
+    fireEvent.click(jsonButton);
+    const panel = container.querySelector('[role="region"][aria-label="Text als JSON"]') as HTMLElement;
+    expect(panel).not.toBeNull();
+    const textarea = panel.querySelector('textarea[aria-label="Text-JSON"]') as HTMLTextAreaElement;
+    expect(textarea.readOnly).toBe(true);
+    expect(textarea.value).toContain('"heading": 2');
+
+    // Erneuter Klick schließt das Panel.
+    fireEvent.click(jsonButton);
+    expect(container.querySelector('[role="region"][aria-label="Text als JSON"]')).toBeNull();
+
+    // Panel offen + Formatierung → Panel schließt.
+    fireEvent.click(jsonButton);
+    expect(container.querySelector('[role="region"][aria-label="Text als JSON"]')).not.toBeNull();
+    fireEvent.click(buttonByTitle(container, "Fett (Strg+B)"));
+    expect(container.querySelector('[role="region"][aria-label="Text als JSON"]')).toBeNull();
+    // Ohne Auswahl wird nur die nächste Eingabe vorformatiert.
+    expect(instance().state.storedMarks?.some((mark) => mark.type.name === "bold")).toBe(true);
+  });
+
+  it("wechselt zwischen Markdown- und JSON-Panel, jeweils mit Schließen", () => {
+    const { container, surface } = setup({ paragraphs: [{ runs: [{ text: "Text" }] }] });
+    fireEvent.focus(surface);
+
+    fireEvent.click(buttonByTitle(container, "Markdown einfügen oder exportieren (Panel)"));
+    expect(container.querySelector('[role="dialog"][aria-label="Markdown einfügen oder exportieren"]')).not.toBeNull();
+
+    fireEvent.click(buttonByTitle(container, "JSON des Textes anzeigen (Panel)"));
+    expect(container.querySelector('[role="dialog"][aria-label="Markdown einfügen oder exportieren"]')).toBeNull();
+    const json = container.querySelector('[role="region"][aria-label="Text als JSON"]') as HTMLElement;
+    expect(json).not.toBeNull();
+
+    fireEvent.click(within(json).getByText("Schließen"));
+    expect(container.querySelector('[role="region"][aria-label="Text als JSON"]')).toBeNull();
+  });
+
+  it("fügt eine Tabelle mit zwei Spalten ein und erweitert sie per Tab", () => {
+    const { container, surface, instance } = setup({ paragraphs: [{ runs: [{ text: "Start" }] }] });
+    fireEvent.focus(surface);
+    fireEvent.click(buttonByTitle(container, "Tabelle mit 2 Spalten einfügen (Tab erweitert)"));
+
+    const json = () => JSON.stringify(instance().getJSON());
+    expect(json()).toContain('"richTable"');
+    let table = (docToContent(instance().getJSON()).paragraphs ?? []).find(
+      (block) => (block as { type?: string }).type === "table",
+    ) as { columns: unknown[]; rows: Array<{ header?: boolean; cells: unknown[] }> } | undefined;
+    expect(table?.columns).toHaveLength(2);
+    expect(table?.rows).toHaveLength(2);
+    expect(table?.rows[0].header).toBe(true);
+
+    // Tab innerhalb der Tabelle: erst nächste Zelle, am Ende neue Spalte.
+    const tab = () => instance().view.dom.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    tab();
+    tab();
+    tab();
+    tab();
+    const tableOf = () =>
+      (docToContent(instance().getJSON()).paragraphs ?? []).find(
+        (block) => (block as { type?: string }).type === "table",
+      ) as { columns: unknown[]; rows: Array<{ cells: unknown[] }> } | undefined;
+
+    table = tableOf();
+    expect(table?.columns).toHaveLength(3);
+    expect(table?.rows.every((row) => row.cells.length === 3)).toBe(true);
+
+    // Bei 6 Spalten entsteht am Tabellenende eine neue Zeile (Word-Verhalten).
+    const sequence: Array<{ columns: number; rows: number }> = [];
+    for (let index = 0; index < 5; index += 1) {
+      tab();
+      sequence.push({ columns: tableOf()?.columns.length ?? 0, rows: tableOf()?.rows.length ?? 0 });
+    }
+    expect(sequence).toEqual([
+      { columns: 4, rows: 2 },
+      { columns: 5, rows: 2 },
+      { columns: 6, rows: 2 },
+      { columns: 6, rows: 3 },
+      { columns: 6, rows: 3 },
+    ]);
+
+    // Zweite Tabelle: der Cursor landet in der neuen (letzten) Tabelle.
+    fireEvent.click(buttonByTitle(container, "Tabelle mit 2 Spalten einfügen (Tab erweitert)"));
+    for (let index = 0; index < 4; index += 1) tab();
+    const tables = (docToContent(instance().getJSON()).paragraphs ?? []).filter(
+      (block) => (block as { type?: string }).type === "table",
+    ) as Array<{ columns: unknown[]; rows: unknown[] }>;
+    expect(tables).toHaveLength(2);
+    expect(tables[0].columns).toHaveLength(6);
+    expect(tables[1].columns).toHaveLength(3);
+  });
+
+  it("fügt am Tabellenende per Enter eine Zeile hinzu und erlaubt Umbrüche in Zellen", () => {
+    const { container, surface, instance } = setup({ paragraphs: [{ runs: [{ text: "Start" }] }] });
+    fireEvent.focus(surface);
+    fireEvent.click(buttonByTitle(container, "Tabelle mit 2 Spalten einfügen (Tab erweitert)"));
+
+    const tableOf = () =>
+      (docToContent(instance().getJSON()).paragraphs ?? []).find(
+        (block) => (block as { type?: string }).type === "table",
+      ) as { rows: Array<{ cells: Array<{ runs: Array<{ text: string }> }> }> } | undefined;
+    const tab = () => instance().view.dom.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    const enter = () =>
+      instance().view.dom.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    expect(tableOf()?.rows).toHaveLength(2);
+
+    // In die letzte Zelle der Tabelle und Enter: neue Zeile.
+    tab();
+    tab();
+    tab();
+    enter();
+    expect(tableOf()?.rows).toHaveLength(3);
+
+    // In einer Zelle mitten in der Tabelle: weicher Umbruch statt neuer Zeile.
+    instance().commands.setTextSelection({ from: 2, to: 2 });
+    instance().commands.insertContent("A");
+    enter();
+    const firstCell = tableOf()?.rows[0].cells[0];
+    expect(firstCell?.runs.map((run) => run.text).join("")).toBe("A\n");
+    expect(tableOf()?.rows).toHaveLength(3);
+  });
+
+  it("formatiert Gitter und Zellhintergründe über die Tabellen-Toolbox", () => {
+    const { container, surface, instance } = setup({ paragraphs: [{ runs: [{ text: "Start" }] }] });
+    fireEvent.focus(surface);
+    fireEvent.click(buttonByTitle(container, "Tabelle mit 2 Spalten einfügen (Tab erweitert)"));
+    fireEvent.click(buttonByTitle(container, "Tabellen-Gitter und Hintergrund"));
+
+    const bar = container.querySelector('[role="group"][aria-label="Tabelle formatieren"]') as HTMLElement;
+    expect(bar).not.toBeNull();
+
+    const tableOf = () =>
+      (docToContent(instance().getJSON()).paragraphs ?? []).find(
+        (block) => (block as { type?: string }).type === "table",
+      ) as
+        | {
+            border?: { color: string; style: string; width: number };
+            rows: Array<{ cells: Array<{ text: string; background?: string }> }>;
+          }
+        | undefined;
+
+    // Rahmen: Farbe, Stil, Stärke.
+    fireEvent.change(within(bar).getByLabelText("Rahmenfarbe frei"), { target: { value: "#1f513d" } });
+    fireEvent.change(within(bar).getByLabelText("Rahmenstil"), { target: { value: "dashed" } });
+    fireEvent.change(within(bar).getByLabelText("Rahmenstärke"), { target: { value: "2" } });
+    fireEvent.click(within(bar).getByText("Rahmen anwenden"));
+    expect(tableOf()?.border).toEqual({ color: "#1f513d", style: "dashed", width: 2 });
+    expect(container.querySelector("table.rt-table")?.getAttribute("data-bordered")).toBe("true");
+
+    // Hintergrund für die ganze Zeile.
+    fireEvent.change(within(bar).getByLabelText("Ziel der Tabellenaktion"), { target: { value: "row" } });
+    fireEvent.change(within(bar).getByLabelText("Zellhintergrund frei"), { target: { value: "#fff3cd" } });
+    const rowBackgrounds = tableOf()?.rows[0].cells.map((cell) => cell.background);
+    expect(rowBackgrounds).toEqual(["#fff3cd", "#fff3cd"]);
+
+    // Formate: Zebra entfernt den Rahmen, Rahmenlos räumt Hintergründe ab.
+    fireEvent.click(within(bar).getByText("Zebra"));
+    expect(tableOf()?.border).toBeUndefined();
+    fireEvent.click(within(bar).getByText("Rahmenlos"));
+    expect(tableOf()?.rows.every((row) => row.cells.every((cell) => cell.background === undefined))).toBe(true);
+  });
+
+  it("startet neue Tabellen mit sichtbarem Rahmen", () => {
+    const { container, surface, instance } = setup({ paragraphs: [{ runs: [{ text: "Start" }] }] });
+    fireEvent.focus(surface);
+    fireEvent.click(buttonByTitle(container, "Tabelle mit 2 Spalten einfügen (Tab erweitert)"));
+
+    const table = (docToContent(instance().getJSON()).paragraphs ?? []).find(
+      (block) => (block as { type?: string }).type === "table",
+    ) as unknown as { border?: { color: string; style: string; width: number } } | undefined;
+    expect(table?.border).toEqual({ color: "#d5d9e0", style: "solid", width: 1 });
+    expect(container.querySelector("table.rt-table")?.getAttribute("data-bordered")).toBe("true");
+  });
+
+  it("fügt Spalten links ein und entfernt die Cursor-Spalte", () => {
+    const { container, surface, instance } = setup({ paragraphs: [{ runs: [{ text: "Start" }] }] });
+    fireEvent.focus(surface);
+    fireEvent.click(buttonByTitle(container, "Tabelle mit 2 Spalten einfügen (Tab erweitert)"));
+    instance().commands.insertContent("A");
+    fireEvent.click(buttonByTitle(container, "Tabellen-Gitter und Hintergrund"));
+
+    const bar = container.querySelector('[role="group"][aria-label="Tabelle formatieren"]') as HTMLElement;
+    const tableOf = () =>
+      (docToContent(instance().getJSON()).paragraphs ?? []).find(
+        (block) => (block as { type?: string }).type === "table",
+      ) as unknown as
+        | {
+            columns: unknown[];
+            rows: Array<{ header?: boolean; cells: Array<{ runs: Array<{ text: string }> }> }>;
+          }
+        | undefined;
+    const texts = () => tableOf()?.rows.map((row) => row.cells.map((cell) => cell.runs.map((run) => run.text).join("")));
+
+    expect(texts()).toEqual([
+      ["A", ""],
+      ["", ""],
+    ]);
+
+    // Links der Cursor-Spalte einfügen: alle Zeilen wachsen mit, „A" rutscht nach rechts.
+    fireEvent.click(within(bar).getByText("Spalte links einfügen"));
+    expect(tableOf()?.columns).toHaveLength(3);
+    expect(texts()).toEqual([
+      ["", "A", ""],
+      ["", "", ""],
+    ]);
+
+    // Cursor steht in der neuen Spalte: entfernen stellt den Zustand wieder her.
+    fireEvent.click(within(bar).getByText("Spalte entfernen"));
+    expect(tableOf()?.columns).toHaveLength(2);
+    expect(texts()).toEqual([
+      ["A", ""],
+      ["", ""],
+    ]);
+
+    // Auf eine Spalte reduzieren, dann bleibt sie stehen (Hinweis statt Verlust).
+    fireEvent.click(within(bar).getByText("Spalte entfernen"));
+    expect(tableOf()?.columns).toHaveLength(1);
+    fireEvent.click(within(bar).getByText("Spalte entfernen"));
+    expect(tableOf()?.columns).toHaveLength(1);
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("Mindestens eine Spalte bleibt.");
+  });
+
+  it("färbt mit Ziel Spalte nur die Cursor-Spalte", () => {
+    const { container, surface, instance } = setup({ paragraphs: [{ runs: [{ text: "Start" }] }] });
+    fireEvent.focus(surface);
+    fireEvent.click(buttonByTitle(container, "Tabelle mit 2 Spalten einfügen (Tab erweitert)"));
+    fireEvent.click(buttonByTitle(container, "Tabellen-Gitter und Hintergrund"));
+
+    const bar = container.querySelector('[role="group"][aria-label="Tabelle formatieren"]') as HTMLElement;
+    fireEvent.change(within(bar).getByLabelText("Ziel der Tabellenaktion"), { target: { value: "column" } });
+    fireEvent.change(within(bar).getByLabelText("Zellhintergrund frei"), { target: { value: "#fff3cd" } });
+
+    const table = (docToContent(instance().getJSON()).paragraphs ?? []).find(
+      (block) => (block as { type?: string }).type === "table",
+    ) as unknown as {
+      rows: Array<{ cells: Array<{ background?: string }> }>;
+    };
+    // Nur die Cursor-Spalte (0) ist gefärbt, die Nachbarspalte bleibt unberührt.
+    expect(table.rows.map((row) => row.cells.map((cell) => cell.background))).toEqual([
+      ["#fff3cd", undefined],
+      ["#fff3cd", undefined],
+    ]);
+  });
+
+  it("färbt Text in Zellen, ohne den Zellhintergrund zu ändern", () => {
+    const { container, surface, instance } = setup({ paragraphs: [{ runs: [{ text: "Start" }] }] });
+    fireEvent.focus(surface);
+    fireEvent.click(buttonByTitle(container, "Tabelle mit 2 Spalten einfügen (Tab erweitert)"));
+    instance().commands.insertContent("Hallo");
+    fireEvent.click(buttonByTitle(container, "Tabellen-Gitter und Hintergrund"));
+
+    const bar = container.querySelector('[role="group"][aria-label="Tabelle formatieren"]') as HTMLElement;
+    fireEvent.change(within(bar).getByLabelText("Zellhintergrund frei"), { target: { value: "#fff3cd" } });
+    fireEvent.change(within(bar).getByLabelText("Textfarbe frei"), { target: { value: "#b3261e" } });
+    fireEvent.change(within(bar).getByLabelText("Text-Hintergrund frei"), { target: { value: "#b3d4fc" } });
+
+    const table = (docToContent(instance().getJSON()).paragraphs ?? []).find(
+      (block) => (block as { type?: string }).type === "table",
+    ) as unknown as { rows: Array<{ cells: Array<{ runs: Array<{ text: string; color?: string; background?: string }>; background?: string }> }> };
+    const cell = table.rows[0].cells[0];
+    // Drei getrennte Ebenen: Zellfläche, Schriftfarbe, Textmarkierung.
+    expect(cell.background).toBe("#fff3cd");
+    expect(cell.runs).toEqual([{ text: "Hallo", color: "#b3261e", background: "#b3d4fc" }]);
+
+    // Markierung entfernen lässt Zellhintergrund und Schriftfarbe unberührt.
+    fireEvent.click(within(bar).getByText("Markierung entfernen"));
+    const afterClear = (
+      docToContent(instance().getJSON()).paragraphs ?? []
+    ).find((block) => (block as { type?: string }).type === "table") as unknown as {
+      rows: Array<{ cells: Array<{ runs: Array<{ text: string; color?: string; background?: string }>; background?: string }> }>;
+    };
+    expect(afterClear.rows[0].cells[0].background).toBe("#fff3cd");
+    expect(afterClear.rows[0].cells[0].runs).toEqual([{ text: "Hallo", color: "#b3261e" }]);
+  });
+
+  it("hält die Markierung sichtbar, während die Leiste bedient wird", () => {
+    const { container, surface, instance } = setup({ paragraphs: [{ runs: [{ text: "Erster " }, { text: "zweiter" }] }] });
+    fireEvent.focus(surface);
+    instance().commands.setTextSelection({ from: 10, to: 16 });
+
+    // Fokus wechselt in ein Auswahlfeld → Markierung bleibt als Dekoration stehen.
+    fireEvent.blur(surface);
+    expect(container.querySelector(".rte-remembered")).not.toBeNull();
+
+    fireEvent.change(container.querySelector('select[aria-label="Schriftfamilie"]') as HTMLSelectElement, {
+      target: { value: "serif" },
+    });
+    const runs = firstParagraph(docToContent(instance().getJSON())).runs;
+    expect(runs.at(-1)?.fontFamily).toBe("serif");
+
+    // Klick in den Text löscht den Merker.
+    fireEvent.mouseDown(surface);
+    expect(container.querySelector(".rte-remembered")).toBeNull();
   });
 
   it("erlaubt einen weichen Zeilenumbruch im selben Absatz", () => {
@@ -373,5 +698,9 @@ describe("RichTextField", () => {
     expect(instance().getAttributes("richStyle").color ?? null).toBeNull();
   });
 });
+
+
+
+
 
 

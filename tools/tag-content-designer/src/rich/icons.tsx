@@ -111,6 +111,20 @@ export const IconClear = () => (
   </svg>
 );
 
+export const IconTable = () => (
+  <svg {...base({})}>
+    <rect x="3.5" y="5" width="17" height="14" rx="1.5" />
+    <path d="M3.5 9.5h17M3.5 14.5h17M9.5 5v14M15 5v14" />
+  </svg>
+);
+
+export const IconGrid = () => (
+  <svg {...base({})}>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="2" />
+    <path d="M3.5 9h17M3.5 15h17M9 3.5v17M15 3.5v17" />
+  </svg>
+);
+
 export const IconChevronDown = () => (
   <svg {...base({ width: 12, height: 12 })}>
     <path d="M6 9l6 6 6-6" />

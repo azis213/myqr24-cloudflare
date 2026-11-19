@@ -4,12 +4,16 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { canonicalize } from "../domain/serialize";
 import type { ElementStyle, RichTextContent } from "../domain/types";
+import { JsonPanel } from "./JsonPanel";
 import { contentToDoc, docToContent } from "./mapping";
 import { MarkdownDialog } from "./MarkdownDialog";
 import { looksLikeMarkdown, parseMarkdown } from "./markdown";
 import type { PaletteContext } from "./palette";
+import type { FieldPanel } from "./panelTypes";
 import { sanitizePastedHtml } from "./paste";
 import { createRichExtensions } from "./schema";
+import { setRememberedSelection } from "./selectionHighlight";
+import { handleTableEnter } from "./tableEditing";
 import { RichToolbar } from "./Toolbar";
 
 const COMMIT_DELAY_MS = 350;
@@ -35,16 +39,28 @@ export function RichTextField({
   onEditorReady,
 }: RichTextFieldProps) {
   const [focusWithin, setFocusWithin] = useState(false);
-  const [markdownOpen, setMarkdownOpen] = useState(false);
+  const [panel, setPanel] = useState<FieldPanel>("none");
+  const [notice, setNotice] = useState<string | null>(null);
   const contentRef = useRef<RichTextContent | undefined>(content);
   const handlersRef = useRef({ onContentChange });
   const timerRef = useRef<number | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
+  /** Hinweis aus der Tabellen-Keymap (Limit) – über Ref, weil der Editor nur einmal entsteht. */
+  const noticeHandlerRef = useRef<(message: string) => void>(() => {});
   /** Zuletzt markierte Spanne – hält Schriftgröße/-familie & Farben auch nach Fokuswechsel wirksam. */
   const selectionRef = useRef<{ from: number; to: number } | null>(null);
 
   // Immer die aktuellen Props verwenden – der Editor wird nur einmal erzeugt.
   contentRef.current = content;
   handlersRef.current = { onContentChange };
+  noticeHandlerRef.current = (message: string) => {
+    setNotice(message);
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = window.setTimeout(() => {
+      noticeTimerRef.current = null;
+      setNotice(null);
+    }, 3000);
+  };
 
   const commit = useCallback((instance: Editor) => {
     const next = docToContent(instance.getJSON());
@@ -65,7 +81,7 @@ export function RichTextField({
 
   const editor = useEditor(
     {
-      extensions: createRichExtensions(),
+      extensions: createRichExtensions({ onTableLimit: (message) => noticeHandlerRef.current(message) }),
       content: contentToDoc(content),
       shouldRerenderOnTransaction: true,
       editorProps: {
@@ -77,6 +93,21 @@ export function RichTextField({
           spellcheck: "false",
         },
         transformPastedHTML: sanitizePastedHtml,
+        /** Enter in Tabellen (neue Zeile am Ende, sonst Umbruch) – vor der Basis-Keymap. */
+        handleKeyDown: (view, event) => handleTableEnter(view, event, (message) => noticeHandlerRef.current(message)),
+        /**
+         * Klick in den Text löscht den Auswahl-Merker (keine „Reaktivierung" einer alten Spanne)
+         * – Toolbar-Klicks laufen nicht über diesen Pfad und behalten die Auswahl.
+         */
+        handleDOMEvents: {
+          mousedown: (view) => {
+            if (selectionRef.current) {
+              selectionRef.current = null;
+              setRememberedSelection(view, null);
+            }
+            return false;
+          },
+        },
         /**
          * Markdown-Paste: Reiner Text, der nach Markdown aussieht, wird in Tokens übersetzt.
          * HTML-Paste (Word/Web) läuft weiter über den Sanitizer + Schema-Parser.
@@ -114,7 +145,10 @@ export function RichTextField({
       },
       onSelectionUpdate: ({ editor: instance }) => {
         const { from, to } = instance.state.selection;
-        if (to > from) selectionRef.current = { from, to };
+        if (to > from) {
+          selectionRef.current = { from, to };
+          setRememberedSelection(instance.view, { from, to });
+        }
       },
       onUpdate: ({ editor: instance }) => scheduleCommit(instance),
     },
@@ -137,6 +171,7 @@ export function RichTextField({
   useEffect(
     () => () => {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
     },
     [],
   );
@@ -150,8 +185,9 @@ export function RichTextField({
       onBlur={(event) => {
         // Fokus innerhalb des Editors oder der Leiste (z. B. Farbwähler) behält die Leiste offen.
         if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        // Der Auswahl-Merker bleibt bestehen: die Leiste ist nur versteckt, die Spanne
+        // wird beim nächsten Fokus (z. B. über ein Auswahlfeld) weiter formatiert.
         setFocusWithin(false);
-        selectionRef.current = null;
       }}
     >
       <div className="rte-toolbar-holder" hidden={!focusWithin}>
@@ -162,7 +198,10 @@ export function RichTextField({
             onStyleChange={onStyleChange}
             palette={palette}
             selectionRef={selectionRef}
-            onMarkdown={() => setMarkdownOpen(true)}
+            panel={panel}
+            onTogglePanel={(next) => setPanel((current) => (current === next ? "none" : next))}
+            onInteract={() => setPanel("none")}
+            onNotice={(message) => noticeHandlerRef.current(message)}
           />
         ) : null}
       </div>
@@ -173,13 +212,20 @@ export function RichTextField({
       >
         <EditorContent editor={editor} />
       </div>
-      {markdownOpen ? (
+      {notice ? (
+        <p className="rte-notice" role="status">
+          {notice}
+        </p>
+      ) : null}
+      {panel === "markdown" ? (
         <MarkdownDialog
           content={contentRef.current}
           onApply={(next) => onContentChange(next)}
-          onClose={() => setMarkdownOpen(false)}
+          onClose={() => setPanel("none")}
         />
       ) : null}
+      {panel === "json" ? <JsonPanel content={contentRef.current} onClose={() => setPanel("none")} /> : null}
     </div>
   );
 }
+

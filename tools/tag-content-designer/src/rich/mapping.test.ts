@@ -125,8 +125,8 @@ describe("docToContent", () => {
           type: "table",
           columns: [{}, { align: "end" }],
           rows: [
-            { header: true, cells: [{ text: "Fach" }, { text: "Standort" }] },
-            { cells: [{ text: "Roman" }, { text: "A-12" }] },
+            { header: true, cells: [{ runs: [{ text: "Fach" }] }, { runs: [{ text: "Standort" }] }] },
+            { cells: [{ runs: [{ text: "Roman" }] }, { runs: [{ text: "A-12" }] }] },
           ],
         },
         { runs: [{ text: "Ende" }] },
@@ -154,7 +154,102 @@ describe("docToContent", () => {
     const table = asTable(content.paragraphs?.[0]);
     expect(table.columns).toHaveLength(6);
     expect(table.rows[0].cells).toHaveLength(6);
-    expect(table.rows[0].cells[0].text).toHaveLength(200);
+    expect(table.rows[0].cells[0].runs.map((run) => run.text).join("")).toHaveLength(200);
+  });
+
+  it("überträgt Tabellenrahmen, Zellhintergrund und weiche Umbrüche", () => {
+    const content: RichTextContent = {
+      paragraphs: [
+        {
+          type: "table",
+          border: { color: "#1f513d", style: "dashed", width: 2 },
+          columns: [{}, { align: "center" }],
+          rows: [
+            { header: true, cells: [{ runs: [{ text: "A" }], background: "#fff3cd" }, { runs: [{ text: "B" }] }] },
+            { cells: [{ runs: [{ text: "Zeile 1\nZeile 2" }] }, { runs: [] }] },
+          ],
+        },
+      ],
+    };
+    expect(roundtrip(content)).toEqual(content);
+  });
+
+  it("überträgt Textfarbe, Text-Hintergrund, Marks und Links in Zellen", () => {
+    const content: RichTextContent = {
+      paragraphs: [
+        {
+          type: "table",
+          columns: [{}, {}, {}],
+          rows: [
+            {
+              cells: [
+                {
+                  runs: [
+                    { text: "rot", color: "#b3261e" },
+                    { text: " markiert", background: "#b3d4fc" },
+                    { text: "fett", marks: [{ type: "bold" }] },
+                    { text: "Link", link: { href: "https://example.org" } },
+                  ],
+                  background: "#fff3cd",
+                },
+                { runs: [] },
+                { runs: [{ text: "x" }] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const result = roundtrip(content);
+    expect(result).toEqual(content);
+  });
+
+  it("verwirft unsichere Links und ungültige Farben in Zellen", () => {
+    const content = docToContent({
+      type: "doc",
+      content: [
+        {
+          type: "richTable",
+          content: [
+            {
+              type: "richTableRow",
+              content: [
+                {
+                  type: "richTableCell",
+                  content: [
+                    {
+                      type: "text",
+                      text: "A",
+                      marks: [
+                        { type: "link", attrs: { href: "javascript:alert(1)" } },
+                        { type: "richStyle", attrs: { color: "rot", background: "#b3d4fc" } },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const table = asTable(content.paragraphs?.[0]);
+    expect(table.rows[0].cells[0].runs).toEqual([{ text: "A", background: "#b3d4fc" }]);
+  });
+
+  it("verwirft ungültige Rahmenwerte beim Lesen des Editors", () => {
+    const content = docToContent({
+      type: "doc",
+      content: [
+        {
+          type: "richTable",
+          attrs: { borderColor: "rot", borderStyle: "solid", borderWidth: 1 },
+          content: [{ type: "richTableRow", content: [{ type: "richTableCell" }] }],
+        },
+      ],
+    });
+    const table = asTable(content.paragraphs?.[0]);
+    expect(table.border).toBeUndefined();
   });
 
   it("liest Absatzattribute und Listen zurück", () => {

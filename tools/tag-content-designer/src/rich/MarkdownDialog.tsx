@@ -35,7 +35,7 @@ export function MarkdownDialog({ content, onApply, onClose }: MarkdownDialogProp
   };
 
   return (
-    <div className="md-dialog" role="dialog" aria-label="Markdown einfügen oder exportieren">
+    <div className="rte-panel" role="dialog" aria-label="Markdown einfügen oder exportieren">
       <h3>Markdown (Struktur, ohne Farben)</h3>
       <p className="hint">
         Überschriften (<code>#</code> bis <code>#####</code>), Listen, Tabellen, <strong>fett</strong>, <em>kursiv</em> und
@@ -59,7 +59,7 @@ export function MarkdownDialog({ content, onApply, onClose }: MarkdownDialogProp
       ) : null}
       {status ? <p className="hint">{status}</p> : null}
       <div className="group">
-        <button type="button" onClick={apply}>
+        <button type="button" className="primary" onClick={apply}>
           Übernehmen (ersetzt den Text)
         </button>
         <button type="button" onClick={() => void copy()}>
@@ -72,3 +72,4 @@ export function MarkdownDialog({ content, onApply, onClose }: MarkdownDialogProp
     </div>
   );
 }
+

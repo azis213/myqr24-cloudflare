@@ -1,7 +1,7 @@
 import { isKnownBindingSource } from "./bindings";
 import { ELEMENT_CATALOG, FEATURES, PRESENTATIONS, TAG_TYPES, TAG_TYPE_FEATURES } from "./catalog";
 import { error, warning, type ValidationIssue } from "./errors";
-import { isFontFamily, isFontSize, isHeadingLevel, isHexColor, isLineHeight, isListKind, isTableBlock, isTextAlign, normalizeHref } from "./richtext";
+import { isFontFamily, isFontSize, isHeadingLevel, isHexColor, isLineHeight, isListKind, isTableBlock, isTableBorderStyle, isTableBorderWidth, isTextAlign, normalizeHref } from "./richtext";
 import { canonicalByteLength } from "./serialize";
 import {
   INSTANCE_SCHEMA,
@@ -166,7 +166,7 @@ export function validateDocument(input: unknown): ValidationIssue[] {
       error(
         "LIMIT_DOCUMENT_BYTES",
         "",
-        `Das Dokument ist ${bytes} Byte groß (Limit ${MAX_DOCUMENT_BYTES}).`,
+        `Das Dokument ist ${bytes} Byte groß (Limit ${Math.round(MAX_DOCUMENT_BYTES / 1024)} kB).`,
         "Elemente oder Texte kürzen.",
       ),
     );
@@ -491,9 +491,93 @@ export function validateRichText(content: unknown, path = "content"): Validation
  * Tabellenblock: Spalten/Zeilen/Zelllängen und Ausrichtung prüfen.
  * Zellen sind reiner Text – damit bleibt der Renderer frei von Formatierungs-Sonderfällen.
  */
+/**
+ * Prüft Runs (Absatz und Tabellenzelle) und liefert die Zeichenlänge über alle Runs.
+ * Die Regeln sind für beide Stellen identisch – Zellen dürfen nur weniger Zeichen.
+ */
+function validateRuns(runs: unknown[], path: string, issues: ValidationIssue[]): number {
+  let length = 0;
+  runs.forEach((run, runIndex) => {
+    const runPath = `${path}[${runIndex}]`;
+    if (!isObject(run) || typeof run.text !== "string") {
+      issues.push(error("CONTENT_RUN_INVALID", runPath, "Run braucht einen Text."));
+      return;
+    }
+    length += run.text.length;
+    for (const key of ["color", "background"]) {
+      if (run[key] !== undefined && !isHexColor(run[key])) {
+        issues.push(
+          error(
+            "CONTENT_RUN_COLOR_INVALID",
+            `${runPath}.${key}`,
+            "Zeichen- und Markierungsfarbe müssen als #rrggbb angegeben werden.",
+          ),
+        );
+      }
+    }
+    if (run.fontSize !== undefined && !isFontSize(run.fontSize)) {
+      issues.push(
+        error(
+          "CONTENT_RUN_FONT_SIZE_INVALID",
+          `${runPath}.fontSize`,
+          "fontSize muss aus der Skala 12, 14, 16, 18, 20, 24, 28, 32 stammen.",
+        ),
+      );
+    }
+    if (run.fontFamily !== undefined && !isFontFamily(run.fontFamily)) {
+      issues.push(
+        error("CONTENT_RUN_FONT_FAMILY_INVALID", `${runPath}.fontFamily`, "fontFamily muss sans, serif oder mono sein."),
+      );
+    }
+    if (run.link !== undefined) {
+      const href = isObject(run.link) ? run.link.href : undefined;
+      if (normalizeHref(href) === null) {
+        issues.push(
+          error(
+            "CONTENT_RUN_LINK_INVALID",
+            `${runPath}.link`,
+            "Link muss mit https:// oder mailto: beginnen und frei von Steuerzeichen sein.",
+          ),
+        );
+      }
+    }
+    if (run.marks !== undefined) {
+      if (!Array.isArray(run.marks)) {
+        issues.push(error("CONTENT_MARKS_INVALID", `${runPath}.marks`, "marks muss ein Array sein."));
+      } else {
+        for (const mark of run.marks) {
+          const name = isObject(mark) ? String(mark.type) : String(mark);
+          if (!MARKS.includes(name)) {
+            issues.push(error("CONTENT_MARK_UNKNOWN", `${runPath}.marks`, `Unbekannte Auszeichnung: ${name}`));
+          }
+        }
+      }
+    }
+  });
+  return length;
+}
+
 function validateTableBlock(table: Record<string, unknown>, path: string, issues: ValidationIssue[]): void {
   const columns = table.columns;
   const rows = table.rows;
+  if (table.border !== undefined) {
+    const border = table.border;
+    const valid =
+      isObject(border) &&
+      isHexColor(border.color) &&
+      isTableBorderStyle(border.style) &&
+      isTableBorderWidth(border.width);
+    if (!valid) {
+      issues.push(
+        error(
+          "TABLE_BORDER_INVALID",
+          `${path}.border`,
+          "Der Tabellenrahmen braucht color (#rrggbb), style (solid/dashed/dotted/double) und width (1 oder 2).",
+          "Rahmen über die Gitter-Toolbox setzen oder entfernen.",
+        ),
+      );
+    }
+  }
   if (!Array.isArray(columns) || columns.length === 0 || columns.length > MAX_TABLE_COLUMNS) {
     issues.push(
       error("TABLE_COLUMNS_INVALID", `${path}.columns`, `Eine Tabelle braucht 1 bis ${MAX_TABLE_COLUMNS} Spalten.`),
@@ -530,16 +614,34 @@ function validateTableBlock(table: Record<string, unknown>, path: string, issues
     }
     row.cells.forEach((cell, cellIndex) => {
       const cellPath = `${rowPath}.cells[${cellIndex}]`;
-      if (!isObject(cell) || typeof cell.text !== "string") {
-        issues.push(error("TABLE_CELL_INVALID", cellPath, "Zelle braucht einen Text."));
+      if (!isObject(cell) || !Array.isArray(cell.runs)) {
+        issues.push(
+          error(
+            "TABLE_CELL_INVALID",
+            cellPath,
+            "Zelle braucht ein runs-Array (Text mit optionalen Zeichen-Attributen).",
+            "Zellen über die Tabelle bearbeiten; Altbestände werden beim Laden migriert.",
+          ),
+        );
         return;
       }
-      if (cell.text.length > MAX_TABLE_CELL_LENGTH) {
+      const length = validateRuns(cell.runs, `${cellPath}.runs`, issues);
+      if (length > MAX_TABLE_CELL_LENGTH) {
         issues.push(
           error(
             "TABLE_CELL_TOO_LONG",
-            `${cellPath}.text`,
+            `${cellPath}.runs`,
             `Zellen dürfen höchstens ${MAX_TABLE_CELL_LENGTH} Zeichen enthalten.`,
+          ),
+        );
+      }
+      if (cell.background !== undefined && !isHexColor(cell.background)) {
+        issues.push(
+          error(
+            "TABLE_CELL_BACKGROUND_INVALID",
+            `${cellPath}.background`,
+            "Der Zellhintergrund muss als #rrggbb angegeben werden.",
+            "Hintergrund über die Gitter-Toolbox setzen oder entfernen.",
           ),
         );
       }
@@ -663,64 +765,7 @@ function validateContent(content: unknown, path: string, issues: ValidationIssue
         );
       }
     }
-    let length = 0;
-    paragraph.runs.forEach((run, runIndex) => {
-      const runPath = `${paragraphPath}.runs[${runIndex}]`;
-      if (!isObject(run) || typeof run.text !== "string") {
-        issues.push(error("CONTENT_RUN_INVALID", runPath, "Run braucht einen Text."));
-        return;
-      }
-      length += run.text.length;
-      for (const key of ["color", "background"]) {
-        if (run[key] !== undefined && !isHexColor(run[key])) {
-          issues.push(
-            error(
-              "CONTENT_RUN_COLOR_INVALID",
-              `${runPath}.${key}`,
-              "Zeichen- und Markierungsfarbe müssen als #rrggbb angegeben werden.",
-            ),
-          );
-        }
-      }
-      if (run.fontSize !== undefined && !isFontSize(run.fontSize)) {
-        issues.push(
-          error(
-            "CONTENT_RUN_FONT_SIZE_INVALID",
-            `${runPath}.fontSize`,
-            "fontSize muss aus der Skala 12, 14, 16, 18, 20, 24, 28, 32 stammen.",
-          ),
-        );
-      }
-      if (run.fontFamily !== undefined && !isFontFamily(run.fontFamily)) {
-        issues.push(
-          error("CONTENT_RUN_FONT_FAMILY_INVALID", `${runPath}.fontFamily`, "fontFamily muss sans, serif oder mono sein."),
-        );
-      }
-      if (run.link !== undefined) {
-        const href = isObject(run.link) ? run.link.href : undefined;
-        if (normalizeHref(href) === null) {
-          issues.push(
-            error(
-              "CONTENT_RUN_LINK_INVALID",
-              `${runPath}.link`,
-              "Link muss mit https:// oder mailto: beginnen und frei von Steuerzeichen sein.",
-            ),
-          );
-        }
-      }
-      if (run.marks !== undefined) {
-        if (!Array.isArray(run.marks)) {
-          issues.push(error("CONTENT_MARKS_INVALID", `${runPath}.marks`, "marks muss ein Array sein."));
-        } else {
-          for (const mark of run.marks) {
-            const name = isObject(mark) ? String(mark.type) : String(mark);
-            if (!MARKS.includes(name)) {
-              issues.push(error("CONTENT_MARK_UNKNOWN", `${runPath}.marks`, `Unbekannte Auszeichnung: ${name}`));
-            }
-          }
-        }
-      }
-    });
+    const length = validateRuns(paragraph.runs, `${paragraphPath}.runs`, issues);
     if (length > MAX_TEXT_LENGTH) {
       issues.push(
         error("CONTENT_TEXT_LIMIT", paragraphPath, `Absatz überschreitet ${MAX_TEXT_LENGTH} Zeichen.`, "Text kürzen."),

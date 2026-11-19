@@ -12,8 +12,8 @@ describe("validateDocument", () => {
   it("akzeptiert die ausgelieferten Golden Files ohne Fehler", () => {
     expect(blockers(vaultTemplate)).toHaveLength(0);
     expect(blockers(lostFoundTemplate)).toHaveLength(0);
-    // Golden Files liegen auf schemaVersion 2 und nutzen Absatz-Überschriften.
-    expect((vaultTemplate as { schemaVersion: number }).schemaVersion).toBe(2);
+    // Golden Files liegen auf schemaVersion 3 und nutzen Absatz-Überschriften.
+    expect((vaultTemplate as { schemaVersion: number }).schemaVersion).toBe(3);
     expect(JSON.stringify(vaultTemplate)).toContain('"heading":3');
   });
 
@@ -44,7 +44,7 @@ describe("validateDocument", () => {
     const table = {
       type: "table",
       columns: [{}, { align: "mitte" }],
-      rows: [{ header: true, cells: [{ text: "A" }] }],
+      rows: [{ header: true, cells: [{ runs: [{ text: "A" }] }] }],
     };
     element.content!.paragraphs = [table];
 
@@ -53,15 +53,89 @@ describe("validateDocument", () => {
     expect(found).toContain("TABLE_ROW_LENGTH");
 
     table.columns = [{}, { align: "end" }];
-    table.rows = [{ header: true, cells: [{ text: "A" }, { text: "B" }] }];
+    table.rows = [{ header: true, cells: [{ runs: [{ text: "A" }] }, { runs: [{ text: "B" }] }] }];
     expect(blockers(doc)).toHaveLength(0);
 
-    table.rows = [{ header: true, cells: Array.from({ length: 7 }, () => ({ text: "x" })) }];
+    table.rows = [{ header: true, cells: Array.from({ length: 7 }, () => ({ runs: [{ text: "x" }] })) }];
     expect(codes(doc)).toContain("TABLE_ROW_LENGTH");
 
     table.columns = Array.from({ length: 7 }, () => ({}));
-    table.rows = [{ header: true, cells: Array.from({ length: 7 }, () => ({ text: "x" })) }];
+    table.rows = [{ header: true, cells: Array.from({ length: 7 }, () => ({ runs: [{ text: "x" }] })) }];
     expect(codes(doc)).toContain("TABLE_COLUMNS_INVALID");
+  });
+
+  it("prüft Tabellenrahmen, Zellhintergrund und Zell-Runs", () => {
+    const doc = clone() as unknown as {
+      elements: Array<{ content?: { paragraphs?: unknown[] } }>;
+    };
+    const element = doc.elements.find((entry) => (entry.content?.paragraphs?.length ?? 0) > 0)!;
+    const table: Record<string, unknown> = {
+      type: "table",
+      columns: [{}, {}],
+      rows: [{ header: true, cells: [{ runs: [{ text: "A" }] }, { runs: [{ text: "B" }] }] }],
+      border: { color: "#1f513d", style: "wavy", width: 3 },
+    };
+    element.content!.paragraphs = [table];
+
+    expect(codes(doc)).toContain("TABLE_BORDER_INVALID");
+
+    table.border = { color: "#1f513d", style: "dashed", width: 2 };
+    const row = (table.rows as Array<{ cells: Array<Record<string, unknown>> }>)[0];
+    row.cells[0].background = "gelb";
+    expect(codes(doc)).toContain("TABLE_CELL_BACKGROUND_INVALID");
+
+    row.cells[0].background = "#fff3cd";
+    row.cells[1].runs = [{ text: "rot", color: "rot" }];
+    expect(codes(doc)).toContain("CONTENT_RUN_COLOR_INVALID");
+
+    row.cells[1].runs = [{ text: "x".repeat(201) }];
+    expect(codes(doc)).toContain("TABLE_CELL_TOO_LONG");
+
+    row.cells[1].runs = [{ text: "Link", link: { href: "javascript:alert(1)" } }];
+    expect(codes(doc)).toContain("CONTENT_RUN_LINK_INVALID");
+
+    row.cells[1].runs = [{ text: "B", color: "#b3261e", background: "#b3d4fc" }];
+    expect(blockers(doc)).toHaveLength(0);
+  });
+
+  it("fasst zwei volle Tabellen mit Rahmen und Zellformaten im 128-kB-Budget", () => {
+    const doc = clone() as unknown as {
+      elements: Array<{ content?: { paragraphs?: unknown[] } }>;
+    };
+    const element = doc.elements.find((entry) => (entry.content?.paragraphs?.length ?? 0) > 0)!;
+    const makeTable = () => ({
+      type: "table",
+      border: { color: "#1f513d", style: "solid", width: 2 },
+      columns: Array.from({ length: 6 }, () => ({})),
+      rows: Array.from({ length: 20 }, (_, rowIndex) => ({
+        ...(rowIndex === 0 ? { header: true } : {}),
+        cells: Array.from({ length: 6 }, () => ({
+          runs: [{ text: "Zelle", color: "#1c1c1c", background: "#b3d4fc" }],
+          background: "#fff3cd",
+        })),
+      })),
+    });
+    element.content!.paragraphs = [makeTable(), makeTable()];
+
+    expect(blockers(doc)).toHaveLength(0);
+  });
+
+  it("lehnt Dokumente über 128 kB ab", () => {
+    const doc = clone() as unknown as {
+      elements: Array<{ content?: { paragraphs?: unknown[] } }>;
+    };
+    const withContent = doc.elements.filter((entry) => entry.content);
+    const filler = "x".repeat(2048);
+    const paragraphs = Array.from({ length: 16 }, () => ({ runs: [{ text: filler }] }));
+
+    // Drei gefüllte Elemente bleiben im Budget, vier überschreiten es.
+    withContent.slice(0, 3).forEach((element) => {
+      element.content!.paragraphs = structuredClone(paragraphs);
+    });
+    expect(blockers(doc)).toHaveLength(0);
+
+    withContent[3].content!.paragraphs = structuredClone(paragraphs);
+    expect(codes(doc)).toContain("LIMIT_DOCUMENT_BYTES");
   });
 
   it("warnt beim Altfeld heading (schemaVersion 1)", () => {

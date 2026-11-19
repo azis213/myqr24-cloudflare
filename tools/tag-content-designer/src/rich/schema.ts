@@ -15,6 +15,8 @@ import { keymap } from "@tiptap/pm/keymap";
 import { clampHeadingLevel, FONT_STACKS, isFontFamily, isFontSize, isHexColor, isSafeHref } from "../domain/richtext";
 import { DEFAULT_HEADING_LEVEL } from "../domain/types";
 import { parseCssColor, parseCssFontFamily, parseCssFontSize, parseCssLineHeight, parseCssTextAlign } from "./parseCss";
+import { RememberedSelection } from "./selectionHighlight";
+import { TableEditing } from "./tableEditing";
 
 /** Zeichen-Attribute als ein Mark: Farbe, Markierung, Größe, Schriftfamilie (nur geschlossene Werte). */
 export const RichStyle = Mark.create({
@@ -164,17 +166,48 @@ export const RichHeading = Node.create({
   },
 });
 
-/** Tabelle (bewusst schlank: Zellen sind reiner Text, keine Spalten-Resize-UI). */
+/** Tabelle: globaler Gitterrahmen (Farbe/Stil/Stärke) über CSS-Variablen an die Zellen. */
 export const RichTable = Node.create({
   name: "richTable",
   group: "block",
   content: "richTableRow+",
   isolating: true,
+  addAttributes() {
+    return {
+      borderColor: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.style.getPropertyValue("--rt-border-color").trim() || null,
+        renderHTML: (attributes: Record<string, unknown>) =>
+          attributes.borderColor ? { style: `--rt-border-color: ${String(attributes.borderColor)}` } : {},
+      },
+      borderStyle: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.style.getPropertyValue("--rt-border-style").trim() || null,
+        renderHTML: (attributes: Record<string, unknown>) =>
+          attributes.borderStyle ? { style: `--rt-border-style: ${String(attributes.borderStyle)}` } : {},
+      },
+      borderWidth: {
+        default: null,
+        parseHTML: (element: HTMLElement) => {
+          const raw = element.style.getPropertyValue("--rt-border-width").trim();
+          const parsed = Number.parseInt(raw, 10);
+          return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+        },
+        renderHTML: (attributes: Record<string, unknown>) =>
+          attributes.borderWidth ? { style: `--rt-border-width: ${Number(attributes.borderWidth)}px` } : {},
+      },
+    };
+  },
   parseHTML() {
     return [{ tag: "table" }];
   },
-  renderHTML({ HTMLAttributes }) {
-    return ["table", mergeAttributes({ class: "rt-table" }, HTMLAttributes), ["tbody", 0]];
+  renderHTML({ node, HTMLAttributes }) {
+    const bordered = Boolean(node.attrs.borderColor && node.attrs.borderStyle && node.attrs.borderWidth);
+    return [
+      "table",
+      mergeAttributes({ class: "rt-table", "data-bordered": bordered ? "true" : "false" }, HTMLAttributes),
+      ["tbody", 0],
+    ];
   },
 });
 
@@ -191,7 +224,8 @@ export const RichTableRow = Node.create({
 
 export const RichTableCell = Node.create({
   name: "richTableCell",
-  content: "text*",
+  // Wie Fließtext: Text, weiche Umbrüche und alle Marks (Farbe, Markierung, fett/kursiv/unterstrichen, Link).
+  content: "inline*",
   addAttributes() {
     return {
       header: {
@@ -204,6 +238,12 @@ export const RichTableCell = Node.create({
         parseHTML: (element: HTMLElement) => parseCssTextAlign(element),
         renderHTML: (attributes: Record<string, unknown>) =>
           attributes.align && attributes.align !== "start" ? { style: `text-align: ${String(attributes.align)}` } : {},
+      },
+      background: {
+        default: null,
+        parseHTML: (element: HTMLElement) => parseCssColor(element.style.backgroundColor),
+        renderHTML: (attributes: Record<string, unknown>) =>
+          attributes.background ? { style: `background-color: ${String(attributes.background)}` } : {},
       },
     };
   },
@@ -230,8 +270,13 @@ export const RichKeymap = Extension.create({
 });
 
 
+export interface RichExtensionOptions {
+  /** Kurzer Hinweis, wenn Tabellen-Limits erreicht sind. */
+  onTableLimit?: (message: string) => void;
+}
+
 /** Vollständige Erweiterungsliste des RTF-Felds (Reihenfolge: Basis → Blöcke → Marks → Keymap). */
-export function createRichExtensions() {
+export function createRichExtensions(options: RichExtensionOptions = {}) {
   return [
     Document,
     Text,
@@ -257,6 +302,9 @@ export function createRichExtensions() {
     OrderedList.configure({ HTMLAttributes: { class: "rt-list rt-list-ordered" } }),
     ListItem,
     RichStyle,
+    // Tabellen-Navigation (Tab/Shift+Tab) vor der Basis-Keymap.
+    TableEditing.configure({ onLimit: options.onTableLimit }),
+    RememberedSelection,
     RichKeymap,
   ];
 }

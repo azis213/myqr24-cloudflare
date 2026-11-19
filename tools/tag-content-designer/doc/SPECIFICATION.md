@@ -120,7 +120,10 @@ Text ist ein **Runs-Modell**, kein HTML und kein Markdown. Zeichen- und Absatzfo
 | `paragraph.lineHeight` | `1, 1.15, 1.3, 1.5, 1.75, 2` | Zeilenabstand |
 | `paragraph.indent` | `0…3` | Einrückung ohne Liste |
 | `paragraph.list` | `kind: bullet\|ordered`, `level: 0…3` | Aufzählung/Nummerierung |
-| `block.type = "table"` | `columns[]`, `rows[]` | Tabelle; Zellen sind **reiner Text** |
+| `block.type = "table"` | `columns[]`, `rows[]`, `border?` | Tabelle; Zellen tragen **Runs** (Inline wie Absätze) und optionalen Zellhintergrund; ein **globaler** Gitterrahmen |
+| `cell.runs` | `TextRun[]` | Zellinhalt: Text, `\n`, Marks, `color`, `background` (Textmarkierung), Link – keine Absätze/Listen |
+| `cell.background` | `#rrggbb` | **Zellfläche** (nicht zu verwechseln mit `run.background` = Textmarkierung) |
+| `table.border` | `{ color, style, width }` | Gitterrahmen: `solid`/`dashed`/`dotted`/`double`, `1`/`2 px` – gilt für alle Zellkanten |
 
 Regeln:
 
@@ -131,8 +134,9 @@ Regeln:
 - Farben nur `#rrggbb`; Schriftgrößen nur aus der Skala; Ausrichtung/Zeilenabstand nur aus den Enums.
 - **Weicher Zeilenumbruch** (`Shift+Enter`) bleibt im selben Absatz und wird als `"\n"` im Run-Text gespeichert (kein zusätzlicher Block, keine neue Zeile mit Absatzabstand).
 - Absätze/Blöcke je Element: höchstens 16 (Listeneinträge und Tabellen zählen mit), Text je Absatz höchstens 2048 Zeichen.
-- **Tabellen:** max. 6 Spalten, 20 Zeilen, 200 Zeichen je Zelle, 2 Tabellen je Textfeld; Ausrichtung je Spalte; Kopfzeile markiert. Zellen sind reiner Text (keine Marks) – bewusste Grenze.
+- **Tabellen:** max. 6 Spalten, 20 Zeilen, 200 Zeichen je Zelle, 2 Tabellen je Textfeld; Ausrichtung je Spalte; Kopfzeile markiert. Zellen tragen **Inline-Runs wie Absätze** (Text mit `\n`, fett/kursiv/unterstrichen, Textfarbe, Text-Hintergrund, Links) – aber keine Absätze, Listen oder Bilder. Drei Farbebenen bleiben getrennt: `cell.background` (Fläche), `run.color` (Schrift), `run.background` (Markierung). Der Gitterrahmen gilt **global** für die Tabelle (bewusste Entscheidung `D-47`: Einzelkanten je Zelle sind in CSS mit `border-collapse` nicht konfliktfrei darstellbar).
 - **Eigene Farben** der Formatierleiste liegen in `palette.custom` (max. 24, `#rrggbb`) und werden mit der Konfiguration gespeichert.
+- **Dateigröße:** höchstens **128 kB** (kanonisch, `LIMIT_DOCUMENT_BYTES`). Das Budget reicht für zwei volle Tabellen (6 × 20) mit Rahmen und Zellhintergründen plus Text (`D-50`).
 - **`heading` auf Inhaltsebene** (`content.heading`) gehört zu schemaVersion 1; die Migration überführt es in einen Absatz mit `heading: 3` (siehe §6).
 
 
@@ -208,6 +212,7 @@ Migrationsstufen liegen in `src/domain/migrate.ts`:
 | Stufe | Inhalt |
 | --- | --- |
 | `1 → 2` | `content.heading` (eine Überschrift am Feldanfang) wird zum ersten Absatz mit `heading: 3`; Feld wird entfernt. Danach sind Überschriften Absatz-Attribute und damit beliebig positionierbar (H1–H5). |
+| `2 → 3` | Tabellenzellen werden von `cell.text` auf `cell.runs` umgestellt (`{ text }` → `runs: [{ text }]`, leerer Text → `runs: []`). Damit sind Textfarbe/Text-Hintergrund/Marks/Links in Zellen möglich; `cell.background` bleibt unverändert. |
 
 ---
 
@@ -244,16 +249,19 @@ Bekannte, dokumentierte Abweichung: `guestScope: ownOnly` ist derzeit eine **War
 | Gruppe | Funktionen |
 | --- | --- |
 | Absatzstil | **Text** oder **Überschrift 1–5** (`#`-Kürzel, `Strg+Alt+1…5`, `Strg+Alt+0` = Text) |
-| Schrift | Familie (`sans`/`serif`/`mono`), **Größe als Zahlenfeld mit ▲/▼** durch die Skala 12–32 px – wirken nur auf den markierten Text |
+| Schrift | Familie (`Standard`/`serif`/`sans`/`mono`) und **Größe als natives Zahlenfeld** (Pfeile erscheinen beim Fokussieren/Hover) – wirken nur auf den markierten Text |
 | Zeichen | **B**, *I*, U̲ (`Strg+B/I/U`) als Symbolknöpfe |
 | Farben | **A** mit Farbbalken (Zeichenfarbe), **Marker** (Text-Markierung), **Farbeimer** (Box-Hintergrund) – jeweils mit Farbmenü |
 | Absatz | linksbündig, zentriert, rechtsbündig, Zeilenabstand (6 Stufen) |
 | Listen | Aufzählung (`Strg+Shift+8`), Nummerierung (`Strg+Shift+7`), einrücken, ausrücken (Symbolknöpfe) |
+| Tabelle | **Tabelle mit 2 Spalten** einfügen (Kopfzeile + Datenzeile); `Tab` springt zur nächsten Zelle, am Tabellenende entsteht eine neue Spalte (bis 6), danach eine neue Zeile (bis 20), `Shift+Tab` rückwärts |
 | Link | setzen/ändern (`Strg+K`, Inline-Feld mit Validierung), entfernen |
 | Reset | Zeichen- und Absatzformatierung entfernen |
-| Markdown | **MD** öffnet den Ein-/Ausgabe-Dialog (§8.5) |
+| MD / JSON | öffnen ein **Panel unter dem Feld** (Markdown ein-/ausgeben bzw. JSON anzeigen); erneuter Klick auf denselben Knopf, jede andere Formatierung oder „Schließen" blendet es wieder aus |
 
-**Auswahlregel (Schriftgröße & Co.):** Formatiert wird ausschließlich der **markierte Text**. Steht der Cursor ohne Auswahl, wird nur die nächste Eingabe vorformatiert (Word-Verhalten) – bestehender Text ändert sich nie. Hat ein Klick in die Leiste die Auswahl „gestohlen", wird die zuletzt markierte Spanne wiederhergestellt; eine alte Auswahl wird sonst nie reaktiviert.
+**Anzeige folgt der Auswahl:** Das Absatzstil-Feld zeigt `Text`/`Überschrift n`, die Listenknöpfe sind aktiv, und Schrift/Größe zeigen immer den **Ist-Wert** am Cursor bzw. in der Markierung. Ohne gesetztes Zeichen-Mark steht im Schriftfeld `Standard` und im Größenfeld die effektive Standardgröße (gestrichelter Rahmen); erst eine Änderung setzt das Mark.
+
+**Auswahlregel (Schriftgröße & Co.):** Formatiert wird ausschließlich der **markierte Text**. Die Markierung bleibt beim Bedienen der Leiste sichtbar (dezente grüne Merk-Dekoration) und wird bei der nächsten Aktion weiter verwendet – auch wenn ein Auswahlfeld den Fokus nimmt. Steht der Cursor ohne Auswahl, wird nur die nächste Eingabe vorformatiert (Word-Verhalten); ein **Klick in den Text** löscht den Merker, damit keine alte Spanne „wiederauflebt".
 
 **Farbmenü** (Word-nah, je Farbknopf):
 
@@ -312,6 +320,28 @@ Markdown ist **Eingabe- und Ausgabeformat**, nie Speicherformat (`D-40`). Das Mo
 - Der Export enthält nur Struktur; Farben, Markierungen und Schriftgrößen sind nicht Teil von Markdown (Hinweis im Dialog).
 - „Übernehmen" **ersetzt** den Feldinhalt (per Undo rückgängig zu machen); es gibt keinen dauerhaften Markdown-Modus.
 
+### 8.6 JSON-Panel (Anzeige)
+
+- Der Knopf **JSON** zeigt das Runs-Modell des Felds in einem Panel unter dem Feld (`readOnly`, scrollbar, mit „Kopieren" und „Schließen").
+- Das Panel ist **lesend**: schreibende Kontrolle bleibt die Textkontrolle in der rechten Spalte und die Formatierleiste. Damit gibt es nur eine Schreibstelle pro Feld.
+- Markdown- und JSON-Panel sind **exklusiv**: ein Knopf öffnet, derselbe Knopf oder jede andere Formatierung schließt; „Schließen" bleibt in beiden Panels.
+- Die Anzeige folgt dem Modell live (jede Änderung im Feld aktualisiert das JSON).
+
+### 8.7 Tabellen: Gitter, Hintergrund und Hilfslinien
+
+- **Editor-Hilfslinien:** Zellen tragen im Editor immer ein dezentes gestricheltes Gitter (plus Mindesthöhe und Hervorhebung der aktiven Zelle). Das ist reine Editor-Hilfe, kein Token und kein Export.
+- **Vorschau = Druckansicht:** Dort erscheinen nur **gespeicherte** Rahmen; eine Tabelle ohne Rahmen bleibt linienlos.
+- **Gitter-Toolbox** (Knopf „Tabellen-Gitter und Hintergrund", erscheint in der Leiste bei Cursor in einer Tabelle):
+  - **Rahmen:** Farbe (Theme/Standard/eigene + RGB), Stil (`solid`/`dashed`/`dotted`/`double`), Stärke (1/2 px), „Rahmen anwenden"/„Rahmen aus" – gilt für die **ganze** Tabelle. Neue Tabellen starten mit dem aktuell eingestellten Rahmen (Default: Theme-Rahmenfarbe, durchgezogen, 1 px) und sind damit sofort sichtbar gerahmt.
+  - **Zellhintergrund:** Ziel `Auswahl`/`Zelle`/`Zeile`/`Spalte`/`ganze Tabelle`, Farbe aus der Palette (oder frei), „Hintergrund entfernen". Das Ziel `Spalte` wirkt auf die **Cursor-Spalte** – ganz ohne mehrzeilige Auswahl.
+  - **Textfarbe und Text-Hintergrund:** wirken auf die **Textauswahl** in der Zelle; ohne Auswahl auf den **ganzen Zellinhalt** (Schriftfarbe `run.color`, Markierung `run.background`). Sie ändern den Zellhintergrund nie.
+  - **Spalten:** „Spalte links einfügen" und „Spalte entfernen" arbeiten auf der **Cursor-Spalte** (alle Zeilen wachsen mit; Kopfzeilen bleiben Kopfzeilen). Die letzte Spalte bleibt immer stehen (Hinweis), maximal 6 Spalten.
+  - **Formate:** `Standard` (1 px + Kopf-Hintergrund), `Kopfzeile` (Rahmen aus + Kopf-Hintergrund), `Zebra` (Rahmen aus, alternierende Zeilen), `Kräftig` (2 px + Kopf-Hintergrund), `Rahmenlos` (alles zurücksetzen).
+- **Aufbau der Leiste:** drei Felder in der ersten Zeile (`Ziel`, `Rahmen`, `Stärke`, Labels brechen nie um), darunter je eine Zeile pro Farbe; die Labels `Rahmenfarbe`, `Zellhintergrund`, `Textfarbe`, `Text-Hintergrund` stehen **oben bündig** zur Swatch-Tabelle (10 Farben je Reihe).
+- **Ziele ohne CellSelection:** Die Zielzellen werden aus der Textauswahl abgeleitet (Cursor = eine Zelle, Auswahl = berührte Zellen); zusätzlich schränkt das Ziel-Feld auf Zeile/Spalte/Tabelle ein. Fett/kursiv/unterstrichen und Links funktionieren in Zellen über die normale Leiste.
+- **Tastatur:** `Tab` → nächste Zelle, am Tabellenende neue Spalte (bis 6), danach neue Zeile (bis 20); `Shift+Tab` rückwärts; `Enter` am Tabellenende → neue Zeile, `Enter` in der Zelle → weicher Umbruch (`\n`). Bei erreichten Limits erscheint ein kurzer Hinweis (`role="status"`).
+- **Markdown:** Rahmen- und Zellhintergrundfarben sind nicht Teil von Markdown (Export warnt); Textfarben/Markierungen ebenso; **fett/kursiv/Links in Zellen** werden exportiert (Pipes maskiert), Zellumbrüche zu Leerzeichen.
+
 
 
 ---
@@ -340,17 +370,18 @@ Tastenkürzel: `Strg+O` Load, `Strg+S` Save, `Strg+Shift+S` Save as, `Strg+Z`/`S
 | --- | --- |
 | `validate.test.ts` | Golden Files fehlerfrei; doppelte IDs/Orders, Slot-Range, HTML, `javascript:`, Farben, Typ-Kompatibilität, unbekanntes Schema, Binding-Quellen, Ownership-Warnung |
 | `serialize.test.ts` | kanonische Sortierung, Idempotenz, stabiler Hash, Dateinamen |
-| `migrate.test.ts` | gleiche/neuere/fehlende Version, kumulative Stufe, fehlende `schemaVersion` |
+| `migrate.test.ts` | gleiche/neuere/fehlende Version, kumulative Stufe, fehlende `schemaVersion`, Zell-Migration `text` → `runs` |
 | `library.test.ts` | Default-Bibliothek gültig, doppelte IDs, unbekannter Typ, Merge-Regeln, `libraryVersion` |
 | `layout.test.ts` | Spalten bei 360/768/1280, Span-Klemmung, Sortierung, ausgeblendete Elemente |
 | `bindings.test.ts` | erlaubte Quellen, Auflösung, Fallback, Flatten |
 | `store.test.ts` | Reihenfolge sofort in der Vorschau sichtbar, `placement.order` je Breakpoint, Randfälle, Undo-Bündelung von Tipp-Bursts |
 | `richtext.test.ts` | Link-Allowlist, Zusammenfassen von Runs mit allen Attributen, `groupBlocks` (Verschachtelung, Ebenen-Normalisierung), Präsentations-Mapping |
 | `parseCss.test.ts` | Paste-Konvertierung: Hex/rgb → `#rrggbb`, px/pt/rem → Größenskala, Font-Stacks → Tokens, Ausrichtung, Zeilenabstand |
-| `mapping.test.ts` | Modell → Editor-Dokument → Modell (Roundtrip), Marks/Attribute, Listen mit Ebenen, **weiche Zeilenumbrüche**, unsichere Links verworfen, kanonische Idempotenz |
+| `mapping.test.ts` | Modell → Editor-Dokument → Modell (Roundtrip), Marks/Attribute, Listen mit Ebenen, **weiche Zeilenumbrüche**, unsichere Links verworfen, kanonische Idempotenz, Tabellen mit Rahmen/Zellhintergrund sowie Textfarbe/Markierung/Marks/Links **in Zellen** |
 | `schema.test.ts` | Schema enthält nur unsere Nodes/Marks (inkl. `hardBreak`), Überschrift ohne Marks, Listen + Einrücken, Absatz-Attribute, `richStyle`, `javascript:`-Links verworfen |
-| `RichTextField.test.tsx` | Modell-Anzeige, Leiste erst bei Fokus, B/I/U, Ausrichtung, Zeilenabstand, Listen, Schriftgröße/-familie auf der Auswahl (auch nach Fokuswechsel), Farbmenü (Theme/Standard/Eigene/RGB, hinzufügen/entfernen), Box-Hintergrund, Link-Validierung, weicher Umbruch, Commit bei Blur, Formatierung entfernen |
-| `RichText.test.tsx` | Vorschau-Renderer: Listen/Ausrichtung/Einrückung, Link ohne Navigation, HTML-Markup nur als Text, unsichere Links verworfen |
+| `RichTextField.test.tsx` | Modell-Anzeige, Leiste erst bei Fokus, B/I/U, Ausrichtung, Zeilenabstand, Listen, Schriftgröße/-familie auf der Auswahl (auch nach Fokuswechsel und sichtbar als Merk-Dekoration), Ist-Anzeige von Schrift/Größe (`Standard` + Basisgröße), Tabellen-Einfügen mit sichtbarem Standardrahmen sowie Tab/Shift-Tab (neue Spalte, danach neue Zeile) und Enter (neue Zeile/Umbruch), Gitter-Toolbox (Rahmen, Zellhintergrund je Ziel inkl. Cursor-Spalte, Formate), Spaltenoperationen (links einfügen, Cursor-Spalte entfernen, Hinweis bei einer Spalte), Textfarbe/Text-Hintergrund **in Zellen** getrennt vom Zellhintergrund, MD-/JSON-Panels inkl. Umschalten/Schließen, Farbmenü (Theme/Standard/Eigene/RGB, hinzufügen/entfernen), Box-Hintergrund, Link-Validierung, weicher Umbruch, Commit bei Blur, Formatierung entfernen |
+| `RichText.test.tsx` | Vorschau-Renderer: Listen/Ausrichtung/Einrückung, Link ohne Navigation, HTML-Markup nur als Text, unsichere Links verworfen, Tabellen (Gitterrahmen über CSS-Variablen, Zellfläche vs. Text-Hintergrund vs. Schriftfarbe, Links in Zellen, linienlose Tabellen) |
+| `markdown.test.ts` | Export/Import: Überschriften, Listen, Links, Tabellen (Marks/Links in Zellen, Pipe-Maskierung, Warnungen für Farben/Umbrüche), HTML als Text |
 | `paste.test.ts` | Sanitizer entfernt Script/Style/iframe/`on*`/`javascript:` und lässt normale Formatierung stehen |
 | `architecture.test.ts` | Quellscan: kein `innerHTML`/`dangerouslySetInnerHTML`/`getHTML()`/`eval`; Mapping enthält keine HTML-Pfade |
 | `session.test.ts` | „Letzte Konfiguration": kanonisch speichern, unverändert laden, unbrauchbare Stände verwerfen, Speicher leeren |
@@ -358,14 +389,15 @@ Tastenkürzel: `Strg+O` Load, `Strg+S` Save, `Strg+Shift+S` Save as, `Strg+Z`/`S
 | `Inspector.test.tsx` | Textkontrolle als JSON: Anzeige des Runs-Modells, Übernahme gültiger Änderungen, Abweisung von kaputtem JSON und Regelverstößen |
 | `App.test.tsx` | End-to-End: Aufbau der Arbeitsfläche, Sortieren wirkt sofort in der Vorschau, Leiste mit allen Gruppen (inkl. Farbmenüs, Absatzstil, Größenfeld) beim Fokus |
 
-Nachweisstand: **158 Tests grün** (19 Dateien), `tsc --noEmit` fehlerfrei, `vite build` erfolgreich (815 kB JS / 15 kB CSS; gzip 272 kB / 3,9 kB).
+Nachweisstand: **183 Tests grün** (19 Dateien), `tsc --noEmit` fehlerfrei, `vite build` erfolgreich (837 kB JS / 17 kB CSS; gzip 278 kB / 4,2 kB).
 
 ---
 
 ## 11. Grenzen der ersten Version
 
 - Die **Überschrift** ist jetzt frei formatierbar (auch Fett/Farbe/Größe); die Auszeichnung folgt der Absatzebene 1–5.
-- Keine Tabellenformatierung in Zellen (nur Text), keine Spaltenbreiten, kein Zeilen-/Spalten-Merge, keine Fußnoten, keine Bilder im Fließtext; Listen bis Ebene 3, Einrückung bis 3 Stufen.
+- **Tabellen-Gitter:** nur ein globaler Rahmen (Farbe/Stil/Stärke) und Zellhintergründe; **keine Einzelkanten je Zelle**, keine Spaltenbreiten, kein Zeilen-/Spalten-Merge, keine Absätze/Listen/Bilder in Zellen, keine Mehrspalten-Layouts in Zellen, keine Fußnoten, keine Bilder im Fließtext; Listen bis Ebene 3, Einrückung bis 3 Stufen.
+- **Tabellenauswahl:** Es gibt keine freie Zell-/Spaltenmarkierung per Drag (kein CellSelection-Modell). Spalten werden über die **Cursor-Spalte** bearbeitet (Ziel `Spalte`, „Spalte links einfügen", „Spalte entfernen"); eine mehrzeilige Textauswahl bleibt rechteckig. Zeilenoperationen (einfügen/löschen/verschieben) sind nicht Teil der ersten Version.
 - Eingefügte Formatierung wird auf die geschlossenen Tokens abgebildet – exotische Werte (z. B. `40 px`, `Comic Sans`) werden verworfen, nicht gerundet.
 - Links nur `https:`/`mailto:`; keine relativen Ziele, keine Anchor-Links.
 - **Markdown ist kein Speicherformat**: Export/Austausch nur strukturell (ohne Farben/Größen), Import ersetzt den Feldinhalt; kein dauerhafter Markdown-Modus, keine Markdown-Dateien als Quelle.
@@ -407,5 +439,10 @@ Nachweisstand: **158 Tests grün** (19 Dateien), `tsc --noEmit` fehlerfrei, `vit
 - Access-Vertrag: [`../../../docs/10-Architecture/35-Contracts/tag-app-access-v1.md`](../../../docs/10-Architecture/35-Contracts/tag-app-access-v1.md)
 - TAG-App: [`../../../apps/tag-app/`](../../../apps/tag-app/)
 - Label-Designer (Vorbild): [`../../tag-designer/`](../../tag-designer/)
+
+
+
+
+
 
 

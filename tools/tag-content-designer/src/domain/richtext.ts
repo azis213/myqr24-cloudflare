@@ -6,6 +6,8 @@ import {
   LINE_HEIGHT_SCALE,
   MAX_INDENT,
   MAX_LIST_LEVEL,
+  TABLE_BORDER_STYLES,
+  TABLE_BORDER_WIDTHS,
   TEXT_ALIGNS,
 } from "./types";
 import type {
@@ -19,6 +21,10 @@ import type {
   Paragraph,
   RichTextContent,
   TableBlock,
+  TableBorder,
+  TableBorderStyle,
+  TableBorderWidth,
+  TableCell,
   TextAlign,
   TextRun,
 } from "./types";
@@ -84,6 +90,24 @@ export function clampListLevel(value: unknown): number {
 
 export function isHeadingLevel(value: unknown): value is HeadingLevel {
   return typeof value === "number" && (HEADING_LEVELS as readonly number[]).includes(value);
+}
+
+export function isTableBorderStyle(value: unknown): value is TableBorderStyle {
+  return typeof value === "string" && (TABLE_BORDER_STYLES as readonly string[]).includes(value);
+}
+
+export function isTableBorderWidth(value: unknown): value is TableBorderWidth {
+  return typeof value === "number" && (TABLE_BORDER_WIDTHS as readonly number[]).includes(value);
+}
+
+/** Liest einen Tabellenrahmen aus beliebigen Daten (nur geschlossene Werte, sonst `null`). */
+export function normalizeTableBorder(value: unknown): TableBorder | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  if (!isHexColor(candidate.color)) return null;
+  if (!isTableBorderStyle(candidate.style)) return null;
+  if (!isTableBorderWidth(candidate.width)) return null;
+  return { color: candidate.color, style: candidate.style, width: candidate.width };
 }
 
 /** Begrenzt auf 1–5; unbrauchbare Werte fallen auf die Standardebene zurück. */
@@ -166,13 +190,31 @@ export function paragraphText(paragraph: Paragraph | undefined): string {
   return (paragraph?.runs ?? []).map((run) => run.text).join("");
 }
 
+/** Sichtbarer Text einer Zelle (Runs ohne Formatierung). */
+export function cellText(cell: TableCell | undefined): string {
+  return (cell?.runs ?? []).map((run) => run.text).join("");
+}
+
+/** Kürzt Runs auf ein Zeichenbudget (für Importe und Tabellenzellen). */
+export function truncateRuns(runs: TextRun[], max: number): TextRun[] {
+  let remaining = Math.max(0, max);
+  const result: TextRun[] = [];
+  for (const run of mergeRuns(runs)) {
+    if (remaining <= 0) break;
+    const text = run.text.slice(0, remaining);
+    remaining -= text.length;
+    if (text.length > 0) result.push({ ...run, text });
+  }
+  return result;
+}
+
 export function isTableBlock(block: ContentBlock | undefined): block is TableBlock {
   return !!block && (block as TableBlock).type === "table";
 }
 
 /** Text einer Tabelle (Zellen zeilenweise, für Suche/Plaintext/Byte-Zählung). */
 export function tableText(table: TableBlock): string {
-  return table.rows.map((row) => row.cells.map((cell) => cell.text).join(" | ")).join("\n");
+  return table.rows.map((row) => row.cells.map((cell) => cellText(cell)).join(" | ")).join("\n");
 }
 
 export function blockText(block: ContentBlock | undefined): string {

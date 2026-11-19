@@ -1,6 +1,6 @@
 import MarkdownIt from "markdown-it";
 import type Token from "markdown-it/lib/token.mjs";
-import { blockText, clampHeadingLevel, isTextAlign, normalizeHref } from "../domain/richtext";
+import { blockText, clampHeadingLevel, isTextAlign, normalizeHref, truncateRuns } from "../domain/richtext";
 import {
   MAX_HEADING_LENGTH,
   MAX_LIST_LEVEL,
@@ -10,7 +10,16 @@ import {
   MAX_TABLE_ROWS,
   MAX_TEXT_LENGTH,
 } from "../domain/types";
-import type { ContentBlock, ListKind, Paragraph, RichTextContent, TableBlock, TextAlign, TextRun } from "../domain/types";
+import type {
+  ContentBlock,
+  ListKind,
+  Paragraph,
+  RichTextContent,
+  TableBlock,
+  TableCell,
+  TextAlign,
+  TextRun,
+} from "../domain/types";
 
 /**
  * Markdown als **Ein- und Ausgabeformat** (nie als Speicherformat):
@@ -214,8 +223,8 @@ function alignFromStyle(style: string | null): TextAlign | undefined {
 
 function tableBlock(tokens: Token[], start: number, warnings: string[]): { table: TableBlock; next: number } {
   const aligns: Array<TextAlign | undefined> = [];
-  const rows: Array<{ header?: boolean; cells: Array<{ text: string }> }> = [];
-  let current: { header?: boolean; cells: Array<{ text: string }> } | null = null;
+  const rows: Array<{ header?: boolean; cells: TableCell[] }> = [];
+  let current: { header?: boolean; cells: TableCell[] } | null = null;
   let index = start + 1;
 
   while (index < tokens.length && tokens[index].type !== "table_close") {
@@ -227,16 +236,16 @@ function tableBlock(tokens: Token[], start: number, warnings: string[]): { table
       current = null;
     } else if (token.type === "th_open" || token.type === "td_open") {
       const inline = tokens[index + 1];
-      const text = (inline?.children ?? [])
-        .map((child) => child.content ?? "")
-        .join("")
-        .trim()
-        .slice(0, MAX_TABLE_CELL_LENGTH);
+      // Zellinhalt inkl. **fett**/*kursiv*/Links lesen (GFM-Zellen sind einzeilig).
+      const runs =
+        inline?.type === "inline"
+          ? truncateRuns(paragraphFromInline(inline.children, warnings).runs, MAX_TABLE_CELL_LENGTH)
+          : truncateRuns([{ text: (inline?.content ?? "").trim() }], MAX_TABLE_CELL_LENGTH);
       if (token.type === "th_open") {
         if (current) current.header = true;
         aligns[current?.cells.length ?? 0] = alignFromStyle(token.attrGet("style"));
       }
-      current?.cells.push({ text });
+      current?.cells.push({ runs });
     }
     index += 1;
   }
@@ -255,12 +264,12 @@ function tableBlock(tokens: Token[], start: number, warnings: string[]): { table
     }),
     rows: rows.slice(0, MAX_TABLE_ROWS).map((row) => {
       const cells = Array.from({ length: columnCount }, (_, columnIndex) => ({
-        text: row.cells[columnIndex]?.text ?? "",
+        runs: row.cells[columnIndex]?.runs ?? [],
       }));
       return row.header ? { header: true, cells } : { cells };
     }),
   };
-  if (table.rows.length === 0) table.rows = [{ cells: table.columns.map(() => ({ text: "" })) }];
+  if (table.rows.length === 0) table.rows = [{ cells: table.columns.map(() => ({ runs: [] })) }];
   return { table, next: index + 1 };
 }
 
@@ -337,15 +346,18 @@ function escapeMarkdown(text: string, inTable = false): string {
   return result;
 }
 
-function runsToMarkdown(runs: TextRun[], warnings: string[]): string {
+function runsToMarkdown(runs: TextRun[], warnings: string[], inTable = false): string {
   return runs
     .map((run) => {
       const marks = new Set((run.marks ?? []).map((mark) => mark.type));
       if (run.color || run.background || run.fontSize || run.fontFamily) {
         warnOnce(warnings, "Farben, Markierungen und Schriftgrößen sind nicht Teil von Markdown und fehlen im Export.");
       }
-      // Weiche Umbrüche werden als Markdown-Hard-Break (zwei Leerzeichen) geschrieben.
-      let text = escapeMarkdown(run.text).split("\n").join("  \n");
+      // Weiche Umbrüche werden als Markdown-Hard-Break (zwei Leerzeichen) geschrieben;
+      // in Tabellenzellen bleiben Zeilen einzeilig (GFM kennt dort keine Umbrüche).
+      let text = inTable
+        ? escapeMarkdown(run.text.replace(/\n/g, " "), true)
+        : escapeMarkdown(run.text).split("\n").join("  \n");
       if (marks.has("bold") && marks.has("italic")) text = "***" + text + "***";
       else if (marks.has("bold")) text = "**" + text + "**";
       else if (marks.has("italic")) text = "*" + text + "*";
@@ -357,8 +369,16 @@ function runsToMarkdown(runs: TextRun[], warnings: string[]): string {
 function tableToMarkdown(table: TableBlock, warnings: string[]): string {
   if (table.rows.length === 0) return "";
   const headIndex = Math.max(0, table.rows.findIndex((row) => row.header === true));
-  const cellLine = (cells: Array<{ text: string }>): string =>
-    "| " + table.columns.map((_, index) => escapeMarkdown(cells[index]?.text ?? "", true)).join(" | ") + " |";
+  const cellLine = (cells: TableCell[]): string =>
+    "| " +
+    table.columns
+      .map((_, index) => {
+        const cell = cells[index];
+        // Zellhintergrund ist ein Token; Text-Hintergrund/Farben meldet runsToMarkdown.
+        return runsToMarkdown(cell?.runs ?? [], warnings, true);
+      })
+      .join(" | ") +
+    " |";
   const alignLine =
     "| " +
     table.columns
@@ -366,12 +386,18 @@ function tableToMarkdown(table: TableBlock, warnings: string[]): string {
       .join(" | ") +
     " |";
 
+  if (table.border || table.rows.some((row) => row.cells.some((cell) => cell.background))) {
+    warnOnce(warnings, "Rahmen- und Zellhintergrundfarben der Tabelle sind nicht Teil von Markdown und fehlen im Export.");
+  }
+  if (table.rows.some((row) => row.cells.some((cell) => cell.runs.some((run) => run.text.includes("\n"))))) {
+    warnOnce(warnings, "Zeilenumbrüche in Zellen werden im Markdown-Export zu Leerzeichen.");
+  }
+
   const lines = [cellLine(table.rows[headIndex].cells), alignLine];
   table.rows.forEach((row, index) => {
     if (index === headIndex) return;
     lines.push(cellLine(row.cells));
   });
-  warnOnce(warnings, "Zellen sind im Modell reiner Text – Zeichenformatierung in Tabellen wird nicht exportiert.");
   return lines.join("\n");
 }
 
@@ -419,3 +445,4 @@ export function toMarkdown(content?: RichTextContent): MarkdownExport {
 
   return { markdown: lines.join("\n").trim() + "\n", warnings };
 }
+

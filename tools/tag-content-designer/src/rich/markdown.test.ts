@@ -63,8 +63,11 @@ describe("parseMarkdown", () => {
     const table = asTable(content.paragraphs?.[0]);
     expect(table.type).toBe("table");
     expect(table.columns).toEqual([{}, { align: "end" }]);
-    expect(table.rows[0]).toEqual({ header: true, cells: [{ text: "Fach" }, { text: "Standort" }] });
-    expect(table.rows[1]).toEqual({ cells: [{ text: "Roman" }, { text: "A-12" }] });
+    expect(table.rows[0]).toEqual({
+      header: true,
+      cells: [{ runs: [{ text: "Fach" }] }, { runs: [{ text: "Standort" }] }],
+    });
+    expect(table.rows[1]).toEqual({ cells: [{ runs: [{ text: "Roman" }] }, { runs: [{ text: "A-12" }] }] });
   });
 
   it("nimmt HTML als Text und entfernt Code-Auszeichnung", () => {
@@ -88,8 +91,8 @@ describe("toMarkdown", () => {
         type: "table",
         columns: [{}, { align: "center" }],
         rows: [
-          { header: true, cells: [{ text: "A" }, { text: "B" }] },
-          { cells: [{ text: "1" }, { text: "2" }] },
+          { header: true, cells: [{ runs: [{ text: "A" }] }, { runs: [{ text: "B" }] }] },
+          { cells: [{ runs: [{ text: "1" }] }, { runs: [{ text: "2" }] }] },
         ],
       },
     ],
@@ -109,6 +112,63 @@ describe("toMarkdown", () => {
   it("weist auf nicht darstellbare Zeichenformate hin", () => {
     const { warnings } = toMarkdown({ paragraphs: [{ runs: [{ text: "rot", color: "#b3261e" }] }] });
     expect(warnings.join(" ")).toContain("Farben");
+  });
+
+  it("weist auf Gitterfarben und Zellumbrüche im Export hin", () => {
+    const { markdown, warnings } = toMarkdown({
+      paragraphs: [
+        {
+          type: "table",
+          border: { color: "#1f513d", style: "solid", width: 1 },
+          columns: [{}, {}],
+          rows: [
+            {
+              header: true,
+              cells: [
+                { runs: [{ text: "A" }], background: "#fff3cd" },
+                { runs: [{ text: "Zeile 1\nZeile 2" }] },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(warnings.join(" ")).toContain("Zellhintergrundfarben");
+    expect(warnings.join(" ")).toContain("Zeilenumbrüche");
+    expect(markdown).toContain("| A | Zeile 1 Zeile 2 |");
+  });
+
+  it("exportiert Marks und Links in Zellen und maskiert Pipes", () => {
+    const { markdown, warnings } = toMarkdown({
+      paragraphs: [
+        {
+          type: "table",
+          columns: [{}],
+          rows: [
+            {
+              cells: [
+                {
+                  runs: [
+                    { text: "fett", marks: [{ type: "bold" }] },
+                    { text: " | " },
+                    { text: "Link", link: { href: "https://example.org" } },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(markdown).toContain("**fett** \\| [Link](https://example.org)");
+    expect(warnings.join(" ")).not.toContain("reiner Text");
+  });
+
+  it("liest Marks und Links aus Markdown-Zellen", () => {
+    const { content } = parseMarkdown("| A | B |\n| --- | --- |\n| **fett** | [Link](https://example.org) |\n");
+    const table = asTable(content.paragraphs?.[0]);
+    expect(table.rows[1].cells[0].runs[0]).toMatchObject({ text: "fett", marks: [{ type: "bold" }] });
+    expect(table.rows[1].cells[1].runs[0].link).toEqual({ href: "https://example.org" });
   });
 
   it("ist über den Umweg Markdown stabil", () => {

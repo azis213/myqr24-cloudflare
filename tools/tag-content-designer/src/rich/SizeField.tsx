@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { FONT_SIZE_SCALE } from "../domain/types";
-import { IconChevronDown } from "./icons";
 
 export interface SizeFieldProps {
   /** Aktuelle Größe am Cursor/der Auswahl; `null` = keine Größe gesetzt. */
   value: number | null;
-  /** Größe übernehmen (nur Auswahl bzw. künftige Eingabe). */
+  /** Effektive Standardgröße (berechnet), wird angezeigt, solange kein Mark gesetzt ist. */
+  inheritedSize?: number;
+  /** Größe übernehmen (nur Auswahl bzw. künftige Eingabe); `null` entfernt das Mark. */
   onChange: (size: number | null) => void;
   /** Wenn die Auswahl gemischte Größen hat. */
   mixed?: boolean;
@@ -30,29 +31,34 @@ function stepFrom(current: number | null, direction: 1 | -1): number {
 }
 
 /**
- * Schriftgröße als Zahlenfeld mit Pfeilen (Word-nah): tippen, hoch/runter steppen.
+ * Schriftgröße als natives Zahlenfeld: die Pfeile erscheinen beim Fokussieren/Hover,
+ * ↑/↓ laufen durch die geschlossene Skala, freie Eingaben werden darauf geschnappt.
  * Angewendet wird ausschließlich auf den markierten Text – ohne Auswahl nur als
- * Vorformatierung der nächsten Eingabe.
+ * Vorformatierung der nächsten Eingabe. Ohne Mark zeigt das Feld die effektive
+ * Standardgröße (gestrichelter Rahmen), damit die Anzeige dem Absatzstil gleicht.
  */
-export function SizeField({ value, onChange, mixed = false }: SizeFieldProps) {
-  const [draft, setDraft] = useState(value === null ? "" : String(value));
+export function SizeField({ value, inheritedSize = 16, onChange, mixed = false }: SizeFieldProps) {
+  const inherited = value === null && !mixed;
+  const fallback = Number.isFinite(inheritedSize) && inheritedSize > 0 ? Math.round(inheritedSize) : 16;
+  const display = value === null ? fallback : value;
+  const [draft, setDraft] = useState(String(display));
   const focused = useRef(false);
 
   useEffect(() => {
     if (focused.current) return;
-    setDraft(value === null ? "" : String(value));
-  }, [value, mixed]);
+    setDraft(String(display));
+  }, [display, mixed]);
 
   const commit = (raw: string) => {
     const trimmed = raw.trim();
     if (trimmed === "") {
-      setDraft("");
+      setDraft(String(fallback));
       onChange(null);
       return;
     }
     const parsed = Number(trimmed);
     if (!Number.isFinite(parsed)) {
-      setDraft(value === null ? "" : String(value));
+      setDraft(String(display));
       return;
     }
     const snapped = snapToScale(parsed);
@@ -60,14 +66,8 @@ export function SizeField({ value, onChange, mixed = false }: SizeFieldProps) {
     onChange(snapped);
   };
 
-  const bump = (direction: 1 | -1) => {
-    const next = stepFrom(value, direction);
-    setDraft(String(next));
-    onChange(next);
-  };
-
   return (
-    <div className="fb-sizefield">
+    <div className={`fb-sizefield${inherited ? " is-inherited" : ""}`}>
       <input
         className="fb-size"
         type="number"
@@ -75,9 +75,13 @@ export function SizeField({ value, onChange, mixed = false }: SizeFieldProps) {
         min={STEPS[0]}
         max={STEPS[STEPS.length - 1]}
         step={1}
-        title="Schriftgröße (nur markierter Text)"
+        title={
+          inherited
+            ? `Standardgröße ${fallback} px – Pfeile oder Zahl ändern nur den markierten Text`
+            : "Schriftgröße (nur markierter Text)"
+        }
         aria-label="Schriftgröße"
-        placeholder={mixed ? "–" : "Größe"}
+        placeholder={mixed ? "–" : undefined}
         value={draft}
         onFocus={() => {
           focused.current = true;
@@ -94,36 +98,18 @@ export function SizeField({ value, onChange, mixed = false }: SizeFieldProps) {
           }
           if (event.key === "ArrowUp") {
             event.preventDefault();
-            bump(1);
+            const next = stepFrom(value ?? fallback, 1);
+            setDraft(String(next));
+            onChange(next);
           }
           if (event.key === "ArrowDown") {
             event.preventDefault();
-            bump(-1);
+            const next = stepFrom(value ?? fallback, -1);
+            setDraft(String(next));
+            onChange(next);
           }
         }}
       />
-      <span className="fb-size-steps">
-        <button
-          type="button"
-          className="fb-step"
-          title="Schriftgröße erhöhen"
-          aria-label="Schriftgröße erhöhen"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => bump(1)}
-        >
-          <IconChevronDown />
-        </button>
-        <button
-          type="button"
-          className="fb-step fb-step-down"
-          title="Schriftgröße verringern"
-          aria-label="Schriftgröße verringern"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => bump(-1)}
-        >
-          <IconChevronDown />
-        </button>
-      </span>
     </div>
   );
 }

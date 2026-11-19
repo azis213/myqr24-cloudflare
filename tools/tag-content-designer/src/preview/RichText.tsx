@@ -62,21 +62,39 @@ function ListView({ kind, items }: { kind: ListKind; items: ListItemNode[] }) {
 }
 
 function TableView({ table }: { table: TableBlock }) {
+  const border = table.border;
+  // Gitterrahmen über CSS-Variablen: eine Wahrheit für Vorschau und Editor.
+  const tableStyle = {
+    borderCollapse: "collapse" as const,
+    ...(border
+      ? {
+          "--rt-border-color": border.color,
+          "--rt-border-style": border.style,
+          "--rt-border-width": `${border.width}px`,
+        }
+      : {}),
+  } as CSSProperties;
+
   return (
-    <table className="rt-table">
+    <table className="rt-table" data-bordered={border ? "true" : "false"} style={tableStyle}>
       <tbody>
         {table.rows.map((row, rowIndex) => (
           <tr key={rowIndex}>
             {table.columns.map((column, columnIndex) => {
-              const cell = row.cells[columnIndex] ?? { text: "" };
-              const style: CSSProperties = column.align && column.align !== "start" ? { textAlign: column.align } : {};
+              const cell = row.cells[columnIndex] ?? { runs: [] };
+              const style: CSSProperties = {
+                ...(column.align && column.align !== "start" ? { textAlign: column.align } : {}),
+                ...(cell.background ? { backgroundColor: cell.background } : {}),
+              };
+              const runs = cell.runs ?? [];
+              const content = runs.length === 0 ? <br /> : runs.map((run, runIndex) => <Run key={runIndex} run={run} />);
               return row.header ? (
                 <th key={columnIndex} className="rt-cell" style={style}>
-                  {cell.text}
+                  {content}
                 </th>
               ) : (
                 <td key={columnIndex} className="rt-cell" style={style}>
-                  {cell.text}
+                  {content}
                 </td>
               );
             })}

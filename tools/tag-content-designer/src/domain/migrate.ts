@@ -54,6 +54,65 @@ export const MIGRATIONS: MigrationStep[] = [
       return { document: { ...document, elements: migrated }, changes };
     },
   },
+  {
+    from: 2,
+    to: 3,
+    description: "Tabellenzellen von reinem Text auf Runs umstellen (Farbe/Markierung/Marks)",
+    apply: (document) => {
+      const changes: string[] = [];
+      const elements = document.elements;
+      if (!Array.isArray(elements)) return { document, changes };
+
+      /** Wandelt `cell.text` in `cell.runs`; andere Zellen bleiben unverändert. */
+      const migrateCell = (cell: unknown): unknown => {
+        if (!cell || typeof cell !== "object" || Array.isArray(cell)) return cell;
+        const entry = cell as Record<string, unknown>;
+        if (Array.isArray(entry.runs) || typeof entry.text !== "string") return cell;
+        const { text, ...rest } = entry;
+        return { ...rest, runs: text.length > 0 ? [{ text }] : [] };
+      };
+
+      const migrated = elements.map((entry, elementIndex) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+        const element = entry as Record<string, unknown>;
+        const content = element.content;
+        if (!content || typeof content !== "object" || Array.isArray(content)) return entry;
+        const paragraphs = (content as Record<string, unknown>).paragraphs;
+        if (!Array.isArray(paragraphs)) return entry;
+
+        let touched = false;
+        const nextParagraphs = paragraphs.map((block, blockIndex) => {
+          if (!block || typeof block !== "object" || Array.isArray(block)) return block;
+          const table = block as Record<string, unknown>;
+          if (table.type !== "table" || !Array.isArray(table.rows)) return block;
+
+          const rows = table.rows.map((row, rowIndex) => {
+            if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+            const cells = (row as Record<string, unknown>).cells;
+            if (!Array.isArray(cells)) return row;
+            const nextCells = cells.map((cell, cellIndex) => {
+              const next = migrateCell(cell);
+              if (next !== cell) {
+                touched = true;
+                changes.push(
+                  `elements[${elementIndex}].content.paragraphs[${blockIndex}].rows[${rowIndex}].cells[${cellIndex}].text → runs`,
+                );
+              }
+              return next;
+            });
+            return { ...(row as Record<string, unknown>), cells: nextCells };
+          });
+
+          return { ...table, rows };
+        });
+
+        if (!touched) return entry;
+        return { ...element, content: { ...(content as Record<string, unknown>), paragraphs: nextParagraphs } };
+      });
+
+      return { document: { ...document, elements: migrated }, changes };
+    },
+  },
 ];
 
 export function migrateDocument(

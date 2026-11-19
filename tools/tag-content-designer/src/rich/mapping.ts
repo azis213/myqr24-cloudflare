@@ -12,6 +12,8 @@ import {
   markNames,
   mergeRuns,
   normalizeHref,
+  normalizeTableBorder,
+  truncateRuns,
   type BlockNode,
   type ListItemNode,
 } from "../domain/richtext";
@@ -91,22 +93,33 @@ function listNode(kind: ListKind, items: ListItemNode[]): JSONContent {
   return { type: kind === "ordered" ? "orderedList" : "bulletList", content: items.map(listItemNode) };
 }
 
-/** Tabelle: Zellen als reiner Text, Ausrichtung je Spalte, Kopfzeile über `header`. */
+/** Tabelle: Zellen als Inline-Runs, Ausrichtung je Spalte, Kopfzeile über `header`, Rahmen/Hintergrund als Tokens. */
 function tableNode(table: TableBlock): JSONContent {
   const columnCount = Math.min(MAX_TABLE_COLUMNS, Math.max(1, table.columns.length));
   const rows: JSONContent[] = table.rows.slice(0, MAX_TABLE_ROWS).map((row) => ({
     type: "richTableRow",
     content: Array.from({ length: columnCount }, (_, index) => {
-      const text = (row.cells[index]?.text ?? "").slice(0, MAX_TABLE_CELL_LENGTH);
+      const cell = row.cells[index];
       const align = table.columns[index]?.align;
       const attrs: Record<string, unknown> = { header: row.header === true };
       if (isTextAlign(align) && align !== "start") attrs.align = align;
+      if (isHexColor(cell?.background)) attrs.background = cell.background;
       const node: JSONContent = { type: "richTableCell", attrs };
-      if (text.length > 0) node.content = [{ type: "text", text }];
+      const inline = truncateRuns(cell?.runs ?? [], MAX_TABLE_CELL_LENGTH).flatMap(runToNodes);
+      if (inline.length > 0) node.content = inline;
       return node;
     }),
   }));
-  return { type: "richTable", content: rows.length > 0 ? rows : [{ type: "richTableRow", content: [] }] };
+
+  const attrs: Record<string, unknown> = {};
+  const border = normalizeTableBorder(table.border);
+  if (border) {
+    attrs.borderColor = border.color;
+    attrs.borderStyle = border.style;
+    attrs.borderWidth = border.width;
+  }
+
+  return { type: "richTable", attrs, content: rows.length > 0 ? rows : [{ type: "richTableRow", content: [] }] };
 }
 
 function tableFromNode(node: JSONContent): TableBlock {
@@ -125,16 +138,21 @@ function tableFromNode(node: JSONContent): TableBlock {
     rows: rows.slice(0, MAX_TABLE_ROWS).map((row) => {
       const cells = Array.from({ length: columnCount }, (_, index) => {
         const cell = (row.content ?? [])[index];
-        const text = (cell?.content ?? [])
-          .map((child) => (typeof child.text === "string" ? child.text : ""))
-          .join("")
-          .slice(0, MAX_TABLE_CELL_LENGTH);
-        return { text };
+        const runs = truncateRuns(runsFromInline(cell?.content), MAX_TABLE_CELL_LENGTH);
+        const background = cell?.attrs?.background;
+        return isHexColor(background) ? { runs, background } : { runs };
       });
       const header = (row.content ?? []).length > 0 && (row.content ?? []).every((cell) => cell.attrs?.header === true);
       return header ? { header: true, cells } : { cells };
     }),
   };
+
+  const border = normalizeTableBorder({
+    color: node.attrs?.borderColor,
+    style: node.attrs?.borderStyle,
+    width: node.attrs?.borderWidth,
+  });
+  if (border) table.border = border;
   return table;
 }
 
