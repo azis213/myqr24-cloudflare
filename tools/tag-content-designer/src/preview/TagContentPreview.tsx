@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { ELEMENT_CATALOG } from "../domain/catalog";
-import { layoutElements } from "../domain/layout";
+import { BREAKPOINT_LABELS, layoutElements, type LayoutView } from "../domain/layout";
 import type { TagContentDocument, ThemeColors } from "../domain/types";
 import { ElementView, type ElementEditing } from "./ElementView";
 
@@ -16,17 +16,23 @@ const PADDING: Record<string, string> = { none: "0", sm: "0.5rem", md: "1rem", l
 export function TagContentPreview({
   doc,
   widthPx,
+  fit,
+  view = "compact",
   selectedId,
   onSelect,
   editing,
 }: {
   doc: TagContentDocument;
   widthPx: number;
+  /** Breite folgt dem verfügbaren Platz statt einer festen Simulation. */
+  fit?: boolean;
+  /** `compact` = mehrspaltig (echte Ausgabe), `stacked` = alle Elemente untereinander. */
+  view?: LayoutView;
   selectedId: string | null;
   onSelect: (elementId: string) => void;
   editing?: ElementEditing;
 }) {
-  const { breakpoint, columns, placed } = layoutElements(doc.elements, doc.layout, widthPx);
+  const { breakpoint, columns, placed } = layoutElements(doc.elements, doc.layout, widthPx, { view });
   const colors = doc.shell.theme.colors;
   const typography = doc.shell.theme.typography ?? {};
 
@@ -44,14 +50,19 @@ export function TagContentPreview({
   };
 
   return (
-    <div className="tcp" style={rootStyle} data-breakpoint={breakpoint}>
+    <div className="tcp" style={rootStyle} data-breakpoint={breakpoint} data-view={view}>
       <header className="tcp-header">
         <span className="tcp-title">{doc.template.name || "Unbenanntes Template"}</span>
         <span className="tcp-meta">
-          {columns} Spalten · {breakpoint}
+          {fit ? `Fit (${widthPx} px)` : `${widthPx} px`} · {BREAKPOINT_LABELS[breakpoint]} ·{" "}
+          {view === "stacked" ? "Untereinander" : "Compact"} · {columns} {columns === 1 ? "Spalte" : "Spalten"}
           {doc.shell.statusBar?.showTagId ? " · TAG-ID" : ""}
         </span>
       </header>
+
+      {view === "stacked" ? (
+        <p className="tcp-view-badge">Alle Elemente untereinander – nicht die echte Ausgabe</p>
+      ) : null}
 
       {doc.shell.presentation !== "standard" ? (
         <div className="tcp-presentation">Präsentation: {doc.shell.presentation}</div>

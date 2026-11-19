@@ -30,7 +30,7 @@ Weitere Befehle:
 | ---------------------- | ----------------------------------------------------------- |
 | `npm run build`      | `tsc --noEmit` + Produktions-Build nach `dist/`         |
 | `npm run preview`    | gebautes Ergebnis lokal ansehen (`http://127.0.0.1:4180`) |
-| `npm test`           | Vitest-Suite (183 Tests)                                    |
+| `npm test`           | Vitest-Suite (200 Tests)                                    |
 | `npm run test:watch` | Tests im Watch-Modus                                        |
 
 ## Was das Tool kann
@@ -38,7 +38,7 @@ Weitere Befehle:
 - **Templates laden und speichern**: `Load`, `Save` (gleiche Datei), `Save as` (neue Datei), `Download`. Nutzt die File System Access API; Firefox/Safari fallen auf Download + Datei-Dialog zurück.
 - **Vorlagen**: „Vault – Standard" und „Lost & Found – Standard" sind eingebaut, dazu „Neu" für alle TAG-Typen.
 - **Elemente**: Text, Einzelbild, Dokument, Galerie, Dokumentenliste sowie Hinweis, Titelbereich, Fundhinweis, Kontaktweg, Wartungshistorie (optional).
-- **Layout**: 12-Spalten-Grid mit Flusslayout; Spalten und Spans werden zur Laufzeit berechnet, Vorschau in Handy/Tablet/Desktop.
+- **Layout**: 12-Spalten-Grid mit Flusslayout; Spalten und Spans werden zur Laufzeit berechnet (`span` ist ein Anteil am 12er-Raster, 8/4 ergibt 2/3 + 1/3). Vorschau-Breiten mobil-first: Handy 320/360/390/430, Tablet 768/1024, Web 1280/1440 und **Fit** (nutzt den verfügbaren Platz ohne Scrollbalken). Der Schalter **Compact** wirkt in jeder Breite: an = mehrspaltig (echte Ausgabe), aus = alle Elemente untereinander (Editieransicht, `Strg+Shift+E`). Darunter Layout-Hinweise für zu schmale Spalten, zu kleine Schrift, breite Tabellen und lange Handy-Kacheln.
 - **Gestaltung**: Theme-Farben, Element-Hintergründe, Text- und Überschriftenfarben, Innenabstände.
 - **RTF-Textfelder**: Tiptap/ProseMirror mit eigenem Schema. Beim Fokus erscheint die Leiste über dem Feld: **Absatzstil (Text / Überschrift 1–5)**, Schriftfamilie mit **Ist-Anzeige** („Standard" ohne Zeichen-Mark) und **Schriftgröße als natives Zahlenfeld** (Pfeile bei Fokus/Hover), Fett/Kursiv/Unterstrich, links/zentriert/rechts, Aufzählung und Nummerierung, Ein-/Ausrücken, Zeilenabstand, Zeichenfarbe, Markierung, **Box-Hintergrund** und Links (`https:`/`mailto:`). Symbolknöpfe wie in Word, `Shift+Enter` erzeugt einen Umbruch im selben Absatz.
 - **Markierung bleibt erhalten**: Ein Klick in die Leiste verliert die Auswahl nicht (dezente Merk-Dekoration) – weitere Schritte wirken auf dieselbe Spanne; ein Klick in den Text löscht den Merker.
@@ -80,7 +80,10 @@ THIRD-PARTY.md  Lizenzen der Laufzeit-Abhängigkeiten (Tiptap/ProseMirror, MIT)
 - Links nur `https:`/`mailto:` mit `rel="noopener noreferrer nofollow"`; `javascript:`/`data:` werden verworfen und sind ein Validierungsfehler.
 - Rechte (`actions`) sind Anträge: das Template kann Rechte einschränken, nie erweitern; durchgesetzt wird später serverseitig.
 - Veröffentlichung, Template-Verwaltung und Benutzeranpassung sind **nicht** Teil dieses Tools.
-- Bündelgröße: 837 kB JS (278 kB gzip) inkl. Editor und Markdown-Tokenizer; Tiptap-Tabellen-/Drop-/Gapcursor sind nicht enthalten.
+- Bündelgröße: 841 kB JS (279 kB gzip) inkl. Editor und Markdown-Tokenizer; Tiptap-Tabellen-/Drop-/Gapcursor sind nicht enthalten.
+
+
+
 
 
 

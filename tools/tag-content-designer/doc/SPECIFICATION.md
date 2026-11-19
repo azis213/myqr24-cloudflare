@@ -234,7 +234,13 @@ Bekannte, dokumentierte Abweichung: `guestScope: ownOnly` ist derzeit eine **War
 
 ## 8. Layout, Theme und Darstellung
 
-- **12-Spalten-Grid mit Flusslayout**; effektive Spalten `C = clamp(1, floor(Breite / minColumnWidth), preferredColumns)`, effektiver Span `S = min(span, C)`.
+- **12-Spalten-Grid mit Flusslayout**; effektive Spalten `C = clamp(1, floor(Breite / minColumnWidth), preferredColumns)`. `placement.span` ist ein **Anteil am Raster** (12): effektiver Span `S = max(1, round(span / 12 * C))`. Beispiel: 8 und 4 ergeben bei drei Spalten 2 + 1, bei sechs Spalten 4 + 2 – die Vorlage bleibt also bei jeder Spaltenzahl verhältnismäßig.
+- **Vorschau = Breite × Spaltenmodus.** Die Breite (`Handy 320/360/390/430`, `Tablet 768/1024`, `Web 1280/1440`, `Fit`) und der Schalter **Compact** sind unabhängig voneinander:
+  - `Compact` an (Default): mehrspaltig, so viele Spalten wie `minColumnWidth`/`preferredColumns` zulassen – das ist die echte Ausgabe.
+  - `Compact` aus („Untereinander"): alle Elemente in einer Spalte, volle Breite; Spans werden bewusst ignoriert und die Vorschau trägt den Hinweis „Alle Elemente untereinander – nicht die echte Ausgabe". Das ist reine Editor-Ansicht, wird nie im Dokument gespeichert (Kürzel `Strg+Shift+E`, Zustand in `localStorage`).
+  - Die Kopfzeile nennt immer `Breite · Gerät · Modus · Spalten`; die Layout-Hinweise beziehen sich weiterhin auf die **mehrspaltige** Ausgabe.
+- **Vorschau-Breiten (mobil-first)**: `Fit` misst den verfügbaren Platz im Vorschaubereich (`ResizeObserver`) und zeigt die Vorschau ohne Scrollbalken. Die gewählte Breite wird in `localStorage` gemerkt; der Inspektor folgt dem **angezeigten** Breakpoint.
+- **Layout-Hinweise** unter der Vorschau (max. 4, unverbindlich, nie blockierend): zu schmale Spalten (< 12 rem), zu kleine Basisschrift (< 14 px auf dem Handy), Tabellen mit mehr als 3 Spalten auf dem Handy, sehr lange Handy-Kacheln.
 - Berechnung zur Renderzeit (`ResizeObserver`), kein fester Gerätemodus; Rotation ergibt sich aus der Breite.
 - **Texte werden nie abgeschnitten**: kein `ellipsis`, keine Höhenklemmung, `overflow-wrap: anywhere`.
 - Theme-Tokens: `background`, `surface`, `text`, `mutedText`, `heading`, `accent`, `accentText`, `border`, optional `danger`, `success`; Farben als `#rrggbb` oder Token.
@@ -350,10 +356,10 @@ Markdown ist **Eingabe- und Ausgabeformat**, nie Speicherformat (`D-40`). Das Mo
 
 | Bereich | Inhalt |
 | --- | --- |
-| Kopfzeile | TAG-Typ + „Neu", Vorlagenauswahl, Load/Save/Save as/Download, Undo/Redo, Breakpoint-Umschaltung |
+| Kopfzeile | TAG-Typ + „Neu", Vorlagenauswahl, Load/Save/Save as/Download, Undo/Redo, Vorschau-Breiten (Handy/Tablet/Web + Fit) und der Schalter **Compact** (mehrspaltig ↔ untereinander) |
 | Bibliotheksleiste | Name, `libraryVersion`, Anzahl Bausteine, Load/Save/Save as/Default |
 | Links | Elementliste (sortieren, löschen, hinzufügen), JSON-Ansicht mit Größe und Hash; **Breite per Ziehgriff verstellbar** (220–680 px, in `localStorage` gemerkt) |
-| Mitte | Live-Vorschau in Handy-/Tablet-/Desktopbreite, klickbare Elemente, **RTF-Textfelder mit Leiste** (Zeichen, Absatz, Listen, Schrift, Farben, Link) |
+| Mitte | Live-Vorschau in der gewählten Breite (Handy/Tablet/Web oder `Fit`) und im gewählten Spaltenmodus (`Compact`/`Untereinander`), Kopfzeile mit Breite · Gerät · Modus · Spalten, klickbare Elemente, **RTF-Textfelder mit Leiste** (Zeichen, Absatz, Listen, Schrift, Farben, Link); darunter die Layout-Hinweise |
 | Rechts | Inspektor: Template-Rahmen, Farben, Layout, Element-Eigenschaften, Verhalten, Slots; **Breite per Ziehgriff verstellbar** (280–760 px, in `localStorage` gemerkt); Textkontrolle als **bearbeitbares JSON** (scrollbar, prüft beim Verlassen/„Übernehmen") |
 | Unten | Validierungsliste mit Sprung zum betroffenen Element |
 
@@ -372,7 +378,8 @@ Tastenkürzel: `Strg+O` Load, `Strg+S` Save, `Strg+Shift+S` Save as, `Strg+Z`/`S
 | `serialize.test.ts` | kanonische Sortierung, Idempotenz, stabiler Hash, Dateinamen |
 | `migrate.test.ts` | gleiche/neuere/fehlende Version, kumulative Stufe, fehlende `schemaVersion`, Zell-Migration `text` → `runs` |
 | `library.test.ts` | Default-Bibliothek gültig, doppelte IDs, unbekannter Typ, Merge-Regeln, `libraryVersion` |
-| `layout.test.ts` | Spalten bei 360/768/1280, Span-Klemmung, Sortierung, ausgeblendete Elemente |
+| `layout.test.ts` | Spalten bei 360/768/1280, Span als Rasteranteil (8/4 → 2/1 bei drei, 4/2 bei sechs Spalten), Spaltenmodus (`view: stacked` → eine Spalte, alle Spans 1, Reihenfolge unverändert), fehlende Platzierung, Sortierung, ausgeblendete Elemente |
+| `layoutChecks.test.ts` | Layout-Hinweise: zu schmale Spalten, zu kleine Basisschrift, breite Tabellen auf dem Handy (mit Elementbezug), Obergrenze von vier Hinweisen, keine Fehlalarme auf breiten Ansichten |
 | `bindings.test.ts` | erlaubte Quellen, Auflösung, Fallback, Flatten |
 | `store.test.ts` | Reihenfolge sofort in der Vorschau sichtbar, `placement.order` je Breakpoint, Randfälle, Undo-Bündelung von Tipp-Bursts |
 | `richtext.test.ts` | Link-Allowlist, Zusammenfassen von Runs mit allen Attributen, `groupBlocks` (Verschachtelung, Ebenen-Normalisierung), Präsentations-Mapping |
@@ -387,9 +394,9 @@ Tastenkürzel: `Strg+O` Load, `Strg+S` Save, `Strg+Shift+S` Save as, `Strg+Z`/`S
 | `session.test.ts` | „Letzte Konfiguration": kanonisch speichern, unverändert laden, unbrauchbare Stände verwerfen, Speicher leeren |
 | `markdown.test.ts` | Markdown → Modell (Überschriften 1–5/6, Marks, Links inkl. Ablehnung, Listen, Tabellen mit Ausrichtung, HTML nur als Text) und Modell → Markdown (Struktur, Maskierung, Warnungen, Stabiler Roundtrip) |
 | `Inspector.test.tsx` | Textkontrolle als JSON: Anzeige des Runs-Modells, Übernahme gültiger Änderungen, Abweisung von kaputtem JSON und Regelverstößen |
-| `App.test.tsx` | End-to-End: Aufbau der Arbeitsfläche, Sortieren wirkt sofort in der Vorschau, Leiste mit allen Gruppen (inkl. Farbmenüs, Absatzstil, Größenfeld) beim Fokus |
+| `App.test.tsx` | End-to-End: Aufbau der Arbeitsfläche, Sortieren wirkt sofort in der Vorschau, Leiste mit allen Gruppen (inkl. Farbmenüs, Absatzstil, Größenfeld) beim Fokus, Vorschau-Breiten 320–1440 + `Fit` mit Statuszeile („Breite · Gerät · Modus · Spalten"), mitwanderndem Inspektor-Breakpoint und dem **Compact**-Schalter (untereinander, Badge, Spans 1, Persistenz in `localStorage`) |
 
-Nachweisstand: **183 Tests grün** (19 Dateien), `tsc --noEmit` fehlerfrei, `vite build` erfolgreich (837 kB JS / 17 kB CSS; gzip 278 kB / 4,2 kB).
+Nachweisstand: **200 Tests grün** (20 Dateien), `tsc --noEmit` fehlerfrei, `vite build` erfolgreich (841 kB JS / 18 kB CSS; gzip 279 kB / 4,4 kB).
 
 ---
 
@@ -439,6 +446,7 @@ Nachweisstand: **183 Tests grün** (19 Dateien), `tsc --noEmit` fehlerfrei, `vit
 - Access-Vertrag: [`../../../docs/10-Architecture/35-Contracts/tag-app-access-v1.md`](../../../docs/10-Architecture/35-Contracts/tag-app-access-v1.md)
 - TAG-App: [`../../../apps/tag-app/`](../../../apps/tag-app/)
 - Label-Designer (Vorbild): [`../../tag-designer/`](../../tag-designer/)
+
 
 
 

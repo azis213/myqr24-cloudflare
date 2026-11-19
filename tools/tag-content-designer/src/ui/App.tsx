@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createDocument, TAG_TYPE_LABELS, TAG_TYPES } from "../domain/catalog";
 import { DocumentError } from "../domain/errors";
-import { BREAKPOINTS, BREAKPOINT_LABELS, PREVIEW_WIDTHS } from "../domain/layout";
+import { PREVIEW_PRESETS, PREVIEW_WIDTHS, breakpointForWidth, type LayoutView } from "../domain/layout";
+import { layoutHints } from "../domain/layoutChecks";
 import { bumpLibrary, mergeLibraries, validateLibrary } from "../domain/library";
 import { migrateDocument } from "../domain/migrate";
 import { canonicalize, documentFileName, libraryFileName } from "../domain/serialize";
@@ -31,6 +32,7 @@ import { saveSession } from "../state/session";
 import { addCustomColor, removeCustomColor, type PaletteContext } from "../rich/palette";
 import { Inspector } from "./Inspector";
 import { JsonPanel, Outline, ValidationPanel } from "./Panels";
+import { useMeasuredWidth } from "./useMeasuredWidth";
 
 const templateTypes = () => jsonFileTypes("TAG-Content-Template", ".tagcontent.json");
 const libraryTypes = () => jsonFileTypes("Element-Bibliothek", ".tagelements.json");
@@ -104,6 +106,64 @@ export function App({
       /* Komfort, kein Muss */
     }
   }, [rightWidth]);
+
+  /**
+   * Simulierte Vorschau-Breite: eine der Handy-/Tablet-/Web-Breiten oder `fit`
+   * (= tatsächlicher Platz im Vorschaubereich, ohne Scrollbalken).
+   */
+  const [previewWidth, setPreviewWidth] = useState<number | "fit">(() => {
+    try {
+      const stored = window.localStorage.getItem("myqr24.tcd.previewWidth");
+      if (stored === "fit") return "fit";
+      const value = Number(stored);
+      if (PREVIEW_PRESETS.some((preset) => preset.widthPx === value)) return value;
+    } catch {
+      /* localStorage kann blockiert sein */
+    }
+    return "fit";
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("myqr24.tcd.previewWidth", String(previewWidth));
+    } catch {
+      /* Komfort, kein Muss */
+    }
+  }, [previewWidth]);
+
+  const { ref: centerRef, width: centerWidth } = useMeasuredWidth(PREVIEW_WIDTHS.desktop);
+  const fit = previewWidth === "fit";
+  const shownWidth = fit ? Math.max(280, centerWidth) : previewWidth;
+  const shownBreakpoint = breakpointForWidth(shownWidth);
+
+  /**
+   * Ein Schalter für alle Breiten: `compact` zeigt das echte Raster, `stacked` legt
+   * alle Elemente untereinander. Reine Ansichtssache – wird nie im Dokument gespeichert.
+   */
+  const [view, setView] = useState<LayoutView>(() => {
+    try {
+      return window.localStorage.getItem("myqr24.tcd.previewColumns") === "stacked" ? "stacked" : "compact";
+    } catch {
+      return "compact";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("myqr24.tcd.previewColumns", view);
+    } catch {
+      /* Komfort, kein Muss */
+    }
+  }, [view]);
+
+  // Der Inspector bearbeitet immer den Breakpoint, den die Vorschau gerade zeigt.
+  useEffect(() => {
+    if (state.breakpoint !== shownBreakpoint) {
+      dispatch({ type: "breakpoint", breakpoint: shownBreakpoint });
+    }
+  }, [shownBreakpoint, state.breakpoint, dispatch]);
+
+  const hints = useMemo(() => layoutHints(doc, shownWidth), [doc, shownWidth]);
 
   const beginResizeRight = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -334,6 +394,11 @@ export function App({
       }
       // Im Textfeld bleibt das native Text-Undo des Browsers zuständig.
       if (inEditable) return;
+      if (key === "e" && event.shiftKey) {
+        event.preventDefault();
+        setView((current) => (current === "compact" ? "stacked" : "compact"));
+        return;
+      }
       if (key === "z") {
         event.preventDefault();
         dispatch({ type: event.shiftKey ? "redo" : "undo" });
@@ -483,17 +548,39 @@ export function App({
           </button>
         </div>
 
-        <div className="group">
-          {BREAKPOINTS.map((entry) => (
-            <button
-              key={entry}
-              type="button"
-              className={state.breakpoint === entry ? "active" : ""}
-              onClick={() => dispatch({ type: "breakpoint", breakpoint: entry })}
-            >
-              {BREAKPOINT_LABELS[entry]}
-            </button>
+        <div className="group preview-group" role="group" aria-label="Vorschau-Breite">
+          {PREVIEW_PRESETS.map((preset, index) => (
+            <span key={preset.widthPx} className="preview-slot">
+              {index === 0 || PREVIEW_PRESETS[index - 1].group !== preset.group ? (
+                <span className="preview-group-label">{preset.group}</span>
+              ) : null}
+              <button
+                type="button"
+                className={previewWidth === preset.widthPx ? "active" : ""}
+                title={`${preset.group} · ${preset.widthPx} px simulieren`}
+                onClick={() => setPreviewWidth(preset.widthPx)}
+              >
+                {preset.widthPx}
+              </button>
+            </span>
           ))}
+          <button
+            type="button"
+            className={fit ? "active" : ""}
+            title="Verfügbaren Platz nutzen (ohne Scrollbalken)"
+            onClick={() => setPreviewWidth("fit")}
+          >
+            Fit
+          </button>
+          <button
+            type="button"
+            className={view === "compact" ? "active" : ""}
+            aria-pressed={view === "compact"}
+            title="Compact: mehrspaltig, wenn Platz ist · aus: alle Elemente untereinander (Strg+Shift+E)"
+            onClick={() => setView((current) => (current === "compact" ? "stacked" : "compact"))}
+          >
+            Compact
+          </button>
         </div>
       </header>
 
@@ -560,16 +647,32 @@ export function App({
           <span className="splitter-grip" aria-hidden="true" />
         </div>
 
-        <section className="center">
-          <div className="preview-frame" style={{ width: `${PREVIEW_WIDTHS[state.breakpoint]}px` }}>
+        <section className="center" ref={centerRef}>
+          <div className="preview-frame" style={{ width: fit ? "100%" : `${shownWidth}px` }}>
             <TagContentPreview
               doc={doc}
-              widthPx={PREVIEW_WIDTHS[state.breakpoint]}
+              widthPx={shownWidth}
+              fit={fit}
+              view={view}
               selectedId={state.selectedId}
               onSelect={(elementId) => dispatch({ type: "select", elementId })}
               editing={{ onContentChange: handleContentChange, onStyleChange: handleElementStyleChange, palette }}
             />
           </div>
+          {hints.length > 0 ? (
+            <div className="preview-hints-wrap">
+              {view === "stacked" ? (
+                <p className="preview-hints-note">Hinweise zur mehrspaltigen Ausgabe:</p>
+              ) : null}
+              <ul className="preview-hints" role="status" aria-label="Layout-Hinweise">
+                {hints.map((hint) => (
+                  <li key={`${hint.id}-${hint.elementId ?? "doc"}`} className={`preview-hint ${hint.severity}`}>
+                    {hint.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </section>
 
         <div
