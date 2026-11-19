@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Wartung vor Ort">
+  <rect width="800" height="600" fill="#e8ecea"/>
+  <rect x="120" y="200" width="560" height="240" rx="14" fill="#ffffff" stroke="#c9d1cb" stroke-width="4"/>
+  <circle cx="250" cy="320" r="52" fill="#dfe6e1"/>
+  <rect x="340" y="270" width="290" height="14" rx="4" fill="#3f6b52"/>
+  <rect x="340" y="310" width="240" height="12" rx="4" fill="#c9d1cb"/>
+  <rect x="340" y="342" width="270" height="12" rx="4" fill="#c9d1cb"/>
+  <text x="36" y="540" font-family="system-ui, sans-serif" font-size="28" fill="#5f6863">Wartung</text>
+</svg>

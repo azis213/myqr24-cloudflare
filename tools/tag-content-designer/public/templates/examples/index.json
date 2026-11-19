@@ -1,0 +1,46 @@
+{
+  "schema": "myqr24-tag-content-examples-v1",
+  "schemaVersion": 1,
+  "examples": [
+    {
+      "id": "wedding-garden",
+      "label": "Hochzeit – Gartenfeier",
+      "group": "Beispiele",
+      "templatePath": "/templates/examples/wedding-garden/template.tagcontent.json",
+      "samplePath": "/templates/examples/wedding-garden/sample.json",
+      "tagType": "event",
+      "presentation": "wedding",
+      "description": "Hero mit Bild, Willkommen, Ablauf und Speisekarte als Tabellen, Gästegalerie, Dokumente."
+    },
+    {
+      "id": "wedding-party",
+      "label": "Hochzeit – Abendparty",
+      "group": "Beispiele",
+      "templatePath": "/templates/examples/wedding-party/template.tagcontent.json",
+      "samplePath": "/templates/examples/wedding-party/sample.json",
+      "tagType": "event",
+      "presentation": "wedding",
+      "description": "Dunkles Party-Layout mit Getränkekarte, Partyfotos, Ablaufplan und Playlist."
+    },
+    {
+      "id": "lost-found-luggage",
+      "label": "Lost & Found – Reisekoffer",
+      "group": "Beispiele",
+      "templatePath": "/templates/examples/lost-found-luggage/template.tagcontent.json",
+      "samplePath": "/templates/examples/lost-found-luggage/sample.json",
+      "tagType": "lost-found",
+      "presentation": "standard",
+      "description": "Fundhinweis, Funddaten als Tabelle, Fundmeldung mit Fotos und Kontaktweg."
+    },
+    {
+      "id": "maintenance-heat-pump",
+      "label": "Wartung – Wärmepumpe",
+      "group": "Beispiele",
+      "templatePath": "/templates/examples/maintenance-heat-pump/template.tagcontent.json",
+      "samplePath": "/templates/examples/maintenance-heat-pump/sample.json",
+      "tagType": "maintenance",
+      "presentation": "standard",
+      "description": "Wartungshistorie mit Dokumenten, Wartungstabelle, Typenschild und Sicherheitshinweis."
+    }
+  ]
+}

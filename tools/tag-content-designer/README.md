@@ -30,13 +30,14 @@ Weitere Befehle:
 | ---------------------- | ----------------------------------------------------------- |
 | `npm run build`      | `tsc --noEmit` + Produktions-Build nach `dist/`         |
 | `npm run preview`    | gebautes Ergebnis lokal ansehen (`http://127.0.0.1:4180`) |
-| `npm test`           | Vitest-Suite (200 Tests)                                    |
+| `npm test`           | Vitest-Suite (239 Tests)                                    |
 | `npm run test:watch` | Tests im Watch-Modus                                        |
 
 ## Was das Tool kann
 
 - **Templates laden und speichern**: `Load`, `Save` (gleiche Datei), `Save as` (neue Datei), `Download`. Nutzt die File System Access API; Firefox/Safari fallen auf Download + Datei-Dialog zurück.
-- **Vorlagen**: „Vault – Standard" und „Lost & Found – Standard" sind eingebaut, dazu „Neu" für alle TAG-Typen.
+- **Vorlagen**: „Vault – Standard" und „Lost & Found – Standard" sind eingebaut, dazu „Neu" für alle TAG-Typen. Unter **Beispiele** liegen vier fertige Templates mit Testdaten: Hochzeit (Gartenfeier, Abendparty), Lost & Found (Reisekoffer) und Wartung (Wärmepumpe) – geladen über das Manifest `public/templates/examples/index.json`.
+- **Beispieldaten & Rollen**: Beim Laden eines Beispiels erscheinen in der Kopfzeile der Schalter **Beispieldaten** und die **Rolle** (`Gast`, `Owner`, `Scanner`). Die Vorschau zeigt dann echte Bilder, Dokumente, Galeriebeiträge („wartet auf Freigabe") und Wartungseinträge nach Jahr. `shared`-Inhalte verschwinden für `Scanner`; `private`/`ownerOnly` bleiben nur im Editor mit Hinweis. Die Daten kommen aus `sample.json` und werden **nie** ins Template geschrieben.
 - **Elemente**: Text, Einzelbild, Dokument, Galerie, Dokumentenliste sowie Hinweis, Titelbereich, Fundhinweis, Kontaktweg, Wartungshistorie (optional).
 - **Layout**: 12-Spalten-Grid mit Flusslayout; Spalten und Spans werden zur Laufzeit berechnet (`span` ist ein Anteil am 12er-Raster, 8/4 ergibt 2/3 + 1/3). Vorschau-Breiten mobil-first: Handy 320/360/390/430, Tablet 768/1024, Web 1280/1440 und **Fit** (nutzt den verfügbaren Platz ohne Scrollbalken). Der Schalter **Compact** wirkt in jeder Breite: an = mehrspaltig (echte Ausgabe), aus = alle Elemente untereinander (Editieransicht, `Strg+Shift+E`). Darunter Layout-Hinweise für zu schmale Spalten, zu kleine Schrift, breite Tabellen und lange Handy-Kacheln.
 - **Gestaltung**: Theme-Farben, Element-Hintergründe, Text- und Überschriftenfarben, Innenabstände.
@@ -80,7 +81,8 @@ THIRD-PARTY.md  Lizenzen der Laufzeit-Abhängigkeiten (Tiptap/ProseMirror, MIT)
 - Links nur `https:`/`mailto:` mit `rel="noopener noreferrer nofollow"`; `javascript:`/`data:` werden verworfen und sind ein Validierungsfehler.
 - Rechte (`actions`) sind Anträge: das Template kann Rechte einschränken, nie erweitern; durchgesetzt wird später serverseitig.
 - Veröffentlichung, Template-Verwaltung und Benutzeranpassung sind **nicht** Teil dieses Tools.
-- Bündelgröße: 841 kB JS (279 kB gzip) inkl. Editor und Markdown-Tokenizer; Tiptap-Tabellen-/Drop-/Gapcursor sind nicht enthalten.
+- Bündelgröße: 856 kB JS (283 kB gzip) inkl. Editor und Markdown-Tokenizer; Tiptap-Tabellen-/Drop-/Gapcursor sind nicht enthalten.
+
 
 
 

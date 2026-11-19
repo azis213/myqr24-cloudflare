@@ -1,16 +1,56 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import defaultLibrary from "../../public/elements/default.tagelements.json";
 import vaultTemplate from "../../public/templates/vault-standard.tagcontent.json";
+import gardenTemplateJson from "../../public/templates/examples/wedding-garden/template.tagcontent.json";
+import gardenSampleJson from "../../public/templates/examples/wedding-garden/sample.json";
 import type { ElementLibrary, TagContentDocument } from "../domain/types";
 import { App } from "./App";
 
 beforeEach(() => window.localStorage.clear());
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 const template = () => structuredClone(vaultTemplate) as unknown as TagContentDocument;
 const library = () => structuredClone(defaultLibrary) as unknown as ElementLibrary;
+
+const EXAMPLE_REF = {
+  id: "wedding-garden",
+  label: "Hochzeit – Gartenfeier",
+  path: "/templates/examples/wedding-garden/template.tagcontent.json",
+  group: "Beispiele",
+  samplePath: "/templates/examples/wedding-garden/sample.json",
+};
+
+/** Liefert Template-Text und Beispieldaten aus den echten Dateien, ohne HTTP-Server. */
+function stubExampleFetch() {
+  const templateText = JSON.stringify(gardenTemplateJson);
+  const sampleValue = structuredClone(gardenSampleJson);
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    const body: unknown = url.endsWith("sample.json") ? sampleValue : templateText;
+    return {
+      ok: true,
+      text: async () => (typeof body === "string" ? body : JSON.stringify(body)),
+      json: async () => (typeof body === "string" ? JSON.parse(body) : body),
+    } as unknown as Response;
+  });
+  vi.stubGlobal("fetch", fetchMock);
+}
+
+/** Lädt das Beispiel über die Vorlagenauswahl der Kopfzeile. */
+async function loadExample(container: HTMLElement) {
+  const option = container.querySelector('option[value="wedding-garden"]');
+  const select = option?.closest("select") as HTMLSelectElement | null;
+  expect(select).not.toBeNull();
+  fireEvent.change(select!, { target: { value: "wedding-garden" } });
+  await waitFor(() => {
+    expect(container.querySelector(".tcp-meta")?.textContent ?? "").toContain("Beispiel");
+  });
+}
 
 function setup() {
   const view = render(<App initialDoc={template()} initialLibrary={library()} bundledTemplates={[]} />);
@@ -142,5 +182,42 @@ describe("App", () => {
 
     const json = container.querySelector(".json") as HTMLTextAreaElement;
     expect(json.value).toContain("Willkommen");
+  });
+
+  it("lädt ein Beispiel mit Bildern, Dokumenten und Beispieldaten-Schalter", async () => {
+    stubExampleFetch();
+    const { container } = render(
+      <App initialDoc={template()} initialLibrary={library()} bundledTemplates={[EXAMPLE_REF]} />,
+    );
+    await loadExample(container);
+
+    expect(container.querySelector('img[alt="Garten mit Lichterkette"]')).not.toBeNull();
+    expect(container.querySelector(".tcp-meta")?.textContent).toContain("Beispiel (Gast)");
+    expect(container.textContent).toContain("Speisekarte (PDF)");
+    expect(container.querySelectorAll(".tcp-gallery-item")).toHaveLength(3);
+    expect(container.querySelector(".tcp-gallery-count")?.textContent).toContain("3 Bilder");
+
+    // Beispieldaten aus → wieder Struktur/Platzhalter wie ohne Beispiel.
+    const toggle = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    fireEvent.click(toggle);
+    expect(container.querySelector('img[alt="Garten mit Lichterkette"]')).toBeNull();
+    expect(window.localStorage.getItem("myqr24.tcd.sampleData")).toBe("off");
+  });
+
+  it("blendet shared-Inhalte für die Scanner-Rolle aus", async () => {
+    stubExampleFetch();
+    const { container } = render(
+      <App initialDoc={template()} initialLibrary={library()} bundledTemplates={[EXAMPLE_REF]} />,
+    );
+    await loadExample(container);
+
+    const role = container.querySelector('select[aria-label="Rolle in der Vorschau"]') as HTMLSelectElement;
+    fireEvent.change(role, { target: { value: "scanner" } });
+
+    expect(container.querySelector('[role="note"]')?.textContent).toContain("Für Scanner nicht sichtbar");
+    expect(container.textContent).not.toContain("Speisekarte (PDF)");
+    expect(container.querySelector('img[alt="Garten mit Lichterkette"]')).not.toBeNull();
+    expect(window.localStorage.getItem("myqr24.tcd.sampleRole")).toBe("scanner");
   });
 });

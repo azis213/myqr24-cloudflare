@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Kofferanhänger">
+  <rect width="800" height="600" fill="#e9eef3"/>
+  <rect x="180" y="200" width="440" height="250" rx="16" fill="#ffffff" stroke="#c6d4e1" stroke-width="4"/>
+  <rect x="220" y="250" width="200" height="14" rx="4" fill="#2b6cb0"/>
+  <rect x="220" y="290" width="330" height="10" rx="4" fill="#dbe3ea"/>
+  <rect x="220" y="320" width="280" height="10" rx="4" fill="#dbe3ea"/>
+  <rect x="220" y="350" width="310" height="10" rx="4" fill="#dbe3ea"/>
+  <circle cx="540" cy="250" r="34" fill="#e9eef3" stroke="#c6d4e1" stroke-width="4"/>
+  <text x="36" y="540" font-family="system-ui, sans-serif" font-size="28" fill="#5b6672">Anhänger</text>
+</svg>

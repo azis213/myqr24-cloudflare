@@ -176,6 +176,34 @@ Beim Start lädt das Tool Dateien aus `public/`:
 
 Diese Dateien sind **zugleich** die Golden Files der Tests. Änderungen daran sind bewusste Versionserhöhungen (`templateVersion`/`libraryVersion`), keine Testanpassungen.
 
+### Beispiele (`public/templates/examples`)
+
+Zusätzlich liegen vier **Beispiel-Templates** mit Testdaten bei. Sie sind vollständige, valide v3-Templates und dienen als Testkörper für die spätere TAG-App-Anbindung:
+
+| Beispiel | TAG-Typ / Presentation | Inhalt |
+| --- | --- | --- |
+| `wedding-garden` | `event` / `wedding` | Hero mit Cover, Willkommen, Einzelbild, **Ablauf** und **Speisekarte** als Tabellen, Gästegalerie mit Upload, Dokumente (`shared`), Kontakttext |
+| `wedding-party` | `event` / `wedding` | Dunkles Theme, Dresscode-Hinweis, **Getränkekarte** als Tabelle, Partyfotos (nur Download), Ablaufplan, externer Link (Playlist) |
+| `lost-found-luggage` | `lost-found` / `standard` | Fundhinweis, Fundmeldung mit Foto-Slot, **Funddaten** als Tabelle, Datenschutz-Hinweis, Kontaktweg (`shared`) |
+| `maintenance-heat-pump` | `maintenance` / `standard` | Wartungshistorie mit Dokumenten, **Wartungstabelle**, Typenschild, Sicherheitshinweis, Prüfprotokolle (`shared`) |
+
+Struktur je Beispiel:
+
+```text
+public/templates/examples/<id>/
+├── template.tagcontent.json   vollständiges Template (schemaVersion 3)
+├── sample.json                Beispieldaten (Medien, Dokumente, Einträge, Beiträge, slotFill)
+└── README.md                  Zweck, Datenlage, Prüfpunkte
+```
+
+`public/templates/examples/index.json` ist das **Manifest** (`myqr24-tag-content-examples-v1`). Es wird beim Start geladen; fehlt oder bricht es, bleibt das Tool mit den beiden Standardvorlagen benutzbar. Die Pfade im Manifest sind auf `/templates/examples/<id>/…` begrenzt (`parseExampleIndex`), damit ein Manifest keine beliebigen Dateien lädt.
+
+**Beispieldaten sind Editor-Kontext, kein Artefakt** (`D-60`): Sie werden nie in `.tagcontent.json` geschrieben (keine Bildpfade, keine Storage-Keys im Template) und beim Laden einer anderen Vorlage oder von einer Datei verworfen. Medienpfade in `sample.json` sind auf `/…` oder `https://…` beschränkt (`data:` wird abgewiesen); die Vorschau rendert sie als `<img>` mit `alt` aus den Daten.
+
+**Terminplan und Speisekarte** sind bewusst **Tabellen in Textfeldern** (max. 2 Tabellen je Feld, 6×20): Das hält die Beispiele bei `schemaVersion 3`. Ein eigenes `schedule`/`menu`-Element wäre ein Schema-Bump und braucht zuerst einen Blocktyp im Content-Vertrag.
+
+Die Assets unter `examples/assets/*.svg` sind selbst erzeugte Platzhalter (offline, keine externen Dienste, keine neuen Dependencies).
+
 Bibliotheksarbeit:
 
 - `Load` merged eine Bibliotheksdatei (neue ID ergänzen, höhere Version ersetzen, gleiche Version melden, ältere ignorieren).
@@ -240,6 +268,11 @@ Bekannte, dokumentierte Abweichung: `guestScope: ownOnly` ist derzeit eine **War
   - `Compact` aus („Untereinander"): alle Elemente in einer Spalte, volle Breite; Spans werden bewusst ignoriert und die Vorschau trägt den Hinweis „Alle Elemente untereinander – nicht die echte Ausgabe". Das ist reine Editor-Ansicht, wird nie im Dokument gespeichert (Kürzel `Strg+Shift+E`, Zustand in `localStorage`).
   - Die Kopfzeile nennt immer `Breite · Gerät · Modus · Spalten`; die Layout-Hinweise beziehen sich weiterhin auf die **mehrspaltige** Ausgabe.
 - **Vorschau-Breiten (mobil-first)**: `Fit` misst den verfügbaren Platz im Vorschaubereich (`ResizeObserver`) und zeigt die Vorschau ohne Scrollbalken. Die gewählte Breite wird in `localStorage` gemerkt; der Inspektor folgt dem **angezeigten** Breakpoint.
+- **Beispieldaten und Rollen** (`D-61`): Wird ein Beispiel geladen, erscheinen in der Kopfzeile der Schalter **Beispieldaten** und die **Rolle** (`Gast`, `Owner`, `Scanner`). Damit füllt die Vorschau Slots mit echten Bildern, Dokumenten und Galeriebeiträgen und zeigt Wartungseinträge samt Jahresgruppen. Der Zustand liegt nur im Browser (`myqr24.tcd.sampleData`, `myqr24.tcd.sampleRole`); das Template bleibt unverändert.
+  - Sichtbarkeit folgt `40-TAG-APP-DATA-MODEL` §4: `public` für alle, `shared` nur für Gast/Owner, `private`/`ownerOnly` erscheinen **nur im Editor** mit dem Hinweis, dass die Content-Route sie nicht ausliefert.
+  - Das Element bleibt in der Vorschau **bedienbar** (Inspector/Formatierung); die Rolle wirkt auf den **Inhalt** (Dokumentliste, Galerie, Hinweis), nicht auf die Auswahl.
+  - Galeriebeiträge: freigegebene Bilder für alle, eigene `pending` zusätzlich für den Gast, alle `pending` für den Owner – jeweils mit Vermerk „wartet auf Freigabe".
+  - **Keine Mutationen**: Upload, Löschen und Freigeben werden in der Vorschau nicht simuliert (das ist Aufgabe der TAG-App-Simulation).
 - **Layout-Hinweise** unter der Vorschau (max. 4, unverbindlich, nie blockierend): zu schmale Spalten (< 12 rem), zu kleine Basisschrift (< 14 px auf dem Handy), Tabellen mit mehr als 3 Spalten auf dem Handy, sehr lange Handy-Kacheln.
 - Berechnung zur Renderzeit (`ResizeObserver`), kein fester Gerätemodus; Rotation ergibt sich aus der Breite.
 - **Texte werden nie abgeschnitten**: kein `ellipsis`, keine Höhenklemmung, `overflow-wrap: anywhere`.
@@ -394,9 +427,11 @@ Tastenkürzel: `Strg+O` Load, `Strg+S` Save, `Strg+Shift+S` Save as, `Strg+Z`/`S
 | `session.test.ts` | „Letzte Konfiguration": kanonisch speichern, unverändert laden, unbrauchbare Stände verwerfen, Speicher leeren |
 | `markdown.test.ts` | Markdown → Modell (Überschriften 1–5/6, Marks, Links inkl. Ablehnung, Listen, Tabellen mit Ausrichtung, HTML nur als Text) und Modell → Markdown (Struktur, Maskierung, Warnungen, Stabiler Roundtrip) |
 | `Inspector.test.tsx` | Textkontrolle als JSON: Anzeige des Runs-Modells, Übernahme gültiger Änderungen, Abweisung von kaputtem JSON und Regelverstößen |
-| `App.test.tsx` | End-to-End: Aufbau der Arbeitsfläche, Sortieren wirkt sofort in der Vorschau, Leiste mit allen Gruppen (inkl. Farbmenüs, Absatzstil, Größenfeld) beim Fokus, Vorschau-Breiten 320–1440 + `Fit` mit Statuszeile („Breite · Gerät · Modus · Spalten"), mitwanderndem Inspektor-Breakpoint und dem **Compact**-Schalter (untereinander, Badge, Spans 1, Persistenz in `localStorage`) |
+| `examples.test.ts` | Beispiel-Manifest (gültig, feste Reihenfolge, fremde Pfade/doppelte IDs abgewiesen), alle vier Templates fehlerfrei validiert, ≤ 24 Elemente/≤ 128 kB, eindeutige IDs und Spans 1–12, Tabellenlimits (≤ 6 Spalten, ≤ 20 Zeilen, Zellen mit Runs, ≤ 200 Zeichen), Spaltenzahl je Breite (360 → 1, 1280 → 2/3), `slotFill` nur mit vorhandenen Elementen, Slots und Content-IDs |
+| `sample.test.ts` | Beispieldaten lesen, fremdes Schema/doppelte IDs/`data:`-Pfade/unbekannte Beitrags-Medien abgewiesen; Rollenmatrix (`public`/`shared`/`private`/`ownerOnly` × `scanner`/`guest`/`owner`); Slot-Auflösung in Datenreihenfolge, unbekannte IDs werden ignoriert; Galeriebeiträge je Rolle; Wartungseinträge sortiert und nach Jahr gruppiert; Dokumentarten |
+| `App.test.tsx` | End-to-End: Aufbau der Arbeitsfläche, Sortieren wirkt sofort in der Vorschau, Leiste mit allen Gruppen (inkl. Farbmenüs, Absatzstil, Größenfeld) beim Fokus, Vorschau-Breiten 320–1440 + `Fit` mit Statuszeile („Breite · Gerät · Modus · Spalten"), mitwanderndem Inspektor-Breakpoint, dem **Compact**-Schalter (untereinander, Badge, Spans 1, Persistenz in `localStorage`) sowie dem **Beispiel-Laden** (Bilder, Dokumente, Galeriezähler, „Beispiel (Gast)") inklusive Beispieldaten-Schalter und Rollenwechsel auf `Scanner` (`shared`-Inhalte ausgeblendet, Bilder bleiben) |
 
-Nachweisstand: **200 Tests grün** (20 Dateien), `tsc --noEmit` fehlerfrei, `vite build` erfolgreich (841 kB JS / 18 kB CSS; gzip 279 kB / 4,4 kB).
+Nachweisstand: **239 Tests grün** (22 Dateien), `tsc --noEmit` fehlerfrei, `vite build` erfolgreich (856 kB JS / 20 kB CSS; gzip 283 kB / 4,9 kB).
 
 ---
 
@@ -417,7 +452,10 @@ Nachweisstand: **200 Tests grün** (20 Dateien), `tsc --noEmit` fehlerfrei, `vit
 - keine Bearbeitung von `actions` über die UI (im JSON vorhanden und validiert);
 - keine Theme-Voreinstellungen/Theme-Bibliothek;
 - kein Drag-and-drop-Sortieren (Pfeiltasten; Tastatur-/DnD-Sortierung nach `TCD-US-004` folgt);
-- keine PDF-Seitendarstellung, kein Upload, keine Wartungserfassung (Refinement `OP-01`, `OP-02`, `OP-04`);
+- **Beispieldaten sind Anzeige, keine Verwaltung:** In der Vorschau werden Upload, Löschen und Freigeben **nicht** simuliert; Galeriebeiträge und Wartungseinträge kommen fertig aus `sample.json`. Die Bedienung dieser Aktionen bleibt der TAG-App-Simulation vorbehalten.
+- **Kein Compiler/keine zweite Wahrheit:** Die Vorschau rendert weiterhin elementbasiert (nötig für Inspector und Formatierung). Die spätere Content-Projektion (`PublicTagView`, `myqr24-tag-content-v2`) entsteht in einem eigenen, framework-freien Modul; die Beispiele sind dafür der Testkörper (`D-62`, offen).
+- **`maintenance` als TAG-Typ** ist jetzt mit Beispiel (`maintenance-heat-pump`) belegt, aber weiterhin ohne ausgelieferte Wartungserfassung.
+- Keine PDF-Seitendarstellung, kein Upload, keine Wartungserfassung (Refinement `OP-01`, `OP-02`, `OP-04`);
 - keine Template-Verwaltung (`OP-13`);
 - `maintenance` als TAG-Typ ist vorbereitet, aber ohne ausgelieferte Vorlage.
 

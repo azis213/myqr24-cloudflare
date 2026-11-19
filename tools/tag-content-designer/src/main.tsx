@@ -1,24 +1,62 @@
 import { createRoot } from "react-dom/client";
 import { createDocument } from "./domain/catalog";
+import { exampleTemplateRefs, parseExampleIndex } from "./domain/examples";
 import { emptyLibrary } from "./domain/library";
 import type { ElementLibrary, TagContentDocument } from "./domain/types";
 import { describeSession, loadSession } from "./state/session";
 import { App } from "./ui/App";
 import "./styles.css";
 
-const bundledTemplates = [
-  { id: "vault-standard", label: "Vault – Standard", path: "/templates/vault-standard.tagcontent.json" },
+type TemplateRef = {
+  id: string;
+  label: string;
+  path: string;
+  group?: string;
+  description?: string;
+  samplePath?: string;
+};
+
+/** Mitgelieferte Standardvorlagen – immer verfügbar, auch ohne Beispiel-Manifest. */
+const STANDARD_TEMPLATES: TemplateRef[] = [
+  {
+    id: "vault-standard",
+    label: "Vault – Standard",
+    path: "/templates/vault-standard.tagcontent.json",
+    group: "Standard",
+  },
   {
     id: "lost-found-standard",
     label: "Lost & Found – Standard",
     path: "/templates/lost-found-standard.tagcontent.json",
+    group: "Standard",
   },
 ];
+
+/**
+ * Beispiele aus `public/templates/examples/index.json`. Fehlt oder bricht das
+ * Manifest, bleibt das Tool mit den Standardvorlagen voll benutzbar.
+ */
+async function loadExampleTemplates(): Promise<TemplateRef[]> {
+  try {
+    const response = await fetch("/templates/examples/index.json");
+    if (!response.ok) return [];
+    const parsed = parseExampleIndex(await response.json());
+    if (!parsed.index) {
+      console.warn("Beispiel-Manifest ignoriert:", parsed.issues.map((issue) => `${issue.code} ${issue.path}`).join(", "));
+      return [];
+    }
+    return exampleTemplateRefs(parsed.index);
+  } catch {
+    return [];
+  }
+}
 
 async function boot(): Promise<void> {
   const container = document.getElementById("root");
   if (!container) throw new Error("Root-Element fehlt.");
   const root = createRoot(container);
+  const examples = await loadExampleTemplates();
+  const bundledTemplates = [...STANDARD_TEMPLATES, ...examples];
 
   try {
     const [documentResponse, libraryResponse] = await Promise.all([

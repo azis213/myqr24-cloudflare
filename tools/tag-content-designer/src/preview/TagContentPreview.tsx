@@ -1,8 +1,9 @@
 import type { CSSProperties } from "react";
 import { ELEMENT_CATALOG } from "../domain/catalog";
 import { BREAKPOINT_LABELS, layoutElements, type LayoutView } from "../domain/layout";
-import type { TagContentDocument, ThemeColors } from "../domain/types";
+import type { Principal, TagContentDocument, ThemeColors } from "../domain/types";
 import { ElementView, type ElementEditing } from "./ElementView";
+import type { TagSample } from "./sample";
 
 export function resolveColor(value: string | undefined, colors: ThemeColors, fallback: string): string {
   if (!value) return fallback;
@@ -18,6 +19,8 @@ export function TagContentPreview({
   widthPx,
   fit,
   view = "compact",
+  sample,
+  principal = "guest",
   selectedId,
   onSelect,
   editing,
@@ -28,6 +31,10 @@ export function TagContentPreview({
   fit?: boolean;
   /** `compact` = mehrspaltig (echte Ausgabe), `stacked` = alle Elemente untereinander. */
   view?: LayoutView;
+  /** Beispieldaten: Bilder, Dokumente, Galeriebeiträge, Wartungseinträge. */
+  sample?: TagSample | null;
+  /** Simulierte Rolle für Sichtbarkeit und Aktionen. */
+  principal?: Principal;
   selectedId: string | null;
   onSelect: (elementId: string) => void;
   editing?: ElementEditing;
@@ -56,6 +63,7 @@ export function TagContentPreview({
         <span className="tcp-meta">
           {fit ? `Fit (${widthPx} px)` : `${widthPx} px`} · {BREAKPOINT_LABELS[breakpoint]} ·{" "}
           {view === "stacked" ? "Untereinander" : "Compact"} · {columns} {columns === 1 ? "Spalte" : "Spalten"}
+          {sample ? ` · Beispiel (${principal === "owner" ? "Owner" : principal === "guest" ? "Gast" : "Scanner"})` : ""}
           {doc.shell.statusBar?.showTagId ? " · TAG-ID" : ""}
         </span>
       </header>
@@ -107,7 +115,13 @@ export function TagContentPreview({
                   color: style.textColor ? resolveColor(style.textColor, colors, "inherit") : undefined,
                 }}
               >
-                <ElementView element={element} tagName={doc.template.name} editing={editing} />
+                <ElementView
+                  element={element}
+                  tagName={doc.template.name}
+                  editing={editing}
+                  sample={sample}
+                  principal={principal}
+                />
               </div>
             </section>
           );

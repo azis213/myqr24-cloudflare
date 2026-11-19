@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" role="img" aria-label="Abendparty">
+  <rect width="1200" height="800" fill="#141018"/>
+  <circle cx="300" cy="220" r="70" fill="#e2a33c" opacity="0.9"/>
+  <circle cx="620" cy="160" r="40" fill="#ffe9a8" opacity="0.7"/>
+  <circle cx="900" cy="250" r="55" fill="#e2a33c" opacity="0.5"/>
+  <rect y="560" width="1200" height="240" fill="#1e1826"/>
+  <text x="60" y="700" font-family="system-ui, sans-serif" font-size="48" fill="#ffe9a8">Abendparty</text>
+  <text x="62" y="745" font-family="system-ui, sans-serif" font-size="24" fill="#b4a8c6">Beispielfoto (SVG-Platzhalter)</text>
+</svg>

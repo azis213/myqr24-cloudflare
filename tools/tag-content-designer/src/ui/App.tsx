@@ -10,12 +10,14 @@ import { SCHEMA_VERSION } from "../domain/types";
 import type {
   ElementLibrary,
   ElementStyle,
+  Principal,
   RichTextContent,
   TagContentDocument,
   TagType,
   TemplateElement,
 } from "../domain/types";
 import { validateDocument } from "../domain/validate";
+import { parseSample, type TagSample } from "../preview/sample";
 import { TagContentPreview } from "../preview/TagContentPreview";
 import {
   downloadTextFile,
@@ -55,7 +57,14 @@ export function App({
 }: {
   initialDoc: TagContentDocument;
   initialLibrary: ElementLibrary;
-  bundledTemplates: Array<{ id: string; label: string; path: string }>;
+  bundledTemplates: Array<{
+    id: string;
+    label: string;
+    path: string;
+    group?: string;
+    description?: string;
+    samplePath?: string;
+  }>;
   /** Hinweis, woher der Startzustand kommt (z. B. „zuletzt verwendet · …"). */
   initialSource?: string | null;
 }) {
@@ -155,6 +164,43 @@ export function App({
       /* Komfort, kein Muss */
     }
   }, [view]);
+
+  /**
+   * Beispieldaten sind Editor-Kontext: Sie füllen Slots mit Bildern, Dokumenten und
+   * Einträgen, werden aber nie ins Template geschrieben (siehe `D-60`).
+   */
+  const [sample, setSample] = useState<TagSample | null>(null);
+  const [sampleData, setSampleData] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem("myqr24.tcd.sampleData") !== "off";
+    } catch {
+      return true;
+    }
+  });
+  const [role, setRole] = useState<Principal>(() => {
+    try {
+      const stored = window.localStorage.getItem("myqr24.tcd.sampleRole");
+      return stored === "owner" || stored === "scanner" ? stored : "guest";
+    } catch {
+      return "guest";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("myqr24.tcd.sampleData", sampleData ? "on" : "off");
+    } catch {
+      /* Komfort, kein Muss */
+    }
+  }, [sampleData]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("myqr24.tcd.sampleRole", role);
+    } catch {
+      /* Komfort, kein Muss */
+    }
+  }, [role]);
 
   // Der Inspector bearbeitet immer den Breakpoint, den die Vorschau gerade zeigt.
   useEffect(() => {
@@ -272,6 +318,8 @@ export function App({
       const log = [describeLoad(result.document, result.changes, result.migrated, result.from)];
       dispatch({ type: "load", doc: migratedDoc, fileName: name, log });
       setMessage(log[0]);
+      // Beispieldaten gelten nur für das Beispiel, aus dem sie stammen.
+      setSample(null);
     },
     [dispatch],
   );
@@ -297,11 +345,27 @@ export function App({
   }, [loadTemplateFromText]);
 
   const loadBundledTemplate = useCallback(
-    async (path: string) => {
+    async (path: string, samplePath?: string) => {
       try {
         const response = await fetch(path);
+        if (!response.ok) throw new Error("Vorlage fehlt");
         loadTemplateFromText(await response.text(), null);
         setTemplateHandle(null);
+        if (!samplePath) return;
+        const sampleResponse = await fetch(samplePath);
+        if (!sampleResponse.ok) throw new Error("Beispieldaten fehlen");
+        const parsed = parseSample(await sampleResponse.json());
+        if (!parsed.sample) {
+          setError(`Beispieldaten unvollständig: ${parsed.issues[0]?.message ?? "unbekannter Fehler"}`);
+          return;
+        }
+        setSample(parsed.sample);
+        setSampleData(true);
+        setMessage(
+          `Beispiel geladen: ${parsed.sample.media.length} Medien, ${parsed.sample.documents.length} Dokumente, ${
+            parsed.sample.entries.length
+          } Wartungseinträge.`,
+        );
       } catch {
         setError("Vorlage konnte nicht geladen werden.");
       }
@@ -317,6 +381,7 @@ export function App({
     });
     dispatch({ type: "load", doc: created, fileName: null, log: ["Neues Template erstellt."] });
     setTemplateHandle(null);
+    setSample(null);
     setMessage("Neues Template erstellt.");
   }, [dispatch, newTagType]);
 
@@ -512,17 +577,47 @@ export function App({
           <select
             value=""
             onChange={(event) => {
-              if (event.target.value) void loadBundledTemplate(event.target.value);
+              const picked = bundledTemplates.find((entry) => entry.id === event.target.value);
+              if (picked) void loadBundledTemplate(picked.path, picked.samplePath);
             }}
           >
             <option value="">Vorlage laden…</option>
-            {bundledTemplates.map((entry) => (
-              <option key={entry.id} value={entry.path}>
-                {entry.label}
-              </option>
+            {Array.from(new Set(bundledTemplates.map((entry) => entry.group ?? "Standard"))).map((group) => (
+              <optgroup key={group} label={group}>
+                {bundledTemplates
+                  .filter((entry) => (entry.group ?? "Standard") === group)
+                  .map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.label}
+                    </option>
+                  ))}
+              </optgroup>
             ))}
           </select>
         </div>
+
+        {sample ? (
+          <div className="group sample-group" role="group" aria-label="Beispieldaten">
+            <label className="sample-toggle">
+              <input
+                type="checkbox"
+                checked={sampleData}
+                onChange={(event) => setSampleData(event.target.checked)}
+              />
+              <span>Beispieldaten</span>
+            </label>
+            <select
+              value={role}
+              aria-label="Rolle in der Vorschau"
+              disabled={!sampleData}
+              onChange={(event) => setRole(event.target.value as Principal)}
+            >
+              <option value="guest">Gast</option>
+              <option value="owner">Owner</option>
+              <option value="scanner">Scanner</option>
+            </select>
+          </div>
+        ) : null}
 
         <div className="group">
           <button type="button" onClick={() => void handleLoad()}>
@@ -654,6 +749,8 @@ export function App({
               widthPx={shownWidth}
               fit={fit}
               view={view}
+              sample={sampleData ? sample : null}
+              principal={role}
               selectedId={state.selectedId}
               onSelect={(elementId) => dispatch({ type: "select", elementId })}
               editing={{ onContentChange: handleContentChange, onStyleChange: handleElementStyleChange, palette }}

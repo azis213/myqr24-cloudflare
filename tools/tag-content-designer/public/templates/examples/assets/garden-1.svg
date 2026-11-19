@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Tischdekoration">
+  <rect width="800" height="600" fill="#e7ecdd"/>
+  <rect x="90" y="300" width="620" height="180" rx="18" fill="#f7f4ea"/>
+  <circle cx="240" cy="290" r="46" fill="#c9d3b6"/>
+  <circle cx="400" cy="280" r="34" fill="#e3c9a3"/>
+  <circle cx="560" cy="290" r="46" fill="#c9d3b6"/>
+  <text x="36" y="560" font-family="system-ui, sans-serif" font-size="30" fill="#3d4a3a">Tischdeko</text>
+</svg>

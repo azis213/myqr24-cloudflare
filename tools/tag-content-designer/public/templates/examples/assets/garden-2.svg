@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Lichterkette">
+  <rect width="800" height="600" fill="#2f3a33"/>
+  <path d="M0 120 Q200 210 400 140 T800 170" fill="none" stroke="#8d9a86" stroke-width="4"/>
+  <circle cx="120" cy="160" r="12" fill="#f6efd8"/>
+  <circle cx="300" cy="188" r="12" fill="#f6efd8"/>
+  <circle cx="480" cy="150" r="12" fill="#f6efd8"/>
+  <circle cx="660" cy="168" r="12" fill="#f6efd8"/>
+  <text x="36" y="540" font-family="system-ui, sans-serif" font-size="30" fill="#f6efd8">Abendlicht</text>
+</svg>

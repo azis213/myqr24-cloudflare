@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" role="img" aria-label="Reisekoffer">
+  <rect width="1200" height="800" fill="#f2f5f8"/>
+  <rect x="330" y="230" width="540" height="390" rx="26" fill="#2b6cb0"/>
+  <rect x="360" y="260" width="480" height="330" rx="16" fill="#3d80c4"/>
+  <rect x="520" y="180" width="160" height="60" rx="24" fill="#1f4e7a"/>
+  <circle cx="330" cy="620" r="26" fill="#1f4e7a"/>
+  <circle cx="870" cy="620" r="26" fill="#1f4e7a"/>
+  <text x="60" y="730" font-family="system-ui, sans-serif" font-size="40" fill="#20262c">Reisekoffer</text>
+</svg>

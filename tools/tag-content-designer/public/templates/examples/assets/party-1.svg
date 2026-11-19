@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Tanzfläche">
+  <rect width="800" height="600" fill="#1e1826"/>
+  <rect x="80" y="330" width="640" height="180" rx="12" fill="#2a2237"/>
+  <circle cx="250" cy="200" r="18" fill="#ffe9a8"/>
+  <circle cx="400" cy="170" r="18" fill="#e2a33c"/>
+  <circle cx="550" cy="200" r="18" fill="#ffe9a8"/>
+  <text x="36" y="560" font-family="system-ui, sans-serif" font-size="30" fill="#f3ecff">Tanzfläche</text>
+</svg>
