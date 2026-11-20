@@ -6,7 +6,7 @@ const NUMERIC = 623187229;
 
 /**
  * Nach `D-14` enthält das Tag-Dokument die Element-Nutzlasten. Die Content-Route
- * darf dafür keine Element-Datei mehr anfragen (Altbestand bleibt als Fallback).
+ * darf dafür keine Element-Datei mehr anfragen.
  */
 function environment() {
   const document = {
@@ -81,10 +81,6 @@ function environment() {
                       content_element_id: "cel_gallery",
                       content_element_type: "gallery",
                       display_order: 10,
-                      content_file: "tag-rev2.json",
-                      content_sha256: "a".repeat(64),
-                      content_bytes: contentBytes,
-                      content_type: "application/json",
                       visibility: "public",
                     },
                   ],

@@ -4,7 +4,6 @@ import { parseContentId } from "./content-id";
 import {
   globalItemVariantKey,
   tagContentFileKey,
-  tagElementFileKey,
   tagItemVariantKey,
 } from "./content-paths";
 import { publishTagContent } from "./tag-content/publish";
@@ -66,10 +65,6 @@ interface ContentElementRow {
   content_element_id: string;
   content_element_type: string;
   display_order: number;
-  content_file: string;
-  content_sha256: string;
-  content_bytes: number;
-  content_type: string;
   visibility: ElementVisibility;
 }
 
@@ -80,14 +75,7 @@ interface ContentDocument {
   revision: number;
   view: Record<string, unknown>;
   /** Seit `D-14`: vollständige Element-Nutzlasten im Tag-Dokument. */
-  elements?: unknown;
-}
-
-interface ContentElementDocument {
-  schema: "myqr24-tag-element-v1";
-  elementId: string;
-  elementType: string;
-  payload: Record<string, unknown>;
+  elements: unknown;
 }
 
 interface ContentItemRow {
@@ -223,20 +211,6 @@ function isContentDocument(value: unknown, row: ContentRow): value is ContentDoc
     && typeof document.view === "object";
 }
 
-function isElementDocument(
-  value: unknown,
-  row: ContentElementRow,
-): value is ContentElementDocument {
-  if (!value || typeof value !== "object") return false;
-  const document = value as Partial<ContentElementDocument>;
-  return document.schema === "myqr24-tag-element-v1"
-    && document.elementId === row.content_element_id
-    && document.elementType === row.content_element_type
-    && !!document.payload
-    && typeof document.payload === "object"
-    && !Array.isArray(document.payload);
-}
-
 async function routing(env: AppApiEnv, tagId: string): Promise<RoutingRecord | null> {
   return env.APP_DB.prepare("SELECT tag_id, status, target_type, protection_mode, access_version, content_revision FROM tag_routing WHERE tag_id = ?1 LIMIT 1")
     .bind(tagId).first<RoutingRecord>();
@@ -293,31 +267,24 @@ async function content(
     if (!isContentDocument(tagValue, row) || containsStorageKey(tagValue)) return null;
     const document = tagValue;
 
-    /**
-     * Seit `D-14` liegen die Element-Nutzlasten im Tag-Dokument. Der Fallback
-     * auf separate Element-Dateien bleibt für Altbestand (Seeds, frühere
-     * Publishes), bis Migration/Cleanup abgeschlossen sind.
-     */
     const inlineElements = new Map<string, { elementType: string; payload: Record<string, unknown> }>();
-    const hasInlineElements = Array.isArray(document.elements);
-    if (Array.isArray(document.elements)) {
-      for (const entry of document.elements) {
-        if (!entry || typeof entry !== "object") continue;
-        const candidate = entry as { elementId?: unknown; elementType?: unknown; payload?: unknown };
-        if (typeof candidate.elementId !== "string"
-          || typeof candidate.elementType !== "string"
-          || !candidate.payload
-          || typeof candidate.payload !== "object"
-          || Array.isArray(candidate.payload)) continue;
-        inlineElements.set(candidate.elementId, {
-          elementType: candidate.elementType,
-          payload: candidate.payload as Record<string, unknown>,
-        });
-      }
+    if (!Array.isArray(document.elements)) return null;
+    for (const entry of document.elements) {
+      if (!entry || typeof entry !== "object") continue;
+      const candidate = entry as { elementId?: unknown; elementType?: unknown; payload?: unknown };
+      if (typeof candidate.elementId !== "string"
+        || typeof candidate.elementType !== "string"
+        || !candidate.payload
+        || typeof candidate.payload !== "object"
+        || Array.isArray(candidate.payload)) continue;
+      inlineElements.set(candidate.elementId, {
+        elementType: candidate.elementType,
+        payload: candidate.payload as Record<string, unknown>,
+      });
     }
 
     const elementRows = await env.APP_DB.prepare(
-      "SELECT content_element_id, content_element_type, display_order, content_file, content_sha256, content_bytes, content_type, visibility FROM tag_content_elements WHERE tag_numeric_id = ?1 ORDER BY display_order, content_element_id",
+      "SELECT content_element_id, content_element_type, display_order, visibility FROM tag_content_elements WHERE tag_numeric_id = ?1 ORDER BY display_order, content_element_id",
     ).bind(row.tag_numeric_id).all<ContentElementRow>();
 
     const itemRows = await env.APP_DB.prepare(
@@ -343,36 +310,15 @@ async function content(
 
     const elements: LoadedElement[] = [];
     for (const element of elementRows.results ?? []) {
-      if (element.content_type !== "application/json") return null;
       if (!isVisibleToScope(element.visibility, scope)) continue;
-
-      if (hasInlineElements) {
-        const inline = inlineElements.get(element.content_element_id);
-        if (!inline || inline.elementType !== element.content_element_type) return null;
-        elements.push({
-          id: element.content_element_id,
-          type: element.content_element_type,
-          displayOrder: element.display_order,
-          visibility: element.visibility,
-          payload: inline.payload,
-          items: itemsByElement.get(element.content_element_id) ?? [],
-        });
-        continue;
-      }
-
-      const object = await env.PRIVATE_CONTENT.get(
-        tagElementFileKey(row.tag_numeric_id, element.content_element_id, element.content_file),
-      );
-      if (!object) return null;
-      if (typeof object.size === "number" && object.size !== element.content_bytes) return null;
-      const value = await object.json<unknown>();
-      if (!isElementDocument(value, element) || containsStorageKey(value)) return null;
+      const inline = inlineElements.get(element.content_element_id);
+      if (!inline || inline.elementType !== element.content_element_type) return null;
       elements.push({
         id: element.content_element_id,
         type: element.content_element_type,
         displayOrder: element.display_order,
         visibility: element.visibility,
-        payload: value.payload,
+        payload: inline.payload,
         items: itemsByElement.get(element.content_element_id) ?? [],
       });
     }

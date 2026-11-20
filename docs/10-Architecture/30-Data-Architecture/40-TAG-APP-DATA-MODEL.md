@@ -1,7 +1,7 @@
 # TAG-App-Datenmodell: operative Contentprojektion
 
-**Status:** operative D1-Struktur mit lokal ausführbarer Migration
-**Stand:** 2026-11-17
+**Status:** operative D1-Struktur mit lokal ausführbaren Migrationen `0001`–`0004`
+**Stand:** 2026-11-20
 **Ebene:** logisch und physisch für die TAG Application API
 **Grundlage:** [fachliches Gesamtmodell](10-DOMAIN-DATA-MODEL.md), [Komponentensicht](20-COMPONENT-DATA-ARCHITECTURE.md), [TAG App Access v1](../35-Contracts/tag-app-access-v1.md)
 
@@ -12,10 +12,10 @@ Dieses Dokument beschreibt die operative D1-Datenbank der TAG Application API. S
 | Datenbereich | Autorität | TAG-App-D1 | R2 | Browser |
 | --- | --- | --- | --- | --- |
 | TAG-Identität, Lifecycle, Owner, redaktioneller Vault | TCP/MySQL | minimale Laufzeitprojektion | nein | nein |
-| aktuelle TAG-/Element-Beschreibung | TCP erzeugt und publiziert | Pointer, Hash, Größe, Sichtbarkeit | versionierte JSON-Dateien | nur erlaubte API-Antwort |
+| aktuelle TAG-/Element-Beschreibung | TCP erzeugt und publiziert | TAG-Pointer plus Elementstruktur/Sichtbarkeit | ein versioniertes TAG-JSON mit `view` + `elements[]` | nur erlaubte API-Antwort |
 | Content-Items und Varianten | TCP/Application API | Item-Identität, Metadaten, Mitgliedschaft, Variantenindex | Item-/Medienbytes | keine Keys, keine persistente private Kopie |
 | Scanner-Access, PIN-Throttle, Sessions | TAG Application API | autoritativ für den Laufzeitbereich | nein | nur `HttpOnly`-Cookie |
-| Chat, Guestbook, Check-ins | spätere API-Module | nicht Bestandteil von `0002_tag_content.sql` | spätere private Anhänge | kein persistenter privater Cache |
+| Chat, Guestbook, Check-ins | spätere API-Module | nicht Bestandteil der TAG-Content-Migrationen | spätere private Anhänge | kein persistenter privater Cache |
 
 `global` ist keine Sichtbarkeit. Ein globales Item wird nur ausgeliefert, wenn es einem Element des angefragten TAGs zugeordnet ist und Session-, Element- und Item-Sichtbarkeit dies erlauben.
 
@@ -34,7 +34,7 @@ erDiagram
 | Tabelle | Aufgabe |
 | --- | --- |
 | `tag_content` | genau eine Zeile pro TAG mit numerischem PK; Pointer auf die aktuelle TAG-JSON |
-| `tag_content_elements` | aktuelle Elemente eines TAGs, Reihenfolge, Sichtbarkeit und Pointer auf Element-JSONs |
+| `tag_content_elements` | aktuelle Elementstruktur eines TAGs: `tag_numeric_id`, `content_element_id`, `content_element_type`, `display_order`, `visibility`; keine Datei-/Hash-/Größenfelder |
 | `tag_content_items` | Item-Identität, Typ, Scope, Owner, Anzeigefelder, Dateiname und Status |
 | `tag_content_element_items` | relationale Mitgliedschaft, Reihenfolge, Sichtbarkeit und Dateinamen-Eindeutigkeit |
 | `tag_content_media_variants` | Variantenmetadaten für Signierung und Downloads |
@@ -96,7 +96,7 @@ Nur `ready`-Items dürfen einem Element zugeordnet werden. Ein Item kann vor dem
 
 Jeder Upload schreibt nur seine eigene Item-Zeile, seine eigenen R2-Objekte und seine eigene Zuordnung. Es gibt keine gemeinsame Element-JSON, die parallele Uploads überschreiben könnten.
 
-Die Content-Antwort der Application API liest die sichtbaren Elemente aus D1 und ergänzt sie um die jeweilige Element-Payload aus R2. Die Item-Mitgliedschaft und die Anzeigefelder `contentId`, Typ, Titel, Alt-Text, Dateiname, Reihenfolge und Scope kommen aus D1; `contentId` wird als Dezimalstring ausgeliefert.
+Die Content-Antwort der Application API liest `view` und Element-Payloads aus demselben TAG-JSON (`elements[]`), gleicht die Liste mit D1-Strukturzeilen ab und ergänzt sichtbare Item-Mitgliedschaften aus D1. Elementdateien werden nicht mehr gelesen. Item-Anzeigefelder `contentId`, Typ, Titel, Alt-Text, Dateiname, Reihenfolge und Scope kommen aus D1; `contentId` wird als Dezimalstring ausgeliefert.
 
 ### 4.3 Dateinamen
 
@@ -118,7 +118,6 @@ Alle Keys werden serverseitig aus D1-Werten und Konstanten abgeleitet. Der Brows
 
 ```text
 content/v1/tags/{tagNumericId}/tag-rev{revision}.json
-content/v1/tags/{tagNumericId}/elements/{contentElementId}/element-rev{revision}.json
 content/v1/tags/{tagNumericId}/items/{contentId}/item.json
 content/v1/tags/{tagNumericId}/items/{contentId}/variants/{variant}
 content/v1/global/items/{contentId}/item.json
@@ -131,7 +130,6 @@ Beispiele:
 
 ```text
 content/v1/tags/623187229/tag-rev8.json
-content/v1/tags/623187229/elements/cel_gallery/element-rev8.json
 content/v1/tags/623187229/items/1850000000000000/item.json
 content/v1/tags/623187229/items/1850000000000000/variants/large
 content/v1/global/items/1850000000000001/item.json
@@ -142,15 +140,15 @@ content/v1/global/descriptions/redirect-default/content-rev3.json
 Regeln:
 
 - Die numerische TAG-ID stabilisiert den Pfad; Base36 ist nur Such-/Anzeigeinformation.
-- `tag-rev{n}.json` und `element-rev{n}.json` sind veränderliche Präsentationsartefakte und werden über den D1-Pointer aktualisiert.
+- `tag-rev{n}.json` ist das einzige Präsentationsartefakt des TAGs; es enthält `view` und `elements[]`. Elementdateien sind Altbestand und werden nicht mehr geschrieben oder gelesen.
 - `item.json` und Varianten sind pro Content-ID unveränderlich. Ein Ersatz erzeugt eine neue Content-ID.
 - `tagNumericId` und `contentId` sind kanonisch dezimal; `contentElementId` beginnt mit `cel_`; Varianten und Dateinamen werden allowlistbasiert validiert.
 - `..`, `/`, `\`, Steuerzeichen und reservierte Segmente sind ausgeschlossen.
 
 ## 6. Publish, Ersetzen und Rollback
 
-1. TCP validiert die neue Revision und erzeugt TAG-/Element-JSONs.
-2. Neue R2-Präsentationsdateien werden unter dem neuen Revisionsnamen geschrieben.
+1. TCP validiert die neue Revision und erzeugt ein TAG-JSON mit `view` und `elements[]`.
+2. Das eine R2-Präsentationsdokument wird unter dem neuen Revisionsnamen geschrieben.
 3. Ein D1-Batch aktualisiert `tag_content`, ersetzt die Elementzeilen und item-Zuordnungen und setzt `tag_routing.content_revision`.
 4. Erst nach erfolgreichem Commit werden nicht mehr referenzierte Präsentationsdateien gelöscht.
 5. Ein Fehler vor dem Commit lässt den alten D1-Pointer aktiv. Neue R2-Dateien sind Waisen und werden bereinigt.
@@ -205,6 +203,8 @@ Chat, Lost & Found, Guestbook und Check-ins erhalten eigene Tabellen mit eigener
 | --- | --- |
 | `apps/tag-app/database/0001_tag_access.sql` | Routing, Access-Sessions, PIN-Credentials und Throttle |
 | `apps/tag-app/database/0002_tag_content.sql` | operative Contentprojektion, Items, Varianten, Range-/Global-Beschreibungen |
+| `apps/tag-app/database/0003_tag_content_element_structure.sql` | entfernt Element-Datei-Spalten; `_v3` sind temporäre Namen, das finale Schema verwendet die kanonischen Tabellennamen |
+| `apps/tag-app/database/0004_tag_app_development_reset.sql` | destruktiver Reset von D1-Access-/Contentdaten für disposable Dev-/Staging-Umgebungen; nicht produktiv anwenden |
 | `apps/tag-app/workers/content-id.ts` | 52-Bit-Content-ID erzeugen, parsen, formatieren |
 | `apps/tag-app/workers/content-paths.ts` | serverseitige R2-Key-Ableitung und Segmentvalidierung |
 | `apps/tag-app/test/database-schema.test.mjs` | SQLite-/D1-Schema, Trigger, Unique- und Scope-Regeln |
@@ -213,6 +213,6 @@ Chat, Lost & Found, Guestbook und Check-ins erhalten eigene Tabellen mit eigener
 | `apps/tag-app/test/app-api.test.ts` | Session-, Content-, Sichtbarkeits- und Signer-Grenzen |
 | `apps/tag-app/wrangler.app-api.toml` | D1-Binding und `migrations_dir = "database"` |
 
-Die Migrationen sind lokal ausführbar, aber kein Nachweis eines Cloudflare-D1-Deployments. Reale Ressourcen, Secrets, TCP-Publish und Betriebs-Cleanup bleiben externe Gates.
+Migration `0004` löscht Daten, nicht das Schema; R2-Objekte werden nicht berührt. Nur auf explizit entbehrlichen Umgebungen ausführen. Staging ist auf `myqr24-stg-db` und `myqr24-stg-blob` gebunden; `0001`–`0004` wurden remote angewendet und per D1-Migrationsliste, Schema-Query, `PRAGMA foreign_key_check` und Zeilenzählung geprüft. R2-Objekte blieben unangetastet. Das Ausführen lokaler Migrationstests ist kein Nachweis eines Cloudflare-D1-Deployments.
 
 

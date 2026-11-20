@@ -1,25 +1,10 @@
 import type { AppApiEnv } from "./app-api";
 
-const LOCAL_SCHEMA = [
-  "CREATE TABLE IF NOT EXISTS tag_routing (tag_id TEXT PRIMARY KEY, status TEXT NOT NULL, target_type TEXT NOT NULL, external_url TEXT, protection_mode TEXT NOT NULL, access_version INTEGER NOT NULL, content_revision INTEGER NOT NULL, schema_version INTEGER NOT NULL, updated_at TEXT NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS tag_pin_credentials (tag_id TEXT PRIMARY KEY, pin_hash TEXT NOT NULL, pin_version INTEGER NOT NULL, updated_at TEXT NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS tag_pin_throttles (tag_id TEXT NOT NULL, client_key TEXT NOT NULL, failed_attempts INTEGER NOT NULL DEFAULT 0, locked_until TEXT, updated_at TEXT NOT NULL, PRIMARY KEY (tag_id, client_key))",
-  "CREATE TABLE IF NOT EXISTS tag_access_sessions (id TEXT PRIMARY KEY, tag_id TEXT NOT NULL, token_hash TEXT NOT NULL, access_version INTEGER NOT NULL, scope TEXT NOT NULL, expires_at TEXT NOT NULL, revoked_at TEXT, created_at TEXT NOT NULL, last_seen_at TEXT)",
-  "CREATE TABLE IF NOT EXISTS tag_content (tag_numeric_id INTEGER PRIMARY KEY, tag_base36_id TEXT NOT NULL, content_revision INTEGER NOT NULL, schema_version INTEGER NOT NULL, content_file TEXT NOT NULL, content_sha256 TEXT NOT NULL, content_bytes INTEGER NOT NULL, content_type TEXT NOT NULL, published_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS tag_content_elements (tag_numeric_id INTEGER NOT NULL, content_element_id TEXT NOT NULL, content_element_type TEXT NOT NULL, display_order INTEGER NOT NULL, content_file TEXT NOT NULL, content_sha256 TEXT NOT NULL, content_bytes INTEGER NOT NULL, content_type TEXT NOT NULL, visibility TEXT NOT NULL, PRIMARY KEY (tag_numeric_id, content_element_id))",
-  "CREATE TABLE IF NOT EXISTS tag_content_items (content_id INTEGER PRIMARY KEY, content_item_type TEXT NOT NULL, scope TEXT NOT NULL, owner_tag_numeric_id INTEGER, owner_tag_base36_id TEXT, title TEXT, alt_text TEXT, original_filename TEXT, filename_key TEXT, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, revoked_at TEXT)",
-  "CREATE TABLE IF NOT EXISTS tag_content_element_items (tag_numeric_id INTEGER NOT NULL, content_element_id TEXT NOT NULL, content_id INTEGER NOT NULL, item_scope TEXT NOT NULL, filename_key TEXT, display_order INTEGER NOT NULL, visibility TEXT NOT NULL, PRIMARY KEY (tag_numeric_id, content_element_id, content_id))",
-  "CREATE TABLE IF NOT EXISTS tag_content_media_variants (content_id INTEGER NOT NULL, variant TEXT NOT NULL, content_type TEXT NOT NULL, byte_size INTEGER NOT NULL, sha256 TEXT NOT NULL, width INTEGER, height INTEGER, duration_ms INTEGER, created_at TEXT NOT NULL, PRIMARY KEY (content_id, variant))",
-  "CREATE TABLE IF NOT EXISTS tag_range_content (range_id TEXT PRIMARY KEY, content_id TEXT NOT NULL, content_revision INTEGER NOT NULL, schema_version INTEGER NOT NULL, content_file TEXT NOT NULL, content_sha256 TEXT NOT NULL, content_bytes INTEGER NOT NULL, content_type TEXT NOT NULL, published_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS global_content (content_id TEXT PRIMARY KEY, content_revision INTEGER NOT NULL, schema_version INTEGER NOT NULL, content_file TEXT NOT NULL, content_sha256 TEXT NOT NULL, content_bytes INTEGER NOT NULL, content_type TEXT NOT NULL, published_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
-];
-
 const now = "2026-11-17T00:00:00.000Z";
 const tagNumericId = 623187229;
 const tagBase36Id = "ab12cd";
 const contentId = 1850000000000000;
 const tagFile = "tag-rev8.json";
-const elementFile = "element-rev8.json";
 
 const tagDocument = JSON.stringify({
   schema: "myqr24-tag-content-v2",
@@ -39,13 +24,18 @@ const tagDocument = JSON.stringify({
     },
     enabledFeatures: ["vault"],
   },
-});
-
-const elementDocument = JSON.stringify({
-  schema: "myqr24-tag-element-v1",
-  elementId: "cel_gallery",
-  elementType: "gallery",
-  payload: { title: "Lokale Galerie", layout: "grid" },
+  elements: [
+    {
+      elementId: "cel_gallery",
+      elementType: "gallery",
+      displayOrder: 20,
+      visibility: "public",
+      payload: {
+        options: { name: "Lokale Galerie", layout: "grid" },
+        slots: [{ slotId: "images", accepts: ["image"], min: 0, max: 48 }],
+      },
+    },
+  ],
 });
 
 const itemDocument = JSON.stringify({
@@ -72,27 +62,16 @@ function byteLength(value: string): number {
 }
 
 export async function seedLocalContent(env: AppApiEnv): Promise<void> {
-  for (const statement of LOCAL_SCHEMA) {
-    await env.APP_DB.exec(statement);
-  }
-
   const tagBytes = byteLength(tagDocument);
-  const elementBytes = byteLength(elementDocument);
   const coverBytes = byteLength(coverDocument);
-  const [tagHash, elementHash, coverHash] = await Promise.all([
+  const [tagHash, coverHash] = await Promise.all([
     sha256Hex(tagDocument),
-    sha256Hex(elementDocument),
     sha256Hex(coverDocument),
   ]);
 
   await env.PRIVATE_CONTENT.put(`content/v1/tags/${tagNumericId}/${tagFile}`, tagDocument, {
     httpMetadata: { contentType: "application/json" },
   });
-  await env.PRIVATE_CONTENT.put(
-    `content/v1/tags/${tagNumericId}/elements/cel_gallery/${elementFile}`,
-    elementDocument,
-    { httpMetadata: { contentType: "application/json" } },
-  );
   await env.PRIVATE_CONTENT.put(
     `content/v1/tags/${tagNumericId}/items/${contentId}/item.json`,
     itemDocument,
@@ -125,9 +104,9 @@ export async function seedLocalContent(env: AppApiEnv): Promise<void> {
 
   await env.APP_DB.prepare(`INSERT INTO tag_content_elements (
     tag_numeric_id, content_element_id, content_element_type, display_order,
-    content_file, content_sha256, content_bytes, content_type, visibility
-  ) VALUES (?1, 'cel_gallery', 'gallery', 0, ?2, ?3, ?4, 'application/json', 'public')`)
-    .bind(tagNumericId, elementFile, elementHash, elementBytes).run();
+    visibility
+  ) VALUES (?1, 'cel_gallery', 'gallery', 20, 'public')`)
+    .bind(tagNumericId).run();
 
   await env.APP_DB.prepare(`INSERT INTO tag_content_items (
     content_id, content_item_type, scope, owner_tag_numeric_id,

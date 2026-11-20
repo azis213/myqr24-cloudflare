@@ -55,6 +55,7 @@ export function contentTexts(content: JsonObject | undefined): { title?: string;
 /** Gemeinsamer Rahmen jedes Blocks: strukturierte Nutzlast zusätzlich zu den Pflichtfeldern. */
 function baseBlock(type: string, element: VElement, extra: JsonObject): JsonObject {
   const block: JsonObject = { type, ...extra };
+  if (element.placement) block.placement = element.placement;
   if (element.content) block.content = element.content;
   if (Object.keys(element.payload).length > 0) block.options = element.payload;
   if (element.style) block.style = element.style;
@@ -95,11 +96,13 @@ export function buildBlock(
       return baseBlock("gallery", element, {
         title: title ?? optionString(element, "name", "Galerie"),
         images: [],
+        ...(element.actions ? { actions: element.actions } : {}),
       });
     case "documents":
       return baseBlock("documents", element, {
         title: title ?? "Dokumente",
         documents: [],
+        ...(element.actions ? { actions: element.actions } : {}),
       });
     case "external-link": {
       const copy = element.copy ?? {};
@@ -108,21 +111,23 @@ export function buildBlock(
       return baseBlock("external-link", element, { label, url });
     }
     case "image":
-      return baseBlock("image", element, { ...(title ? { title } : {}) });
+      return baseBlock("image", element, { ...(title ? { title } : {}), ...(paragraphs.length ? { description: paragraphs.join("\n") } : {}) });
     case "document":
-      return baseBlock("document", element, {});
+      return baseBlock("document", element, { ...(title ? { title } : {}), ...(paragraphs.length ? { description: paragraphs.join("\n") } : {}) });
     case "divider":
-      return baseBlock("divider", element, {});
+      return baseBlock("divider", element, { ...(title ? { title } : {}) });
     case "finder-notice":
-      return baseBlock("notice", element, { urgency: optionString(element, "urgency", "normal") });
+      return baseBlock("notice", element, { urgency: optionString(element, "urgency", "normal"), ...(title ? { title } : {}), ...(paragraphs.length ? { text: paragraphs.join("\n") } : {}) });
     case "finder-form":
-      return baseBlock("finder-form", element, { channel: optionString(element, "channel", "server-mediated") });
+      return baseBlock("finder-form", element, { channel: optionString(element, "channel", "server-mediated"), ...(title ? { title } : {}), ...(paragraphs.length ? { description: paragraphs.join("\n") } : {}) });
     case "contact-channel":
-      return baseBlock("contact", element, { method: optionString(element, "method", "form") });
+      return baseBlock("contact", element, { method: optionString(element, "method", "form"), ...(title ? { title } : {}), ...(paragraphs.length ? { description: paragraphs.join("\n") } : {}) });
     case "maintenance-history":
       return baseBlock("maintenance", element, {
         groupBy: optionString(element, "groupBy", "none"),
         dateFormat: optionString(element, "dateFormat", "de-DE"),
+        ...(title ? { title } : {}),
+        ...(paragraphs.length ? { description: paragraphs.join("\n") } : {}),
       });
     default:
       return null;
@@ -190,6 +195,7 @@ export function buildProjection(input: {
       elementId: element.elementId,
       elementType: element.elementType,
       displayOrder: element.displayOrder,
+      ...(element.placement ? { placement: element.placement } : {}),
       visibility: element.visibility,
       payload: elementPayload(element),
     })),

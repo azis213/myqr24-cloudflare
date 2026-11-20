@@ -152,15 +152,6 @@ export const publicTagViews: Record<string, PublicTagView> = {
       presentation: "wedding",
     },
     vault: {
-      guestContributionDemo: {
-        enabled: true,
-        label: "Erinnerungen teilen",
-        description:
-          "Nach der Freischaltung kannst du in dieser Staging-Demo eigene Erinnerungsbilder hinzufügen und nur deine eigenen Demo-Beiträge entfernen.",
-        maxImages: 5,
-        ownershipRule:
-          "Die spätere Vault-API ordnet Beiträge ausschließlich einer serverseitigen Gast-Session zu.",
-      },
       blocks: [
         {
           type: "hero",
@@ -179,6 +170,8 @@ export const publicTagViews: Record<string, PublicTagView> = {
         {
           type: "gallery",
           title: "Erste Momente",
+          actions: { upload: { enabled: true, principals: ["guest", "owner"], maxItemsPerPrincipal: 5 } },
+          slots: [{ slotId: "images", accepts: ["image"], min: 0, max: 48 }],
           images: [
             {
               id: "welcome",
@@ -245,15 +238,6 @@ export const publicTagViews: Record<string, PublicTagView> = {
       presentation: "wedding",
     },
     vault: {
-      guestContributionDemo: {
-        enabled: false,
-        label: "Galerie nur ansehen",
-        description:
-          "Für diese Konfiguration sind keine Gastbeiträge vorgesehen.",
-        maxImages: 0,
-        ownershipRule:
-          "Keine Gastbeiträge aktiviert.",
-      },
       blocks: [
         {
           type: "hero",

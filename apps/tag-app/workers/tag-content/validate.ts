@@ -70,10 +70,19 @@ export interface VSlot {
   presentation?: Record<string, unknown>;
 }
 
+export interface VPlacement {
+  span: Record<string, number>;
+  order?: Record<string, number>;
+  minWidth?: string;
+  align?: "start" | "stretch" | "center";
+  hint?: string;
+}
+
 export interface VElement {
   elementId: string;
   elementType: ElementType;
   displayOrder: number;
+  placement?: VPlacement;
   visibility: Visibility;
   hidden: boolean;
   payload: Record<string, unknown>;
@@ -557,6 +566,55 @@ function validateElement(
   if (element.hidden !== undefined && typeof element.hidden !== "boolean") {
     issues.add("ELEMENT_HIDDEN_INVALID", `${path}.hidden`, "hidden muss boolean sein.");
   }
+  let placement: VPlacement | undefined;
+  if (element.placement !== undefined) {
+    const placementValue = element.placement;
+    const placementPath = `${path}.placement`;
+    const validBreakpoints = BREAKPOINTS as readonly string[];
+    const columns = isObject(element.placement) ? element.placement.span : undefined;
+    if (!isObject(placementValue) || !isObject(columns)) {
+      issues.add("ELEMENT_PLACEMENT_INVALID", placementPath, "placement.span muss Spalten je Breakpoint enthalten.");
+    } else {
+      const span: Record<string, number> = {};
+      for (const [breakpoint, value] of Object.entries(columns)) {
+        if (!validBreakpoints.includes(breakpoint) || !isInteger(value) || value < 1 || value > 12) {
+          issues.add("ELEMENT_PLACEMENT_SPAN_INVALID", `${placementPath}.span.${breakpoint}`, "Spaltenbreite muss 1–12 betragen.");
+        } else span[breakpoint] = value;
+      }
+      let order: Record<string, number> | undefined;
+      if (placementValue.order !== undefined) {
+        if (!isObject(placementValue.order)) {
+          issues.add("ELEMENT_PLACEMENT_ORDER_INVALID", `${placementPath}.order`, "order muss Ganzzahlen je Breakpoint enthalten.");
+        } else {
+          order = {};
+          for (const [breakpoint, value] of Object.entries(placementValue.order)) {
+            if (!validBreakpoints.includes(breakpoint) || !isInteger(value) || value < 0) {
+              issues.add("ELEMENT_PLACEMENT_ORDER_INVALID", `${placementPath}.order.${breakpoint}`, "order muss eine nichtnegative Ganzzahl sein.");
+            } else order[breakpoint] = value;
+          }
+        }
+      }
+      const minWidth = placementValue.minWidth;
+      if (minWidth !== undefined && (typeof minWidth !== "string" || !REM_VALUE.test(minWidth))) {
+        issues.add("ELEMENT_PLACEMENT_MIN_WIDTH_INVALID", `${placementPath}.minWidth`, "minWidth muss in rem angegeben sein.");
+      }
+      const align = placementValue.align;
+      if (align !== undefined && align !== "start" && align !== "stretch" && align !== "center") {
+        issues.add("ELEMENT_PLACEMENT_ALIGN_INVALID", `${placementPath}.align`, "align muss start, stretch oder center sein.");
+      }
+      const hint = placementValue.hint;
+      if (hint !== undefined && (typeof hint !== "string" || hint.length > 200)) {
+        issues.add("ELEMENT_PLACEMENT_HINT_INVALID", `${placementPath}.hint`, "hint darf höchstens 200 Zeichen enthalten.");
+      }
+      placement = {
+        span,
+        ...(order ? { order } : {}),
+        ...(typeof minWidth === "string" && REM_VALUE.test(minWidth) ? { minWidth } : {}),
+        ...(align === "start" || align === "stretch" || align === "center" ? { align } : {}),
+        ...(typeof hint === "string" && hint.length <= 200 ? { hint } : {}),
+      };
+    }
+  }
   const payload = element.payload;
   if (!isObject(payload)) {
     issues.add("PAYLOAD_INVALID", `${path}.payload`, "payload muss ein Objekt sein.");
@@ -572,6 +630,7 @@ function validateElement(
     elementId,
     elementType: type,
     displayOrder: isInteger(displayOrder) && displayOrder >= 0 ? displayOrder : index,
+    ...(placement ? { placement } : {}),
     visibility: (inList(visibility, VISIBILITIES) ? visibility : "public") as Visibility,
     hidden: element.hidden === true || HIDDEN_ELEMENT_TYPES.includes(type),
     payload: isObject(payload) ? payload : {},

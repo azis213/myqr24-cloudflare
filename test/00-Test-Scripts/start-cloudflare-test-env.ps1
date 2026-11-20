@@ -66,6 +66,16 @@ Wait-LocalTcpPort -Port $apiPort -TimeoutSeconds 240
 Wait-LocalTcpPort -Port $edgePort -TimeoutSeconds 240
 Wait-LocalTcpPort -Port $codecPort -TimeoutSeconds 240
 
+# Apply the TAG-App database schema through Wrangler's migration registry
+# before the local worker seed writes sample rows.
+Invoke-LocalCompose -RepositoryRoot $repositoryRoot -EnvironmentFile $environmentFile -ComposeFile $composeFile `
+    -Arguments @(
+        'exec', '-T', 'tag-app-api',
+        'npx', 'wrangler', 'd1', 'migrations', 'apply', '11111111-2222-4333-8444-555555555555',
+        '--local', '--persist-to', '/data/tag-app-api',
+        '--config', 'wrangler.app-api.local.toml'
+    )
+
 Invoke-LocalAppApiSeed -ApiPort $apiPort -SeedKey $values['LOCAL_APP_LOCAL_SEED_KEY']
 Install-CloudflareSeed -RepositoryRoot $repositoryRoot -EnvironmentFile $environmentFile -ComposeFile $composeFile -RoutingSqlFile $routingSeedSqlFile
 

@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const migrations = ["0001_tag_access.sql", "0002_tag_content.sql"].map((name) =>
+const migrations = ["0001_tag_access.sql", "0002_tag_content.sql", "0003_tag_content_element_structure.sql", "0004_tag_app_development_reset.sql"].map((name) =>
   readFileSync(fileURLToPath(new URL(`../database/${name}`, import.meta.url)), "utf8"),
 );
 
@@ -18,11 +18,16 @@ const replacementImageId = 1850000000000002;
 const secondLocalImageId = 1850000000000003;
 const sha = "a".repeat(64);
 
-function withDatabase(run) {
+function withDatabase(run, applyMigration = true) {
   const db = new DatabaseSync(":memory:");
   try {
     db.exec("PRAGMA foreign_keys = ON");
-    for (const migration of migrations) db.exec(migration);
+    db.exec(migrations[0]);
+    db.exec(migrations[1]);
+    if (applyMigration) {
+      db.exec(migrations[2]);
+      db.exec(migrations[3]);
+    }
     return run(db);
   } finally {
     db.close();
@@ -41,9 +46,9 @@ function insertTagContent(db, tag = tagOne, revision = 8) {
 function insertElement(db, tag = tagOne, id = galleryId, type = "gallery", order = 0, visibility = "public") {
   db.prepare(`INSERT INTO tag_content_elements (
     tag_numeric_id, content_element_id, content_element_type, display_order,
-    content_file, content_sha256, content_bytes, content_type, visibility
-  ) VALUES (?, ?, ?, ?, ?, ?, 64, 'application/json', ?)`)
-    .run(tag.numeric, id, type, order, "element-rev8.json", sha, visibility);
+    visibility
+  ) VALUES (?, ?, ?, ?, ?)`)
+    .run(tag.numeric, id, type, order, visibility);
 }
 
 function insertItem(db, options = {}) {
@@ -92,9 +97,8 @@ function assignItem(db, tag = tagOne, elementId = galleryId, item = {}, order = 
 }
 
 describe("TAG Application API operative content schema", () => {
-  it("applies both migrations idempotently and exposes no revision table", () => {
+  it("applies the migrations, clears old development data, and keeps the final schema", () => {
     withDatabase((db) => {
-      expect(() => migrations.forEach((migration) => db.exec(migration))).not.toThrow();
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND (name = 'tag_content' OR name LIKE 'tag_content_%') ORDER BY name").all();
       expect(tables.map((row) => row.name)).toEqual([
         "tag_content",
@@ -104,6 +108,56 @@ describe("TAG Application API operative content schema", () => {
         "tag_content_media_variants",
       ]);
       expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tag_content_revisions'").get()).toBeUndefined();
+      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      expect(db.prepare("PRAGMA table_info(tag_content_elements)").all().map((row) => row.name)).toEqual([
+        "tag_numeric_id", "content_element_id", "content_element_type", "display_order", "visibility",
+      ]);
+      const itemForeignKeys = db.prepare("PRAGMA foreign_key_list(tag_content_element_items)").all();
+      expect(itemForeignKeys.some((row) => row.table === "tag_content_elements" && row.on_delete === "CASCADE")).toBe(true);
+      expect(db.prepare("SELECT count(*) AS count FROM tag_content").get().count).toBe(0);
+      expect(db.prepare("SELECT count(*) AS count FROM tag_routing").get().count).toBe(0);
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE '%_v3'").all()).toEqual([]);
+    });
+  });
+
+  it("allows the upgrade migration to retain the schema and the reset migration to clear all old rows", () => {
+    withDatabase((db) => {
+      insertTagContent(db);
+      db.prepare(`INSERT INTO tag_content_elements (
+        tag_numeric_id, content_element_id, content_element_type, display_order,
+        content_file, content_sha256, content_bytes, content_type, visibility
+      ) VALUES (?, ?, ?, ?, ?, ?, 64, 'application/json', ?)`)
+        .run(tagOne.numeric, galleryId, "gallery", 0, "element-rev8.json", sha, "public");
+      insertItem(db);
+      assignItem(db);
+      expect(db.prepare("SELECT count(*) AS count FROM tag_content_element_items").get().count).toBe(1);
+      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      expect(() => db.exec(migrations[2])).not.toThrow();
+      expect(db.prepare("SELECT content_element_id, visibility FROM tag_content_elements").all()).toEqual([
+        { content_element_id: galleryId, visibility: "public" },
+      ]);
+      expect(db.prepare("SELECT content_id, filename_key FROM tag_content_element_items").all()).toEqual([
+        { content_id: localImageId, filename_key: "titelbild.jpg" },
+      ]);
+      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      expect(() => db.exec(migrations[3])).not.toThrow();
+      for (const table of [
+        "tag_routing", "tag_pin_credentials", "tag_pin_throttles", "tag_access_sessions",
+        "tag_content", "tag_content_elements", "tag_content_items",
+        "tag_content_element_items", "tag_content_media_variants", "tag_range_content", "global_content",
+      ]) {
+        expect(db.prepare(`SELECT count(*) AS count FROM ${table}`).get().count, table).toBe(0);
+      }
+      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%_v3'").all()).toEqual([]);
+    }, false);
+  });
+
+  it("seeds new content after the development reset", () => {
+    withDatabase((db) => {
+      insertTagContent(db);
+      insertElement(db);
+      expect(db.prepare("SELECT count(*) AS count FROM tag_content").get().count).toBe(1);
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     });
   });

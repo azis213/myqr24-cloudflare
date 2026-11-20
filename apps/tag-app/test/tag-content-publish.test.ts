@@ -268,11 +268,8 @@ describe("PUT /api/v1/tags/{tagId}/content", () => {
     const elementInserts = current.batch.filter((entry) => entry.sql.startsWith("INSERT INTO tag_content_elements "));
     expect(elementInserts.map((entry) => entry.values[1])).toEqual(["cel_hero", "cel_text", "cel_gallery", "cel_docs"]);
     expect(elementInserts.map((entry) => entry.values[1])).not.toContain("cel_theme");
-
-    // Datei-Spalten sind identische Kopien des Tag-Dokuments (TC-PUB-020b).
-    expect(new Set(elementInserts.map((entry) => entry.values[4])).size).toBe(1);
-    expect([...new Set(elementInserts.map((entry) => entry.values[4]))]).toEqual(["tag-rev1.json"]);
-    expect(new Set(elementInserts.map((entry) => entry.values[5])).size).toBe(1);
+    expect(elementInserts.every((entry) => entry.values.length === 5)).toBe(true);
+    expect(elementInserts.every((entry) => !/content_(?:file|sha256|bytes|type)/.test(entry.sql))).toBe(true);
     expect(new Set(elementInserts.map((entry) => entry.values[6])).size).toBe(1);
   });
 
@@ -418,7 +415,7 @@ describe("PUT /api/v1/tags/{tagId}/content", () => {
         id: entry.values[1],
         type: entry.values[2],
         order: entry.values[3],
-        visibility: entry.values[7],
+        visibility: entry.values[4],
       }));
     expect(rows).toEqual([
       { id: "cel_hero", type: "hero", order: 10, visibility: "public" },

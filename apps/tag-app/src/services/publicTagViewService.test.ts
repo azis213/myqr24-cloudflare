@@ -15,22 +15,19 @@ describe("getPublicTagView", () => {
     });
   });
 
-  it("returns the wedding fixture with public documents and a contribution demo", async () => {
+  it("returns the wedding fixture with public documents and gallery actions", async () => {
     await expect(getPublicTagView("TRAUUNG1")).resolves.toMatchObject({
       tag: {
         id: "trauung1",
         presentation: "wedding",
       },
-      vault: {
-        guestContributionDemo: {
-          enabled: true,
-          maxImages: 5,
-        },
-      },
     });
 
     const view = await getPublicTagView("trauung1");
     const documents = view.vault.blocks.find((block) => block.type === "documents");
+    const gallery = view.vault.blocks.find((block) => block.type === "gallery");
+
+    expect(gallery?.actions).toMatchObject({ upload: { enabled: true, maxItemsPerPrincipal: 5 } });
 
     expect(documents).toMatchObject({
       type: "documents",
@@ -44,11 +41,8 @@ describe("getPublicTagView", () => {
 
   it("models a wedding configuration without guest uploads", async () => {
     const view = await getPublicTagView("fest2026");
-
-    expect(view.vault.guestContributionDemo).toMatchObject({
-      enabled: false,
-      maxImages: 0,
-    });
+    const gallery = view.vault.blocks.find((block) => block.type === "gallery");
+    expect(gallery?.actions).not.toMatchObject({ upload: { enabled: true } });
   });
 
   it("rejects malformed tag IDs without exposing a view", async () => {

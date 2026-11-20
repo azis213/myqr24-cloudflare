@@ -36,12 +36,7 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
     tagId: "ab12cd",
     revision: 8,
     view: { tag: { id: "ab12cd", displayName: "Test", presentation: "standard" }, vault: { blocks: [] }, enabledFeatures: ["vault"] },
-  };
-  const elementDocument = {
-    schema: "myqr24-tag-element-v1",
-    elementId: "cel_gallery",
-    elementType: "gallery",
-    payload: { title: "Testgalerie" },
+    elements: [{ elementId: "cel_gallery", elementType: "gallery", payload: { title: "Testgalerie" } }],
   };
   const env = {
     APP_BOOTSTRAP_SECRET_S01: secret,
@@ -51,7 +46,6 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
       get: async (key: string) => {
         r2Keys.push(key);
         if (key === "content/v1/tags/623187229/tag-rev8.json") return { json: async () => tagDocument };
-        if (key === "content/v1/tags/623187229/elements/cel_gallery/element-rev8.json") return { json: async () => elementDocument };
         return null;
       },
     },
@@ -84,7 +78,7 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
                   return { results: [{ content_element_id: "cel_gallery", content_id: 1850000000000000, content_item_type: "image", title: "Testbild", alt_text: "Testbeschreibung", original_filename: "Titelbild.jpg", display_order: 0, visibility: "public", scope: "tag" }] };
                 }
                 if (sql.includes("FROM tag_content_elements")) {
-                  return { results: [{ content_element_id: "cel_gallery", content_element_type: "gallery", display_order: 0, content_file: "element-rev8.json", content_sha256: "b".repeat(64), content_bytes: 1, content_type: "application/json", visibility: "public" }] };
+                  return { results: [{ content_element_id: "cel_gallery", content_element_type: "gallery", display_order: 0, visibility: "public" }] };
                 }
                 return { results: [] };
               },
@@ -147,10 +141,7 @@ describe("tag access API", () => {
       elements: [{ id: "cel_gallery", type: "gallery", payload: { title: "Testgalerie" }, items: [{ contentId: "1850000000000000", type: "image", title: "Testbild", altText: "Testbeschreibung", filename: "Titelbild.jpg", scope: "tag" }] }],
     });
     expect(JSON.stringify(contentBody)).not.toContain("object_key");
-    expect(state.r2Keys).toEqual([
-      "content/v1/tags/623187229/tag-rev8.json",
-      "content/v1/tags/623187229/elements/cel_gallery/element-rev8.json",
-    ]);
+    expect(state.r2Keys).toEqual(["content/v1/tags/623187229/tag-rev8.json"]);
     const media = await handleAppApiRequest(new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json", cookie: cookie ?? "" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "1850000000000000", variant: "cover" }) }), state.env);
     expect(media.status).toBe(200);
     expect(state.signerRequests()).toBe(1);

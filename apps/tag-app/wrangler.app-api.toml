@@ -7,13 +7,13 @@ name = "myqr24-tag-app-api-staging"
 
 [[env.staging.d1_databases]]
 binding = "APP_DB"
-database_name = "myqr24-tag-app-staging"
-database_id = "<set-only-at-w3d-gate>"
+database_name = "myqr24-stg-db"
+database_id = "1c93214d-a7ef-423b-912f-6326d0fccf37"
 migrations_dir = "database"
 
 [[env.staging.r2_buckets]]
 binding = "PRIVATE_CONTENT"
-bucket_name = "myqr24-private-content-staging"
+bucket_name = "myqr24-stg-blob"
 
 [[env.staging.services]]
 binding = "MEDIA_SIGNER"

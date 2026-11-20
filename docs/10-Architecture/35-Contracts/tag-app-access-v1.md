@@ -1,45 +1,39 @@
 # Vertrag: TAG App Access v1
 
-**Version:** `v1`  
-**Status:** `implemented-local`  
-**Content-Projektion:** `myqr24-tag-content-v2` (operativ, ohne D1-Revisionstabellen)
-**Owner:** TAG Application API Worker  
-**Consumer:** React-PWA; Media-Signer nur per Service Binding
+**Version:** `v1`
+**Status:** `implemented-local` (Teil des TAG Application API Workers)
+**Owner:** TAG Application API Worker
+**Consumer:** [TAG Runtime API](tag-app-runtime-api-v1.md)
+**Content-Projektion:** `myqr24-tag-content-v2`
+
+> Die konkreten Browser-Endpunkte, Payloads und Runtime-Antworten sind im [TAG Application Runtime API Contract](tag-app-runtime-api-v1.md) beschrieben. Dieser Contract hält die Access-Sicherheitsregeln fest.
 
 ## 1. Sicherheitsmodell
 
-Die React-PWA ist eine UI. Sie erhält niemals PIN-Hashes, Pepper, R2-Keys, S3-Credentials, Medien-Signer-Key oder fachliche Berechtigungsansprüche. Signierte Edge-Parameter sind nicht vertrauenswürdig und werden bei der API erneut geprüft.
+Die React-PWA ist eine UI und erhält niemals PIN-Hashes, Pepper, R2-Keys, S3-Credentials, Medien-Signer-Key oder serverseitige Berechtigungsansprüche. Signierte Edge-Parameter werden bei der Application API erneut geprüft. Access-Sessiontypen bleiben von späteren Owner-, Gast- und Empfängerberechtigungen getrennt; ein Scanner-Token ist kein Owner-/Gastzugriff.
 
-Sessiontypen bleiben getrennt: Scanner-Access (`public`/`pin`), Owner-Session, Gast-Session und Empfängergrant. Ein Scanner-Token ersetzt keine Owner- oder Gastberechtigung.
+## 2. Bootstrap und Sessions
 
-## 2. Endpunkte
+Public- und PIN-Bootstrap prüfen `mode`, `accessVersion`, `revision`, `nonce`, `exp` und `sig` gegen das aktuelle Routing sowie `APP_BOOTSTRAP_SECRET_S01`. Ein erfolgreicher Bootstrap setzt ein zufälliges 256-Bit-Token als:
 
-```text
-POST /api/v1/tags/{tagId}/access/public
-POST /api/verify-pin
-GET  /api/v1/tags/{tagId}/content
-POST /api/get-image-url
+```http
+Set-Cookie: myqr24_tag_access=<opaque-token>; HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=2592000
 ```
 
-Public- und PIN-Bootstrap prüfen `mode`, `accessVersion`, `revision`, `nonce`, `exp`, `sig` gegen D1 und das serverseitige `APP_BOOTSTRAP_SECRET_S01`. Erfolgreiche Antworten setzen einen zufälligen 256-Bit-Token ausschließlich als `HttpOnly; Secure; SameSite=Strict; Path=/api` Cookie. D1 speichert nur den Tokenhash, Scope, Access-Version, Ablauf und Widerruf.
+D1 speichert nur Tokenhash, TAG, Scope, Access-Version, Ablauf und Widerrufszeit. Sessions laufen nach 30 Tagen ab. Bei jedem Runtime-Request prüft der Worker Tokenhash, Ablauf, aktiven TAG und übereinstimmende `access_version`; Status-/Access-Version-Änderungen invalidieren damit bestehende Sessions.
 
-`GET content` löst `tagId` über den eindeutigen Base36-Index in `tag_content` auf und liest ausschließlich die serverseitig abgeleiteten, sichtbaren Tag-/Elementdateien:
+PIN-Verifikation nutzt Argon2id plus serverseitigen Pepper `APP_PIN_PEPPER_S01`. Der derzeitige Worker-Startwert ist 8 MiB, 1 Iteration, Parallelität 1, 32 Byte Hashlänge; eine produktive Kalibrierung muss auf dem Zielruntime erfolgen. Fünf Fehlversuche pro TAG/Client-IP führen zu einer 15-minütigen Sperre. Fehlermeldungen bleiben neutral.
 
-```text
-content/v1/tags/{tagNumericId}/tag-rev{revision}.json
-content/v1/tags/{tagNumericId}/elements/{contentElementId}/element-rev{revision}.json
-```
+Aktuell implementiert sind nur Public- und PIN-Scanner-Sessions. Login-, Owner- und Gast-Session-Endpunkte existieren nicht. `shared` ist für PIN-, nicht für Public-Sessions sichtbar; `private` und `ownerOnly` werden durch die derzeitigen Sessiontypen nicht ausgeliefert.
 
-Die Base36-ID ist nur Such-/Anzeigeinformation und nicht Bestandteil des R2-Keys. Das JSON enthält typisierte Blöcke, Element-Payloads und numerische `contentId`s als Dezimalstrings, aber keine R2-Keys, Medien-URLs, PINs, Hashes, Tokens, Owner-, Pool- oder POI-Nachweisdaten. Elemente und Items werden zusätzlich gegen die Session-Sichtbarkeit gefiltert.
+## 3. Medienzugriff und Grenzen
 
-## 3. PIN und Throttle
+Die Runtime-Medienroute autorisiert TAG, Session, aktuelle Contentrevision, Itemstatus und Sichtbarkeit der Element-/Item-Zuordnung. Der Browser liefert nur `tagId`, dezimale `contentId` und Variante. Bucket, Pfad und Key werden vollständig serverseitig abgeleitet; der Media-Signer erhält nur den abgeleiteten `objectKey`, `contentType`, `expiresIn` und sein internes Service-Key-Headerfeld.
 
-PINs verwenden Argon2id mit serverseitigem Pepper (`APP_PIN_PEPPER_S01`). Pepper steht ausschließlich im Secret Store, nie in D1 oder R2. Der lokale Startwert lautet 8 MiB, 1 Iteration, Parallelität 1, 32-Byte-Hash; die finale Worker-Kalibrierung erfolgt erst nach Staging-Benchmark.
+Der Media-Signer implementiert derzeit noch keine R2-Signatur und antwortet fail-closed. Presigned URLs sind daher nicht als bereits verfügbar vorauszusetzen. Ebenfalls nicht implementiert sind Bild-/Dokument-Upload, Item-CRUD, Galeriezuordnung, Quarantäne-Workflow sowie Owner-/Gastberechtigungen. `slots` und `actions` aus einem Template sind keine Upload-API.
 
-Fünf Fehlversuche pro `(tagId, clientSignal)` setzen eine serverseitige Sperre von 15 Minuten. Fehlermeldungen bleiben neutral. Bei Erfolg wird der Throttle gelöscht. PIN-Änderung, Sperrung und Deaktivierung erhöhen/ändern `access_version` bzw. Status und widerrufen damit Sessions zentral.
+## 4. Datenschutz und Tests
 
-## 4. Medien
+Presigned URLs, Access-Token und private Content-Dokumente werden nicht im Service Worker oder persistierendem Browser-Speicher abgelegt. API-Antworten sind `Cache-Control: no-store`; Runtime-JSON-Antworten setzen `X-Content-Type-Options: nosniff`.
 
-`POST /api/get-image-url` akzeptiert nur `tagId`, eine numerische `contentId` als Dezimalstring und eine erlaubte Variante. Die API prüft Session, Status, Access-Version, Contentrevision, Element-/Item-Sichtbarkeit und Item-Status, bevor sie den Media-Signer per Service Binding anspricht. Der Signer erhält ausschließlich den serverseitig abgeleiteten `objectKey`, `contentType` und `expiresIn`; niemals einen clientgewählten Bucket, Pfad oder Key. Zusätzlich authentifiziert er den Aufruf über `APP_MEDIA_SIGNER_KEY_S01`. Die lokale Implementierung bleibt fail-closed, bis S3-kompatible R2-Signiercredentials im W3D-Gate bereitstehen.
-
-Presigned URLs, Sessiontoken und Content-JSON werden nicht im Service Worker oder persistentem Browser-Speicher abgelegt. Alle API-Antworten nutzen `Cache-Control: no-store`.
+**Tests:** `apps/tag-app/test/app-api.test.ts`, `apps/tag-app/test/app-api-inline-elements.test.ts`, `apps/tag-app/src/services/tagAccessService.test.ts`.

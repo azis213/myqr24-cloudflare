@@ -106,6 +106,18 @@ describe("validateTemplate", () => {
     expect(maintenanceGallery.issues.map((issue) => issue.code)).toContain("ELEMENT_TYPE_NOT_ALLOWED");
   });
 
+  it("validiert Placement-Spalten und gibt Platzierungsmetadaten an die Projektion weiter", () => {
+    const invalid = validateTemplate(template([element({
+      elementId: "cel_bad", elementType: "text", placement: { span: { desktop: 13 } },
+    })]));
+    expect(invalid.issues.map((issue) => issue.code)).toContain("ELEMENT_PLACEMENT_SPAN_INVALID");
+    const valid = parsed(template([element({
+      elementId: "cel_good", elementType: "text", placement: { span: { mobile: 12, desktop: 8 }, order: { desktop: 3 } },
+    })]));
+    const block = blocksOf(buildProjection({ document: valid, tagId: "ab12cd" }))[0];
+    expect(block.placement).toEqual({ span: { mobile: 12, desktop: 8 }, order: { desktop: 3 } });
+  });
+
   it("erzwingt Grenzen und Policy", () => {
     const tooMany = Array.from({ length: 25 }, (_, index) =>
       element({ elementId: `cel_${index}`, elementType: "text", displayOrder: index + 1 }),
@@ -157,6 +169,7 @@ describe("buildProjection", () => {
           elementId: "cel_gallery",
           elementType: "gallery",
           displayOrder: 30,
+          placement: { span: { mobile: 12, tablet: 6, desktop: 4 }, order: { mobile: 10, tablet: 10, desktop: 10 }, minWidth: "18rem", align: "stretch", hint: "Galerie" },
           payload: { name: "Gästefotos" },
           slots: [{ slotId: "images", accepts: ["image"], min: 0, max: 48, required: false }],
         }),
@@ -178,6 +191,7 @@ describe("buildProjection", () => {
     expect(blocks[1]).toMatchObject({ type: "text", title: "Über uns", paragraphs: ["Ein Text mit Fett", "A · B"] });
     expect((blocks[1].content as { paragraphs: unknown[] }).paragraphs).toHaveLength(3);
     expect(blocks[2]).toMatchObject({ type: "gallery", title: "Gästefotos", images: [] });
+    expect(blocks[2].placement).toMatchObject({ span: { desktop: 4 }, minWidth: "18rem" });
     expect(blocks[3]).toMatchObject({ type: "documents", documents: [] });
     expect(projection.elements.map((entry) => entry.elementId)).toEqual([
       "cel_hero",

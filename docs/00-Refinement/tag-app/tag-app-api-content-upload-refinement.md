@@ -1,18 +1,22 @@
 # Refinement: TAG-App-API – Upload eines TAG-Content-Templates
 
-**Status:** unverbindliches Refinement (Rev. 4: Löschschutz, Definition lesen)
-**Revision:** 4
+**Status:** unverbindliches Refinement (Rev. 6: App-Nachzug und Element-Schema)
+**Revision:** 6
 **Stand:** 2026-11-20
 **Geltungsbereich:** `apps/tag-app` (Worker `app-api`, D1 `database/0002_tag_content.sql`, R2 `PRIVATE_CONTENT`), Consumer TAG Control Center/TCP und TAG-Content-Designer
 **Verbindlichkeit:** gemäß [`../README.md`](../README.md) ausdrücklich **keine** Anforderung, kein Contract und keine Umsetzungsgrundlage
 
 **Historie:** Revision 1 beschreibt erstmals einen **schreibenden** Content-Pfad: ein TAG-Content-Template (JSON, `myqr24-tag-content-template-v1`) wird zu einer TAG-ID hochgeladen, serverseitig validiert und projektziert, und strukturiert in D1 (`tag_content`, `tag_content_elements`) plus R2 (Tag-/Element-JSON) abgelegt.
 
-**Revision 2 (Element-Docs entfallen, Vollprojektion):** Zwei Korrekturen aus der Diskussion. Erstens: Die Projektion wird **nicht** mehr an den heute bekannten App-Blöcken ausgerichtet – jedes Element wird abgebildet, die App-View zieht später nach (Abweichungen dokumentiert, `D-11`). Zweitens: Die **Element-Dokumente in R2 entfallen**; ihre Nutzlast wandert in das Tag-Dokument. Pro Publish entsteht damit genau **ein** R2-Objekt, während `tag_content_elements` als revisionsgekoppelte Strukturprojektion und FK-Ziel der Item-Zuordnung erhalten bleibt (`D-14`). Die vier Datei-Spalten dieser Tabelle bleiben vorerst als konsistente Kopien des Tag-Dokuments (§7.6a); ihr Entfernen ist ein späteres Gate, weil der FK von `tag_content_element_items` einen Tabellenumbau riskant macht.
+**Revision 2 (Element-Docs entfallen, Vollprojektion):** Zwei Korrekturen aus der Diskussion. Erstens: Die Projektion wird **nicht** mehr an den heute bekannten App-Blöcken ausgerichtet – jedes Element wird abgebildet (`D-11`). Zweitens: Die **Element-Dokumente in R2 entfallen**; ihre Nutzlast wandert in das Tag-Dokument. Pro Publish entsteht damit genau **ein** R2-Objekt, während `tag_content_elements` als revisionsgekoppelte Strukturprojektion und FK-Ziel der Item-Zuordnung erhalten bleibt (`D-14`).
 
-**Revision 3 (lokal umgesetzt):** Der Endpunkt ist implementiert (`workers/tag-content/*`, Route in `app-api.ts`, 31 neue Tests). Beim Bauen zeigte sich eine notwendige Präzisierung: Die Revision steht **im** Dokument, deshalb kann der Dokument-Hash bei identischem Inhalt nie gleich bleiben. Die Idempotenz vergleicht daher einen **Inhalts-Hash mit der gespeicherten Revision** (§5.1, §8.4, `D-05`). Der Lese-Pfad der Content-Route bevorzugt `elements[]` im Tag-Dokument und behält den Element-Datei-Fallback für Altbestand (§20).
+**Revision 3 (lokal umgesetzt):** Der Endpunkt ist implementiert (`workers/tag-content/*`, Route in `app-api.ts`, 31 neue Tests). Beim Bauen zeigte sich eine notwendige Präzisierung: Die Revision steht **im** Dokument, deshalb kann der Dokument-Hash bei identischem Inhalt nie gleich bleiben. Die Idempotenz vergleicht daher einen **Inhalts-Hash mit der gespeicherten Revision** (§5.1, §8.4, `D-05`). Der Lese-Pfad bevorzugte zunächst `elements[]` und hatte bis Revision 5/6 einen Elementdatei-Fallback; dieser ist jetzt entfernt.
 
 **Revision 4 (Löschschutz und Definition lesen):** Ein Element mit Inhalten darf **nicht** verschwinden (`D-13`): Der Publish lehnt das Update mit `409 elements_in_use` ab, bevor irgendetwas geschrieben wird; die DELETE-Anweisung trägt zusätzlich `NOT EXISTS`, damit ein `ON DELETE CASCADE` keine Items mehr mitreißen kann. Elemente ohne Inhalte dürfen entfallen, neue dürfen hinzukommen, ein geänderter Anzeigename ist ein Upsert. Dazu ein Lese-Endpunkt `GET /api/v1/tags/{tagId}/content/document`, der das veröffentlichte Dokument **byte-identisch** zurückgibt (`ETag`, `X-Content-Revision`), und die ausdrückliche Invariante „Revision im JSON = `tag_content.content_revision` = `tag_routing.content_revision`" (`D-15`, `D-16`).
+
+**Revision 5/6 (Schemafreigabe und App-Projektion):** Migration `0003` entfernt die vier obsoleten Datei-Spalten aus `tag_content_elements`; beide Tabellen der zusammengesetzten FK-Beziehung werden gemeinsam neu erstellt, kopiert und mit aktiven Fremdschlüsseln geprüft. Die Content-Route verlangt `elements[]` im Tag-Dokument, Seed und Publish schreiben keine Elementdateien. Die App rendert strukturierte RichText-/Tabellen, die neuen Blocktypen, Theme, responsive Placement/Spans und Slot-Platzhalter fail-soft. `placement` wird validiert und in `view.vault.blocks[]` weitergereicht. Der frühere Staging-Upload-Sonderweg wurde entfernt; eine spätere Upload-UI ist an `gallery.actions.upload` zu binden und bedarf einer serverseitigen Upload-API.
+
+**Revision 7 (Dev-/Staging-Reset):** Die `_v3`-Tabellen in Migration `0003` waren ausschließlich temporäre Tabellen und wurden bereits dort in die kanonischen Namen zurückbenannt. Weil lokale und Staging-Daten entbehrlich sind, ergänzt Migration `0004_tag_app_development_reset.sql` einen absichtlich destruktiven Reset aller Access-, Routing-, TAG-Content-, Range- und Global-Zeilen; das Schema selbst bleibt unverändert. R2 wird nicht von einer D1-Migration gelöscht. Staging wurde anhand der Cloudflare-Ressourcenliste auf `myqr24-stg-db` und `myqr24-stg-blob` abgeglichen; alle vier D1-Migrationen sind dort angewendet. R2-Objekte sind absichtlich unberührt geblieben, weil D1-Migrationen sie nicht löschen und die Wrangler-CLI in diesem Setup kein sicheres Objektlisting nach App-Präfix bereitstellt.
 
 
 ---
@@ -344,7 +348,7 @@ Die Nutzlast des Elements (Style, RichText, Slots, Rechte) liegt seit `D-14` **n
 | `content_type` | `application/json` | **entfällt später** |
 | `visibility` | `element.visibility` | bleibt |
 
-Begründung: Mit `D-14` gibt es kein eigenes Element-Dokument mehr. Die vier Datei-Spalten sind nur noch Kopien des Tag-Dokuments; sie werden **nicht mehr gelesen** und nach dem in §7.6a beschriebenen Übergang entfernt.
+Begründung: Mit `D-14` gibt es kein eigenes Element-Dokument mehr. Die vier zuvor redundanten Datei-Spalten sind in Migration `0003` entfernt.
 
 **Wichtig für die Umsetzung:** `NOT NULL` ohne `DEFAULT` erzwingt das Befüllen. Der Upload schreibt deshalb in **jede** Elementzeile dieselben Werte (`content_file = tag-rev{N}.json`, `content_sha256`/`content_bytes` des Tag-Dokuments, `content_type = application/json`). Elementindividuelle Werte wären falsch und würden die Existenz eigener Element-Dateien vortäuschen.
 
@@ -396,7 +400,7 @@ Ohne dieses Update liefert `GET /api/v1/tags/{tagId}/content` dauerhaft `404`, w
 - `tag_pin_credentials`, `tag_access_sessions`, `tag_pin_throttles` – Access bleibt getrennt;
 - R2-Item-/Variantenobjekte – nur das Tag-Dokument.
 
-### 7.6 Die vier Datei-Spalten: Übergang statt Sofort-Umbau
+### 7.6 Die vier Datei-Spalten: entfernt mit Migration `0003`
 
 Mit `D-14` sind `content_file`, `content_sha256`, `content_bytes` und `content_type` in `tag_content_elements` **fachlich obsolet**. Ein sofortiger Umbau ist aber nicht risikofrei:
 
@@ -404,16 +408,11 @@ Mit `D-14` sind `content_file`, `content_sha256`, `content_bytes` und `content_t
 - SQLite/D1 verträgt `DROP TABLE` + `RENAME` auf ein FK-Ziel nur mit deaktivierten Fremdschlüsseln und aktualisiert abhängige FK-Definitionen nicht zuverlässig;
 - eine kaputte Migration würde die Item-Zuordnungen treffen – genau die Daten, die `D-13` bewahren soll.
 
-**Empfohlen (7.6a): Spalten vorerst behalten.** Der Upload füllt sie mit den Werten des Tag-Dokuments (gleiche Datei, gleicher Hash, gleiche Größe). Sie sind damit konsistent, aber nur Kopien; die Route liest sie nicht mehr. Ein Entfernen erfolgt erst gemeinsam mit einer Migration von `tag_content_element_items` (Gate `G-05`).
+Migration `apps/tag-app/database/0003_tag_content_element_structure.sql` baut beide Tabellen mit den notwendigen FK-, `CHECK`-, `UNIQUE`- und Trigger-Guards um. Die temporären `_v3`-Namen werden in derselben Migration auf die kanonischen Tabellennamen umbenannt. `PRAGMA foreign_keys` bleibt aktiv; Migrationstests prüfen den damaligen Datenkopierpfad, `PRAGMA foreign_key_check` und CASCADE.
 
-**Alternativ (7.6b): vollständiger Umbau beider Tabellen** in einer Migration `0003`, mit `PRAGMA foreign_keys = OFF`, Neuerstellung von `tag_content_elements` **und** `tag_content_element_items` (inklusive aller CHECK- und UNIQUE-Regeln), Datenübernahme und abschließendem `PRAGMA foreign_key_check`.
+Für die entbehrlichen Entwicklungs-/Staging-Daten entfernt die nachfolgende Migration `0004_tag_app_development_reset.sql` alle Access-, Routing-, Content-, Range- und Global-Daten. Sie ist ausschließlich auf Disposable-Umgebungen anzuwenden und ändert kein Tabellenschema. R2-Objekte bleiben bestehen und müssen separat sowie nach eindeutig verifiziertem Bucket bereinigt werden. Bereits angewendete Migrationen werden nicht editiert.
 
-| Weg | Aufwand | Risiko | Empfehlung |
-| --- | --- | --- | --- |
-| 7.6a Übergang | keiner | nur „tote Spalten" | **ja, für den Start** |
-| 7.6b Umbau | eine Migration mit zwei Tabellen | FK-/Datenrisiko | später, zusammen mit `G-05` |
-
-In beiden Wegen gilt: **die Route liest keine Datei-Spalten mehr**, sondern die Elementliste aus D1 und die Nutzlast aus dem Tag-Dokument.
+Die D1-Zeile `tag_content_elements` enthält danach nur `tag_numeric_id`, `content_element_id`, `content_element_type`, `display_order`, `visibility`. Inhalte stehen ausschließlich in `elements[]` des einen Tag-Dokuments. Bereits erzeugte Elementdateien sind unreferenzierter Altbestand und können betrieblich bereinigt werden; vorhandene TAGs müssen vor weiterer App-Nutzung neu publiziert oder neu geseedet werden.
 
 ---
 
@@ -580,23 +579,22 @@ Regeln:
 
 ### 9.5 Abweichungen zur heutigen App-View
 
-Nichts geht verloren – aber die App muss nachziehen. Diese Tabelle ist die **Arbeitsliste** für den App-Umbau:
+Die App rendert die Projektion inzwischen; diese Tabelle dokumentiert den erledigten Nachzug und verbleibende Backend-Arbeit:
 
-| Thema | Heute in der App | Projektion liefert bereits | App-Aufgabe |
+| Thema | Vor App-Nachzug | Projektion / App Revision 6 | Restpunkt |
 | --- | --- | --- | --- |
-| Formatierung (Marks, Farben, Tabellen) | nur Plaintext | `content` (RichText, Tabellen) | formatierte Blöcke rendern |
-| Layout/Spans | lineare Blockliste | `view.layout` | Raster/Vorschau übernehmen |
-| Theme | Standard-Styling | `view.theme` | Tokens anwenden |
-| `image`, `document`, `divider` | unbekannt | eigene Blocktypen | rendern |
-| Finder/Wartung (`notice`, `finder-form`, `contact`, `maintenance`) | unbekannt | eigene Blocktypen | rendern |
-| Bilder/Dokumente in Blöcken | `images[]`/`documents[]` | leer, bis Items folgen | Item-Upload + Rendering |
-| `guestContributionDemo` | Sonderfeld | aus `gallery.actions` ableitbar | ersetzen |
+| RichText (Marks, Absätze, Tabellen) | Plaintext | RichText- und Tabellen-Renderer | keine |
+| Placement/Responsive Layout | keine Layout-Metadaten | `placement`, 12-Spaltenraster, Breakpoints, Span/Order | Item-Upload bleibt offen |
+| Theme | Standard-CSS | Themefarben, Dark-Mode und Typografie-CSS-Variablen | Feinschliff |
+| Elementtypen | Teilmenge | alle 13 sichtbaren Typen, unbekannte Typen ignoriert | Daten/Interaktionen bleiben bei späteren APIs |
+| Bilder/Dokumente | leere Arrays | Slot-Platzhalter, Empty States und vorhandene Items | Item-Upload |
+| Upload-Demo | `guestContributionDemo`-Sonderfeld | entfernt; Upload-Konfiguration liegt in `gallery.actions.upload` | spätere serverseitige Upload-API und autorisierte UI |
 
-Bis die App nachgezogen ist, gilt: unbekannte Blocktypen **ignorieren statt abbrechen** (fail-soft), damit ein neues Template die PWA nicht lahmlegt.
+Unbekannte Blocktypen werden **ignoriert statt fatal gerendert** (fail-soft), damit ein neues Template die PWA nicht lahmlegt.
 
 ### 9.6 Leere Blöcke sind zulässig
 
-`gallery.images: []` und `documents.documents: []` sind **gültig** und gewollt: Der TAG ist veröffentlicht, aber noch ohne Inhalte. Die App filtert diese Blöcke in eigene Bereiche (`.filter(block => block.type === "gallery")` in `App.tsx`) und zeigt sie mit leerem Inhalt. Ein späterer Item-Upload füllt sie, ohne die Revision des Templates zu ändern.
+`gallery.images: []` und `documents.documents: []` sind **gültig** und gewollt: Der TAG ist veröffentlicht, aber noch ohne Inhalte. Die App zeigt Slot-Platzhalter mit Kapazität. Ein späterer Item-Upload füllt sie, ohne die Revision des Templates zu ändern.
 
 ---
 
@@ -799,7 +797,7 @@ Nach jedem Publish ist ein Smoke-Test möglich: `GET /api/v1/tags/{tagId}/conten
 | `TC-PUB-019` | R2-Keys | genau ein Key `content/v1/tags/{numeric}/tag-rev{N}.json`, nie Base36, **kein** `element-rev*.json` |
 | `TC-PUB-019b` | `elements[]` im Dokument | je D1-Zeile ein Eintrag mit `elementId`, `elementType`, `payload.options/style/content/slots/actions`; Mengengleichheit mit `tag_content_elements` |
 | `TC-PUB-020` | Hash/Größe | `content_sha256` 64 hex, `content_bytes` = tatsächliche Bytezahl inkl. Umlauten |
-| `TC-PUB-020b` | Datei-Spalten in `tag_content_elements` | alle Elementzeilen tragen **identisch** `tag-rev{N}.json`, Hash und Größe des Tag-Dokuments (Kopie, kein Element-Pointer) |
+| `TC-PUB-020b` | Element-Schema | Element-Upsert bindet nur die fünf Strukturwerte, keine Datei-/Hash-/Größenfelder |
 | `TC-PUB-021` | `tag_routing` | `content_revision` steht im selben Batch wie `tag_content` |
 | `TC-PUB-022` | leere Galerie/Dokumente | View enthält `images: []` / `documents: []` |
 | `TC-PUB-023` | Projektion | `hero`/`text`/`callout`/`external-link` mit Pflichtfeldern **und** strukturiertem `content` (Plus: Plaintext-Kompatibilitätsfelder) |
@@ -837,7 +835,7 @@ Nach jedem Publish ist ein Smoke-Test möglich: `GET /api/v1/tags/{tagId}/conten
 | `G-02` | **Owner-Session** (login-Scope) und Owner-UI | Owner-Upload aus dem Browser |
 | `G-03` | **Item-Upload** (Medien, Dokumente, Varianten, Quarantäne) | echte Galerie-/Dokumentinhalte |
 | `G-04` | **App-View nachziehen** (neue Blocktypen, formatierte Nutzlast, Theme/Layout) | volle Darstellung in der PWA – die **Projektion liegt bereits vollständig vor** (`D-11`, §9.5) |
-| `G-05` | **Cleanup** (R2-Waisen, alte Revisionen, Altbestand Element-Dokumente, Datei-Spalten aus `tag_content_elements`) | Betriebshygiene und schlankes Schema (§7.6b) |
+| `G-05` | **R2-Cleanup** (R2-Waisen, alte Revisionen und Altbestand Element-Dokumente) | Betriebshygiene; Element-Datei-Spalten sind mit Migration `0003` entfernt |
 | `G-06` | **Rate Limiting / Audit-Senke** | Missbrauchsschutz im Dauerbetrieb |
 | `G-07` | **Deployment** (echte D1/R2, Secrets, W3D) | Produktivbetrieb |
 
@@ -857,12 +855,14 @@ Nach jedem Publish ist ein Smoke-Test möglich: `GET /api/v1/tags/{tagId}/conten
 | `D-08` | Items | Template-Upload legt **keine** Items/Zuordnungen an | Empfehlung |
 | `D-09` | Fehlerformat | strukturierte Fehler für den Publisher, Scanner bleibt neutral | Empfehlung |
 | `D-10` | Limits | 128 kB Tag-Dokument (deckt alle Element-Nutzlasten), 24 Elemente, 16 Slots, 64 max/Slot | **entschieden** |
-| `D-11` | Vollprojektion | **Jedes** Element wird als Block abgebildet (auch `image`, `document`, `divider`, Finder, Wartung), Nutzlast strukturiert **plus** Plaintext-Kompatibilitätsfelder; App-View zieht nach, Abweichungen in §9.5 | **entschieden** |
+| `D-11` | Vollprojektion | **Jedes** sichtbare Element wird als Block abgebildet (auch `image`, `document`, `divider`, Finder, Wartung), Nutzlast strukturiert **plus** Plaintext-Kompatibilitätsfelder; Renderer-Nachzug in §9.5 umgesetzt | **umgesetzt** |
 | `D-12` | Spätere Gates | Codec-Verify, Owner-Session, Cleanup, Rate Limit | offen |
 | `D-13` | Element-Upsert & Löschschutz | Elementzeilen werden geupsertet; entfallende Elemente **mit** Inhalten → `409 elements_in_use`, **ohne** Inhalte → DELETE mit `NOT EXISTS`; geänderter Anzeigename = Upsert | **entschieden** |
 | `D-15` | Definition abrufen | `GET /api/v1/tags/{tagId}/content/document` (Publisher), byte-identische Antwort mit `ETag`/`X-Content-Revision`, `304` bei `If-None-Match` | **entschieden** |
 | `D-16` | Stabile `elementId` | `elementId` ist der Schlüssel; „Name ändern" = Upsert. Echtes `renames` (ID-Umzug inklusive Items) ist nur dokumentiert, nicht umgesetzt | **entschieden (renames offen)** |
-| `D-14` | Element-Dokumente | **entfallen**; Element-Nutzlast liegt im Tag-Dokument (`elements[]`). Ein R2-Put pro Publish, ein Hash, eine Größe. Datei-Spalten in `tag_content_elements` bleiben vorerst als Kopien (§7.6a) | **entschieden** |
+| `D-14` | Element-Dokumente | **entfallen**; Element-Nutzlast liegt im Tag-Dokument (`elements[]`). Ein R2-Put pro Publish, ein Hash, eine Größe. Datei-Spalten aus `tag_content_elements` mit Migration `0003` entfernt | **umgesetzt** |
+| `D-17` | Layoutprojektion | `placement` wird validiert und in jeden View-Block übernommen; App portiert 12-Spalten-Spans/Breakpoints | **umgesetzt** |
+| `D-18` | App-Empty-States | leere Slots werden mit Kapazität und Item-Platzhaltern gerendert; keine Upload-API in diesem Schritt | **umgesetzt** |
 
 ---
 
@@ -872,8 +872,9 @@ Nach jedem Publish ist ein Smoke-Test möglich: `GET /api/v1/tags/{tagId}/conten
 | --- | --- |
 | neuer Contract `docs/10-Architecture/35-Contracts/tag-app-content-publish-v1.md` | Request/Response, Fehlercodes, Limits, `D-01`/`D-03`/`D-09`/`D-14` (Tag-Dokument mit `elements[]`) |
 | `40-TAG-APP-DATA-MODEL.md` | §2/§5 Schreibpfad, §9 Gate „Upload-Endpunkte" teilweise geschlossen, `tag_content_elements` ohne Datei-Spalten, `schema_version`-Semantik |
-| `apps/tag-app/database/0003_…` | **nicht** für den Start nötig: Datei-Spalten bleiben als Kopien (§7.6a); späterer Umbau beider Tabellen (§7.6b, Gate `G-05`) |
-| `apps/tag-app/workers/app-api.ts` | `content()` bevorzugt `elements[]` aus dem Tag-Dokument und behält den Element-Datei-Fallback für Altbestand; `PUT`-Route registriert; `isElementDocument()` bleibt für den Fallback |
+| `apps/tag-app/database/0003_tag_content_element_structure.sql` | Element-Datei-Spalten entfernt; beide FK-Tabellen im kanonischen Schema belassen |
+| `apps/tag-app/database/0004_tag_app_development_reset.sql` | destruktiver Reset für entbehrliche Entwicklungs-/Staging-Daten; produktiv nicht anwenden |
+| `apps/tag-app/workers/app-api.ts` | `content()` verlangt `elements[]`; Element-Datei-Fallback und `isElementDocument()` entfernt |
 | `apps/tag-app/workers/tag-content/limits.ts` | Grenzen/Kataloge (Kopie der Designer-Werte) |
 | `apps/tag-app/workers/tag-content/canonical.ts` | kanonische Serialisierung, Bytes, SHA-256 hex |
 | `apps/tag-app/workers/tag-content/validate.ts` | serverseitige Template-Validierung (Struktur, Limits, Policy) |
@@ -881,11 +882,11 @@ Nach jedem Publish ist ein Smoke-Test möglich: `GET /api/v1/tags/{tagId}/conten
 | `apps/tag-app/workers/tag-content/publish.ts` | Endpunkt-Logik (Auth, Adressierung, Idempotenz, Item-Schutz, R2, D1-Batch) |
 | `apps/tag-app/workers/tag-content/read.ts` | `GET …/content/document` (byte-identisch, ETag/Revision, 304) |
 | `apps/tag-app/workers/tag-content/http.ts` | gemeinsame Helfer (Antworten, Fehler, Bearer, Publisher-Prüfung) |
-| `apps/tag-app/workers/content-paths.ts` | `tagElementFileKey` bleibt für Altbestand, wird nicht mehr aufgerufen |
+| `apps/tag-app/workers/content-paths.ts` | `tagElementFileKey` bleibt als Pfadhelper für etwaige Altbestandsbereinigung; der Content-Leser ruft ihn nicht mehr auf |
 | `apps/tag-app/workers/local-seed.ts` | Seed schreibt Elemente ins Tag-Dokument, keine Element-Dateien |
-| `apps/tag-app/test/database-schema.test.mjs` | Spalten bleiben unverändert (§7.6a), CASCADE-Test bleibt |
+| `apps/tag-app/test/database-schema.test.mjs` | Migration, Spaltenliste, FK-Datenkopie und CASCADE geprüft |
 | `apps/tag-app/test/app-api.test.ts` | Fake-R2 liefert Tag-Doc mit `elements[]` |
-| `tag-app-access-v1.md` | Satz zu Element-Dateien („liest Elementdateien") korrigieren; Content-Vertrag bleibt sonst unverändert |
+| `apps/tag-app/src/features/vault/BlockRenderer.tsx`, `RichText.tsx`, `layout.ts` | App-Renderer, RichText/Tabellen, Theme und Layout inkl. Slot-Platzhalter |
 | `docs/40-Implementation/tag-app/10-USER-STORIES.md` | neue Story „Template veröffentlichen" inkl. AC aus §3.4/§10.4 und §9.5 (App-Abweichungen) |
 | `docs/40-Implementation/tag-app/21-TEST-CASES.md` | `TC-PUB-001…028` (inkl. `019b`) |
 | `30-TRACEABILITY.md`, `STATUS.md` | Nachweis „Publish lokal implementiert" erst **nach** Umsetzung |
@@ -957,21 +958,22 @@ Quelle der Wahrheit ist der Designer-Validator (`tools/tag-content-designer/src/
 
 ---
 
-## 20. Umsetzungsstand (Revision 4, lokal)
+## 20. Umsetzungsstand (Revision 6, lokal)
 
 | Artefakt | Stand |
 | --- | --- |
 | `PUT /api/v1/tags/{tagId}/content` | implementiert in `workers/tag-content/publish.ts`, registriert in `app-api.ts`; Auth über `APP_CONTENT_PUBLISH_KEY_S01` (503, wenn nicht gesetzt) |
 | `GET /api/v1/tags/{tagId}/content/document` | implementiert in `workers/tag-content/read.ts`; byte-identische Antwort, `ETag`, `X-Content-Revision`, `304` |
 | Validierung | `workers/tag-content/validate.ts`: Schema, Meta, Shell/Theme, Layout, Elemente, Slots, Actions, Bindings, RichText/Tabellen, Policy (HTML/JS/`data:`/`url()`/Storage-Keys), 128 kB |
-| Projektion | `workers/tag-content/project.ts`: `view` + `elements[]`, alle 13 sichtbaren Elementtypen, Plaintext-Brücke, Theme/Layout |
-| Ablage | ein R2-Objekt `tag-rev{N}.json`; D1-Batch mit `tag_content`, `tag_content_elements` (Upsert, Löschen nur ohne Inhalte), `tag_routing.content_revision` |
+| Projektion | `workers/tag-content/project.ts`: `view` + `elements[]`, alle 13 sichtbaren Typen, Plaintext-Brücke, Theme/Layout und validierte `placement`-Metadaten |
+| Ablage | ein R2-Objekt `tag-rev{N}.json`; D1-Batch mit Struktur-only `tag_content_elements`; Migration `0003` erhält FK-Items und Guards |
 | Löschschutz | Vorab-Prüfung (Item-Zahlen) → `409 elements_in_use`; DELETE zusätzlich mit `NOT EXISTS`; `meta.changes`-Kontrolle |
-| Lese-Pfad | `content()` nutzt `elements[]`, Fallback auf Element-Dateien für Altbestand/Seeds |
-| Tests | `tag-content-publish.test.ts` (27), `tag-content-projection.test.ts` (7), `tag-content-read.test.ts` (6), `app-api-inline-elements.test.ts` (2) – **73 tag-app-Tests grün** |
+| Lese-Pfad | `content()` verlangt `elements[]`; Element-Datei-Fallback entfernt; lokaler Seed schreibt Inline-Elemente |
+| App | fail-soft Block-Renderer, RichText/Tabellen, responsive Layout/Placement, Theme/Typos, Slot-/Item-Platzhalter; Upload-Demo aus `gallery.actions` |
+| Tests | Schema-Migration, Dev-Reset, FK/CASCADE, API/Publish, Renderer und Layout |
 | Konfiguration | `APP_CONTENT_PUBLISH_KEY_S01` in `wrangler.app-api.toml` dokumentiert und in `.dev.vars.example` als lokaler Platzhalter |
 
-**Bewusst noch offen:** CLI/Designer-Anbindung, Owner-Session, Item-Upload, `renames`-Mapping (`D-16`), Migration `0003` (§7.6b), Cleanup-Gate, App-View-Nachzug (`D-11`).
+**Bewusst noch offen:** CLI/Designer-Anbindung, Owner-Session, Item-Upload und echte Galerie-Uploads, `renames`-Mapping (`D-16`), R2-Waisen-/Altversions-Cleanup. Alte TAG-Dokumente ohne `elements[]` müssen vor Nutzung neu publiziert oder geseedet werden.
 
 
 

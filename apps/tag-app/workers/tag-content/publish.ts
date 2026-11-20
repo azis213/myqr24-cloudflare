@@ -237,18 +237,14 @@ export async function publishTagContent(
   }
 
   for (const element of projection.elements) {
-    // Datei-Spalten sind Kopien des Tag-Dokuments (D-14, §7.6a) – identisch für alle Elemente.
     statements.push(
       env.APP_DB.prepare(
-        "INSERT INTO tag_content_elements (tag_numeric_id, content_element_id, content_element_type, display_order, content_file, content_sha256, content_bytes, content_type, visibility) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'application/json', ?8) ON CONFLICT(tag_numeric_id, content_element_id) DO UPDATE SET content_element_type = excluded.content_element_type, display_order = excluded.display_order, content_file = excluded.content_file, content_sha256 = excluded.content_sha256, content_bytes = excluded.content_bytes, content_type = excluded.content_type, visibility = excluded.visibility",
+        "INSERT INTO tag_content_elements (tag_numeric_id, content_element_id, content_element_type, display_order, visibility) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(tag_numeric_id, content_element_id) DO UPDATE SET content_element_type = excluded.content_element_type, display_order = excluded.display_order, visibility = excluded.visibility",
       ).bind(
         numeric,
         element.elementId,
         element.elementType,
         element.displayOrder,
-        contentFile,
-        contentSha256,
-        contentBytes,
         element.visibility,
       ),
     );
