@@ -20,5 +20,7 @@ binding = "MEDIA_SIGNER"
 service = "myqr24-media-signer-staging"
 
 # Required server-only secrets, never browser variables or committed values:
-# APP_BOOTSTRAP_SECRET_S01, APP_PIN_PEPPER_S01, APP_MEDIA_SIGNER_KEY_S01.
+# APP_BOOTSTRAP_SECRET_S01, APP_PIN_PEPPER_S01, APP_MEDIA_SIGNER_KEY_S01,
+# APP_CONTENT_PUBLISH_KEY_S01 (Publisher für PUT /api/v1/tags/{tagId}/content;
+# fehlt es, antwortet der Pfad fail-closed mit 503).
 # Production and real deployment remain blocked by W3D.

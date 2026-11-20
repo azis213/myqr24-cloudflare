@@ -7,6 +7,8 @@ import {
   tagElementFileKey,
   tagItemVariantKey,
 } from "./content-paths";
+import { publishTagContent } from "./tag-content/publish";
+import { getTagContentDocument } from "./tag-content/read";
 
 const TAG_ID = /^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/;
 const VARIANT = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -27,6 +29,8 @@ export interface AppApiEnv {
   APP_BOOTSTRAP_SECRET_S01: string;
   APP_PIN_PEPPER_S01: string;
   APP_MEDIA_SIGNER_KEY_S01: string;
+  /** Publisher-Secret für `PUT /api/v1/tags/{tagId}/content`; fehlt es, ist der Pfad deaktiviert. */
+  APP_CONTENT_PUBLISH_KEY_S01?: string;
   MEDIA_SIGNER: Fetcher;
 }
 
@@ -75,6 +79,8 @@ interface ContentDocument {
   tagId: string;
   revision: number;
   view: Record<string, unknown>;
+  /** Seit `D-14`: vollständige Element-Nutzlasten im Tag-Dokument. */
+  elements?: unknown;
 }
 
 interface ContentElementDocument {
@@ -287,6 +293,29 @@ async function content(
     if (!isContentDocument(tagValue, row) || containsStorageKey(tagValue)) return null;
     const document = tagValue;
 
+    /**
+     * Seit `D-14` liegen die Element-Nutzlasten im Tag-Dokument. Der Fallback
+     * auf separate Element-Dateien bleibt für Altbestand (Seeds, frühere
+     * Publishes), bis Migration/Cleanup abgeschlossen sind.
+     */
+    const inlineElements = new Map<string, { elementType: string; payload: Record<string, unknown> }>();
+    const hasInlineElements = Array.isArray(document.elements);
+    if (Array.isArray(document.elements)) {
+      for (const entry of document.elements) {
+        if (!entry || typeof entry !== "object") continue;
+        const candidate = entry as { elementId?: unknown; elementType?: unknown; payload?: unknown };
+        if (typeof candidate.elementId !== "string"
+          || typeof candidate.elementType !== "string"
+          || !candidate.payload
+          || typeof candidate.payload !== "object"
+          || Array.isArray(candidate.payload)) continue;
+        inlineElements.set(candidate.elementId, {
+          elementType: candidate.elementType,
+          payload: candidate.payload as Record<string, unknown>,
+        });
+      }
+    }
+
     const elementRows = await env.APP_DB.prepare(
       "SELECT content_element_id, content_element_type, display_order, content_file, content_sha256, content_bytes, content_type, visibility FROM tag_content_elements WHERE tag_numeric_id = ?1 ORDER BY display_order, content_element_id",
     ).bind(row.tag_numeric_id).all<ContentElementRow>();
@@ -316,6 +345,21 @@ async function content(
     for (const element of elementRows.results ?? []) {
       if (element.content_type !== "application/json") return null;
       if (!isVisibleToScope(element.visibility, scope)) continue;
+
+      if (hasInlineElements) {
+        const inline = inlineElements.get(element.content_element_id);
+        if (!inline || inline.elementType !== element.content_element_type) return null;
+        elements.push({
+          id: element.content_element_id,
+          type: element.content_element_type,
+          displayOrder: element.display_order,
+          visibility: element.visibility,
+          payload: inline.payload,
+          items: itemsByElement.get(element.content_element_id) ?? [],
+        });
+        continue;
+      }
+
       const object = await env.PRIVATE_CONTENT.get(
         tagElementFileKey(row.tag_numeric_id, element.content_element_id, element.content_file),
       );
@@ -394,6 +438,14 @@ app.post("/api/verify-pin", async (c) => {
   await clearPinFailures(c.env, record.tag_id, client);
   const token = await issueSession(c.env, record, "pin");
   return json({ status: "authorized", mode: "pin" }, 200, { "set-cookie": `myqr24_tag_access=${token}; HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=${SESSION_TTL_SECONDS}` });
+});
+
+app.put("/api/v1/tags/:tagId/content", async (c) => {
+  return publishTagContent(c.req.raw, c.env, c.req.param("tagId"));
+});
+
+app.get("/api/v1/tags/:tagId/content/document", async (c) => {
+  return getTagContentDocument(c.req.raw, c.env, c.req.param("tagId"));
 });
 
 app.get("/api/v1/tags/:tagId/content", async (c) => {
