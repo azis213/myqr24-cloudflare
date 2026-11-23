@@ -338,10 +338,25 @@ function Invoke-LocalAppApiSeed {
     )
 
     $headers = @{ 'x-myqr24-local-seed' = $SeedKey }
-    $response = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$ApiPort/api/local/seed" -Headers $headers -TimeoutSec 60
-    if (-not $response.ok) {
-        throw 'The local Application API seed endpoint did not confirm the seed.'
-    }
+    $deadline = (Get-Date).AddSeconds(60)
+    $lastError = $null
+    do {
+        try {
+            $response = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$ApiPort/api/local/seed" -Headers $headers -TimeoutSec 60
+            if ($response.ok) {
+                return
+            }
+            throw 'The local Application API seed endpoint did not confirm the seed.'
+        }
+        catch {
+            $lastError = $_
+            if ((Get-Date) -lt $deadline) {
+                Start-Sleep -Seconds 2
+            }
+        }
+    } while ((Get-Date) -lt $deadline)
+
+    throw "The local Application API seed endpoint did not become ready: $($lastError.Exception.Message)"
 }
 
 function Install-CloudflareSeed {
@@ -358,7 +373,7 @@ function Install-CloudflareSeed {
             'npx', 'wrangler', 'd1', 'execute', '66666666-7777-4888-8999-aaaaaaaaaaaa',
             '--local', '--persist-to', '/data/edge-router',
             '--config', 'wrangler.local.toml',
-            '--file', '/workspace/tag-app-database/0001_tag_access.sql'
+            '--file', '/workspace/tag-app-database/main.sql'
         )
 
     Invoke-LocalCompose -RepositoryRoot $RepositoryRoot -EnvironmentFile $EnvironmentFile -ComposeFile $ComposeFile `

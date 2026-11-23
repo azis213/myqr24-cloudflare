@@ -3,393 +3,83 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const migrations = ["0001_tag_access.sql", "0002_tag_content.sql", "0003_tag_content_element_structure.sql", "0004_tag_app_development_reset.sql", "0005_tag_content_duplicate_filenames.sql"].map((name) =>
-  readFileSync(fileURLToPath(new URL(`../database/${name}`, import.meta.url)), "utf8"),
-);
-const mainSchema = readFileSync(fileURLToPath(new URL("../database/main.sql", import.meta.url)), "utf8");
+const schema = readFileSync(fileURLToPath(new URL("../database/main.sql", import.meta.url)), "utf8");
+const initialMigration = readFileSync(fileURLToPath(new URL("../database/migrations/0001_initial_schema.sql", import.meta.url)), "utf8");
 
-const now = "2026-11-17T12:00:00.000Z";
-const tagOne = { numeric: 623187229, base36: "ab12cd" };
-const tagTwo = { numeric: 871866449, base36: "ef34gh" };
-const galleryId = "cel_wedding_gallery";
-const documentsId = "cel_event_documents";
-const localImageId = 1850000000000000;
-const globalDocumentId = 1850000000000001;
-const replacementImageId = 1850000000000002;
-const secondLocalImageId = 1850000000000003;
-const sha = "a".repeat(64);
-
-function withDatabase(run, applyMigration = true) {
+function openDatabase(sql = initialMigration) {
   const db = new DatabaseSync(":memory:");
-  try {
-    db.exec("PRAGMA foreign_keys = ON");
-    db.exec(migrations[0]);
-    db.exec(migrations[1]);
-    if (applyMigration) {
-      db.exec(migrations[2]);
-      db.exec(migrations[3]);
-      db.exec(migrations[4]);
-    }
-    return run(db);
-  } finally {
-    db.close();
-  }
+  db.exec(sql);
+  return db;
 }
 
-function schemaSignature(db) {
-  return db.prepare("SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND type IN ('table', 'index', 'trigger') ORDER BY type, name").all();
-}
+describe("TAG Application D1 initial schema", () => {
+  it("keeps the generated initial migration in sync with main.sql", () => {
+    expect(initialMigration).toBe(schema);
+  });
 
-function insertTagContent(db, tag = tagOne, revision = 8) {
-  db.prepare(`INSERT INTO tag_content (
-    tag_numeric_id, tag_base36_id, content_revision, schema_version,
-    content_file, content_sha256, content_bytes, content_type,
-    published_at, updated_at
-  ) VALUES (?, ?, ?, 1, ?, ?, 128, 'application/json', ?, ?)`)
-    .run(tag.numeric, tag.base36, revision, `tag-rev${revision}.json`, sha, now, now);
-}
-
-function insertElement(db, tag = tagOne, id = galleryId, type = "gallery", order = 0, visibility = "public") {
-  db.prepare(`INSERT INTO tag_content_elements (
-    tag_numeric_id, content_element_id, content_element_type, display_order,
-    visibility
-  ) VALUES (?, ?, ?, ?, ?)`)
-    .run(tag.numeric, id, type, order, visibility);
-}
-
-function insertItem(db, options = {}) {
-  const values = {
-    contentId: localImageId,
-    itemType: "image",
-    scope: "tag",
-    owner: tagOne,
-    title: "Testbild",
-    altText: "Nicht personenbezogenes Testbild",
-    originalFilename: "Titelbild.JPG",
-    filenameKey: "titelbild.jpg",
-    status: "ready",
-    revokedAt: null,
-    ...options,
-  };
-  db.prepare(`INSERT INTO tag_content_items (
-    content_id, content_item_type, scope, owner_tag_numeric_id,
-    owner_tag_base36_id, title, alt_text, original_filename, filename_key,
-    status, created_at, updated_at, revoked_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(
-      values.contentId,
-      values.itemType,
-      values.scope,
-      values.owner?.numeric ?? null,
-      values.owner?.base36 ?? null,
-      values.title,
-      values.altText,
-      values.originalFilename,
-      values.filenameKey,
-      values.status,
-      now,
-      now,
-      values.revokedAt,
-    );
-}
-
-function assignItem(db, tag = tagOne, elementId = galleryId, item = {}, order = 0, visibility = "public") {
-  const values = { contentId: localImageId, scope: "tag", filenameKey: "titelbild.jpg", ...item };
-  db.prepare(`INSERT INTO tag_content_element_items (
-    tag_numeric_id, content_element_id, content_id, item_scope,
-    filename_key, display_order, visibility
-  ) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .run(tag.numeric, elementId, values.contentId, values.scope, values.filenameKey, order, visibility);
-}
-
-describe("TAG Application API operative content schema", () => {
-  it("keeps main.sql exactly aligned with the current non-reset migration schema", () => {
-    const migrated = new DatabaseSync(":memory:");
-    const snapshot = new DatabaseSync(":memory:");
+  it("creates all expected tables with foreign keys enabled and no triggers", () => {
+    const db = openDatabase(schema);
     try {
-      migrated.exec("PRAGMA foreign_keys = ON");
-      for (const index of [0, 1, 2, 4]) migrated.exec(migrations[index]);
-      snapshot.exec(mainSchema);
-      expect(snapshot.prepare("PRAGMA foreign_keys").get().foreign_keys).toBe(1);
-      expect(snapshot.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-      expect(schemaSignature(snapshot)).toEqual(schemaSignature(migrated));
+      expect(db.prepare("PRAGMA foreign_keys").get().foreign_keys).toBe(1);
+      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger'").all()).toEqual([]);
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((row) => row.name)).toEqual([
+        "global_content", "tag_access_sessions", "tag_content", "tag_content_element_items",
+        "tag_content_elements", "tag_content_items", "tag_content_media_variants",
+        "tag_pin_credentials", "tag_pin_throttles", "tag_range_content", "tag_routing",
+      ]);
     } finally {
-      migrated.close();
-      snapshot.close();
+      db.close();
     }
   });
 
-  it("applies the migrations, clears old development data, and keeps the final schema", () => {
-    withDatabase((db) => {
-      const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND (name = 'tag_content' OR name LIKE 'tag_content_%') ORDER BY name").all();
-      expect(tables.map((row) => row.name)).toEqual([
-        "tag_content",
-        "tag_content_element_items",
-        "tag_content_elements",
-        "tag_content_items",
-        "tag_content_media_variants",
-      ]);
-      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tag_content_revisions'").get()).toBeUndefined();
-      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'tag_content_element_items_tag_scope_uidx'").get()).toBeUndefined();
-      expect(db.prepare("PRAGMA table_info(tag_content_elements)").all().map((row) => row.name)).toEqual([
-        "tag_numeric_id", "content_element_id", "content_element_type", "display_order", "visibility",
-      ]);
-      const itemForeignKeys = db.prepare("PRAGMA foreign_key_list(tag_content_element_items)").all();
-      expect(itemForeignKeys.some((row) => row.table === "tag_content_elements" && row.on_delete === "CASCADE")).toBe(true);
-      expect(db.prepare("SELECT count(*) AS count FROM tag_content").get().count).toBe(0);
-      expect(db.prepare("SELECT count(*) AS count FROM tag_routing").get().count).toBe(0);
-      expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE '%_v3'").all()).toEqual([]);
-    });
-  });
+  it("keeps simple keys, enum lists, value bounds and state invariants", () => {
+    const db = openDatabase(schema);
+    try {
+      expect(() => db.exec(`INSERT INTO tag_content (
+        tag_numeric_id, tag_base36_id, content_revision, schema_version,
+        content_file, content_sha256, content_bytes, content_type, published_at, updated_at
+      ) VALUES (1, 'arbitrary-id', 1, 1, '../name', 'not-a-hash', 1,
+        'application/json', 'now', 'now')`)).not.toThrow();
 
-  it("allows the upgrade migration to retain the schema and the reset migration to clear all old rows", () => {
-    withDatabase((db) => {
-      insertTagContent(db);
-      db.prepare(`INSERT INTO tag_content_elements (
-        tag_numeric_id, content_element_id, content_element_type, display_order,
-        content_file, content_sha256, content_bytes, content_type, visibility
-      ) VALUES (?, ?, ?, ?, ?, ?, 64, 'application/json', ?)`)
-        .run(tagOne.numeric, galleryId, "gallery", 0, "element-rev8.json", sha, "public");
-      insertItem(db);
-      assignItem(db);
-      expect(db.prepare("SELECT count(*) AS count FROM tag_content_element_items").get().count).toBe(1);
-      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-      expect(() => db.exec(migrations[2])).not.toThrow();
-      expect(db.prepare("SELECT content_element_id, visibility FROM tag_content_elements").all()).toEqual([
-        { content_element_id: galleryId, visibility: "public" },
-      ]);
-      expect(db.prepare("SELECT content_id, filename_key FROM tag_content_element_items").all()).toEqual([
-        { content_id: localImageId, filename_key: "titelbild.jpg" },
-      ]);
-      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-      expect(() => db.exec(migrations[3])).not.toThrow();
-      for (const table of [
-        "tag_routing", "tag_pin_credentials", "tag_pin_throttles", "tag_access_sessions",
-        "tag_content", "tag_content_elements", "tag_content_items",
-        "tag_content_element_items", "tag_content_media_variants", "tag_range_content", "global_content",
-      ]) {
-        expect(db.prepare(`SELECT count(*) AS count FROM ${table}`).get().count, table).toBe(0);
-      }
-      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%_v3'").all()).toEqual([]);
-    }, false);
-  });
+      expect(() => db.exec(`INSERT INTO tag_content_items (
+        content_id, content_item_type, scope, status, created_at, updated_at
+      ) VALUES (0, 'image', 'global', 'ready', 'now', 'now')`)).toThrow();
+      expect(() => db.exec(`INSERT INTO tag_content_items (
+        content_id, content_item_type, scope, status, created_at, updated_at
+      ) VALUES (1, 'image', 'invalid', 'ready', 'now', 'now')`)).toThrow();
+      expect(() => db.exec(`INSERT INTO tag_content_items (
+        content_id, content_item_type, scope, status, created_at, updated_at, revoked_at
+      ) VALUES (1, 'image', 'global', 'revoked', 'now', 'now', NULL)`)).toThrow();
 
-  it("seeds new content after the development reset", () => {
-    withDatabase((db) => {
-      insertTagContent(db);
-      insertElement(db);
-      expect(db.prepare("SELECT count(*) AS count FROM tag_content").get().count).toBe(1);
-      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-    });
-  });
-
-  it("uses the numeric TAG id as primary key and the Base36 id only for lookup", () => {
-    withDatabase((db) => {
-      insertTagContent(db);
-      expect(db.prepare("SELECT tag_numeric_id, tag_base36_id FROM tag_content WHERE tag_base36_id = ?").get(tagOne.base36)).toEqual({
-        tag_numeric_id: tagOne.numeric,
-        tag_base36_id: tagOne.base36,
-      });
-      expect(() => insertTagContent(db, { numeric: 1, base36: "ab12cd" })).toThrow();
-      expect(() => insertTagContent(db, { numeric: 623187229, base36: "abcdefgh" })).toThrow();
-      expect(() => insertTagContent(db, { numeric: 2176782336, base36: "ab12cd" })).toThrow();
-    });
-  });
-
-  it("reconstructs named elements from ordered relational item membership", () => {
-    withDatabase((db) => {
-      insertTagContent(db);
-      insertElement(db, tagOne, galleryId, "gallery", 0);
-      insertElement(db, tagOne, documentsId, "document-list", 1);
-      insertItem(db);
-      insertItem(db, {
-        contentId: globalDocumentId,
-        itemType: "document",
-        scope: "global",
-        owner: null,
-        title: "Handbuch",
-        altText: null,
-        originalFilename: "Handbuch.pdf",
-        filenameKey: "handbuch.pdf",
-      });
-      assignItem(db, tagOne, galleryId, { contentId: localImageId }, 0);
-      assignItem(db, tagOne, documentsId, {
-        contentId: globalDocumentId,
-        scope: "global",
-        filenameKey: "handbuch.pdf",
-      }, 0);
-
-      const rows = db.prepare(`SELECT e.content_element_id, i.content_id, i.scope, i.title
-        FROM tag_content AS c
-        JOIN tag_content_elements AS e ON e.tag_numeric_id = c.tag_numeric_id
-        JOIN tag_content_element_items AS assignment
-          ON assignment.tag_numeric_id = e.tag_numeric_id
-          AND assignment.content_element_id = e.content_element_id
-        JOIN tag_content_items AS i ON i.content_id = assignment.content_id
-        WHERE c.tag_base36_id = ?
-        ORDER BY e.display_order, assignment.display_order, assignment.content_id`).all(tagOne.base36);
-      expect(rows).toEqual([
-        { content_element_id: galleryId, content_id: localImageId, scope: "tag", title: "Testbild" },
-        { content_element_id: documentsId, content_id: globalDocumentId, scope: "global", title: "Handbuch" },
-      ]);
-    });
-  });
-
-  it("allows global reuse across TAGs and elements but rejects TAG-scoped cross-TAG use", () => {
-    withDatabase((db) => {
-      insertTagContent(db, tagOne);
-      insertTagContent(db, tagTwo);
-      insertElement(db, tagOne, galleryId, "gallery", 0);
-      insertElement(db, tagOne, documentsId, "document-list", 1);
-      insertElement(db, tagTwo, documentsId, "document-list", 0);
-
-      insertItem(db, {
-        contentId: globalDocumentId,
-        itemType: "document",
-        scope: "global",
-        owner: null,
-        title: "Handbuch",
-        originalFilename: "Handbuch.pdf",
-        filenameKey: "handbuch.pdf",
-      });
-      assignItem(db, tagOne, documentsId, {
-        contentId: globalDocumentId,
-        scope: "global",
-        filenameKey: "handbuch.pdf",
-      });
-      assignItem(db, tagOne, galleryId, {
-        contentId: globalDocumentId,
-        scope: "global",
-        filenameKey: "handbuch.pdf",
-      }, 1);
-      assignItem(db, tagTwo, documentsId, {
-        contentId: globalDocumentId,
-        scope: "global",
-        filenameKey: "handbuch.pdf",
-      });
-
-      insertItem(db);
-      expect(() => assignItem(db, tagTwo, documentsId, { contentId: localImageId })).toThrow(/scope does not match/);
-      assignItem(db, tagOne, galleryId, { contentId: localImageId });
-      expect(() => assignItem(db, tagOne, documentsId, { contentId: localImageId })).toThrow(/already assigned/);
-    });
-  });
-
-  it("allows same-name items per element while enforcing readiness", () => {
-    withDatabase((db) => {
-      insertTagContent(db);
-      insertElement(db);
-      insertItem(db);
-      assignItem(db);
-
-      insertItem(db, {
-        contentId: replacementImageId,
-        originalFilename: "Titelbild.jpg",
-        filenameKey: "titelbild.jpg",
-      });
-      expect(() => assignItem(db, tagOne, galleryId, { contentId: replacementImageId })).not.toThrow();
-      expect(db.prepare("SELECT content_id FROM tag_content_element_items WHERE tag_numeric_id = ? AND content_element_id = ? ORDER BY content_id").all(tagOne.numeric, galleryId)).toEqual([
-        { content_id: localImageId },
-        { content_id: replacementImageId },
-      ]);
-      expect(() => assignItem(db, tagOne, galleryId, {
-        contentId: replacementImageId,
-        filenameKey: "anderes.jpg",
-      })).toThrow(/filename key does not match/);
-
-      insertItem(db, {
-        contentId: secondLocalImageId,
-        status: "pending",
-        originalFilename: "Pending.jpg",
-        filenameKey: "pending.jpg",
-      });
-      expect(() => assignItem(db, tagOne, galleryId, {
-        contentId: secondLocalImageId,
-        filenameKey: "pending.jpg",
-      }, 1)).toThrow(/not ready/);
-    });
-  });
-
-  it("validates content id, scope, filename pairs and revocation metadata", () => {
-    withDatabase((db) => {
-      expect(() => insertItem(db, { contentId: 0 })).toThrow();
-      expect(() => insertItem(db, { contentId: 4503599627370496 })).toThrow();
-      expect(() => insertItem(db, { scope: "tag", owner: null })).toThrow();
-      expect(() => insertItem(db, { scope: "global", owner: tagOne })).toThrow();
-      expect(() => insertItem(db, { originalFilename: null })).toThrow();
-      expect(() => insertItem(db, { revokedAt: now })).toThrow();
-      insertItem(db, { contentId: secondLocalImageId, status: "revoked", revokedAt: now });
-      expect(db.prepare("SELECT status FROM tag_content_items WHERE content_id = ?").get(secondLocalImageId)).toEqual({
+      db.exec(`INSERT INTO tag_content_items (
+        content_id, content_item_type, scope, status, created_at, updated_at, revoked_at
+      ) VALUES (1, 'image', 'global', 'revoked', 'now', 'now', 'now')`);
+      expect(db.prepare("SELECT status, revoked_at FROM tag_content_items WHERE content_id = 1").get()).toEqual({
         status: "revoked",
+        revoked_at: "now",
       });
-    });
+    } finally {
+      db.close();
+    }
   });
 
-  it("stores media variant metadata by item and rejects invalid variants", () => {
-    withDatabase((db) => {
-      insertItem(db);
-      db.prepare(`INSERT INTO tag_content_media_variants (
-        content_id, variant, content_type, byte_size, sha256, width, height, created_at
-      ) VALUES (?, 'large', 'image/webp', 2048, ?, 1280, 720, ?)`).run(localImageId, sha, now);
-      expect(db.prepare("SELECT content_id, variant, content_type FROM tag_content_media_variants").all()).toEqual([
-        { content_id: localImageId, variant: "large", content_type: "image/webp" },
-      ]);
-      expect(() => db.prepare(`INSERT INTO tag_content_media_variants (
-        content_id, variant, content_type, byte_size, sha256, created_at
-      ) VALUES (?, 'large', 'image/jpeg', 1, ?, ?)`).run(localImageId, sha, now)).toThrow();
-      expect(() => db.prepare(`INSERT INTO tag_content_media_variants (
-        content_id, variant, content_type, byte_size, sha256, created_at
-      ) VALUES (?, '../escape', 'image/jpeg', 1, ?, ?)`).run(localImageId, sha, now)).toThrow();
-    });
-  });
-
-  it("keeps only the current element state when a new revision is projected", () => {
-    withDatabase((db) => {
-      insertTagContent(db, tagOne, 8);
-      insertElement(db, tagOne, galleryId, "gallery", 0);
-      db.prepare("UPDATE tag_content SET content_revision = 9, content_file = 'tag-rev9.json' WHERE tag_numeric_id = ?").run(tagOne.numeric);
-      db.prepare("DELETE FROM tag_content_elements WHERE tag_numeric_id = ?").run(tagOne.numeric);
-      insertElement(db, tagOne, documentsId, "document-list", 0);
-      expect(db.prepare("SELECT content_element_id FROM tag_content_elements WHERE tag_numeric_id = ?").all(tagOne.numeric)).toEqual([
-        { content_element_id: documentsId },
-      ]);
-      expect(db.prepare("SELECT content_revision, content_file FROM tag_content WHERE tag_numeric_id = ?").get(tagOne.numeric)).toEqual({
-        content_revision: 9,
-        content_file: "tag-rev9.json",
-      });
-    });
-  });
-
-  it("stores range and global description pointers with strict identifiers", () => {
-    withDatabase((db) => {
-      db.prepare(`INSERT INTO tag_range_content (
-        range_id, content_id, content_revision, schema_version, content_file,
-        content_sha256, content_bytes, content_type, published_at, updated_at
-      ) VALUES ('campaign-summer-6-001', 'redirect-default', 7, 1,
-        'content-rev7.json', ?, 96, 'application/json', ?, ?)`).run(sha, now, now);
-      db.prepare(`INSERT INTO global_content (
-        content_id, content_revision, schema_version, content_file,
-        content_sha256, content_bytes, content_type, published_at, updated_at
-      ) VALUES ('redirect-default', 3, 1, 'content-rev3.json', ?, 96,
-        'application/json', ?, ?)`).run(sha, now, now);
-      expect(db.prepare("SELECT range_id, content_id FROM tag_range_content").all()).toEqual([
-        { range_id: "campaign-summer-6-001", content_id: "redirect-default" },
-      ]);
-      expect(db.prepare("SELECT content_id FROM global_content").all()).toEqual([
-        { content_id: "redirect-default" },
-      ]);
-      expect(() => db.prepare(`INSERT INTO tag_range_content (
-        range_id, content_id, content_revision, schema_version, content_file,
-        content_sha256, content_bytes, content_type, published_at, updated_at
-      ) VALUES ('../range', 'redirect-default', 1, 1, 'content-rev1.json',
-        ?, 96, 'application/json', ?, ?)`).run(sha, now, now)).toThrow();
-      expect(() => db.prepare(`INSERT INTO global_content (
-        content_id, content_revision, schema_version, content_file,
-        content_sha256, content_bytes, content_type, published_at, updated_at
-      ) VALUES ('Redirect Default', 1, 1, 'content-rev1.json', ?, 96,
-        'application/json', ?, ?)`).run(sha, now, now)).toThrow();
-    });
+  it("enforces unique keys and declared foreign keys", () => {
+    const db = openDatabase(schema);
+    try {
+      db.exec(`INSERT INTO tag_routing (
+        tag_id, status, target_type, protection_mode, access_version,
+        content_revision, updated_at
+      ) VALUES ('tag-a', 'active', 'internal', 'public', 1, 1, 'now')`);
+      db.exec(`INSERT INTO tag_pin_credentials (tag_id, pin_hash, pin_version, updated_at)
+        VALUES ('tag-a', 'hash', 1, 'now')`);
+      expect(() => db.exec(`INSERT INTO tag_pin_credentials (tag_id, pin_hash, pin_version, updated_at)
+        VALUES ('tag-a', 'another-hash', 1, 'now')`)).toThrow();
+      expect(() => db.exec(`INSERT INTO tag_pin_credentials (tag_id, pin_hash, pin_version, updated_at)
+        VALUES ('missing-tag', 'hash', 1, 'now')`)).toThrow();
+      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
   });
 });
