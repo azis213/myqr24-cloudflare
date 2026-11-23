@@ -17,6 +17,7 @@ const CONTENT_FILE = /^[a-z0-9][a-z0-9.-]{0,127}\.json$/;
 const VARIANT = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const RANGE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const DESCRIPTION_ID = /^[a-z][a-z0-9-]{0,63}$/;
+const ITEM_FILE = /^[^/\\\u0000-\u001f\u007f]{1,255}$/u;
 
 function revisionNumber(value: number): number {
   if (!Number.isSafeInteger(value) || value < 1) {
@@ -65,6 +66,13 @@ function contentFileSegment(value: string): string {
   return value;
 }
 
+function itemFileSegment(value: string): string {
+  if (!ITEM_FILE.test(value) || value === "." || value === ".." || value.includes("..")) {
+    throw new RangeError("invalid item filename");
+  }
+  return value;
+}
+
 function variantSegment(value: string): string {
   if (!VARIANT.test(value)) throw new RangeError("invalid variant");
   return value;
@@ -98,6 +106,15 @@ export function tagItemFileKey(
   contentFile = "item.json",
 ): string {
   return `${CONTENT_ROOT}/tags/${numericSegment(tagNumericId)}/items/${contentIdSegment(contentId)}/${contentFileSegment(contentFile)}`;
+}
+
+/** Build an item file key only from validated D1 identifiers and filename. */
+export function tagItemOriginalKey(
+  tagNumericId: number | string,
+  contentId: number | string,
+  filename: string,
+): string {
+  return `${CONTENT_ROOT}/tags/${numericSegment(tagNumericId)}/items/${contentIdSegment(contentId)}/${itemFileSegment(filename)}`;
 }
 
 export function tagItemVariantKey(

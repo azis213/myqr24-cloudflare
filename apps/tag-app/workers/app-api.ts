@@ -1,11 +1,8 @@
 import { argon2Verify } from "hash-wasm";
 import { Hono } from "hono";
 import { parseContentId } from "./content-id";
-import {
-  globalItemVariantKey,
-  tagContentFileKey,
-  tagItemVariantKey,
-} from "./content-paths";
+import { globalItemVariantKey, tagContentFileKey, tagItemVariantKey } from "./content-paths";
+import { deleteContentItem, readContentItem, uploadContentItem } from "./tag-content/items";
 import { publishTagContent } from "./tag-content/publish";
 import { getTagContentDocument } from "./tag-content/read";
 
@@ -30,6 +27,8 @@ export interface AppApiEnv {
   APP_MEDIA_SIGNER_KEY_S01: string;
   /** Publisher-Secret für `PUT /api/v1/tags/{tagId}/content`; fehlt es, ist der Pfad deaktiviert. */
   APP_CONTENT_PUBLISH_KEY_S01?: string;
+  /** Server-to-server Content-Item upload/delete key; never sent to browser code. */
+  TAG_CONTENT_API_KEY_S01?: string;
   MEDIA_SIGNER: Fetcher;
 }
 
@@ -394,6 +393,14 @@ app.get("/api/v1/tags/:tagId/content/document", async (c) => {
   return getTagContentDocument(c.req.raw, c.env, c.req.param("tagId"));
 });
 
+app.post("/api/v1/tags/:tagId/elements/:elementId/items", async (c) => {
+  return uploadContentItem(c.req.raw, c.env, c.req.param("tagId"), c.req.param("elementId"));
+});
+
+app.delete("/api/v1/tags/:tagId/items/:contentId", async (c) => {
+  return deleteContentItem(c.req.raw, c.env, c.req.param("tagId"), c.req.param("contentId"));
+});
+
 app.get("/api/v1/tags/:tagId/content", async (c) => {
   const tagId = c.req.param("tagId");
   if (!TAG_ID.test(tagId)) return neutral();
@@ -413,23 +420,27 @@ app.get("/api/v1/tags/:tagId/content", async (c) => {
   });
 });
 
+app.get("/api/v1/tags/:tagId/items/:contentId/media", async (c) => {
+  const tagId = c.req.param("tagId");
+  if (!TAG_ID.test(tagId)) return neutral();
+  const session = await sessionFromRequest(c.req.raw, c.env, tagId);
+  if (!session) return neutral();
+  return readContentItem(c.req.raw, c.env, tagId, c.req.param("contentId"), session.scope);
+});
+
 app.post("/api/get-image-url", async (c) => {
   const body = await requestBody(c.req.raw);
-  if (!body || typeof body.tagId !== "string" || !TAG_ID.test(body.tagId) || typeof body.contentId !== "string" || typeof body.variant !== "string" || !VARIANT.test(body.variant)) return neutral(400);
+  if (!body || typeof body.tagId !== "string" || !TAG_ID.test(body.tagId) || typeof body.contentId !== "string" || typeof body.variant !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(body.variant)) return neutral(400);
   const contentId = parseContentId(body.contentId);
   if (contentId === null) return neutral(400);
   const session = await sessionFromRequest(c.req.raw, c.env, body.tagId);
+  if (!session) return neutral();
   const record = await routing(c.env, body.tagId);
-  if (!session || !record) return neutral();
-
+  if (!record) return neutral();
   const media = await c.env.APP_DB.prepare(
     "SELECT item.content_id, item.scope, item.owner_tag_numeric_id, variant.content_type, element.visibility AS element_visibility, assignment.visibility AS assignment_visibility FROM tag_content AS tc JOIN tag_content_element_items AS assignment ON assignment.tag_numeric_id = tc.tag_numeric_id JOIN tag_content_elements AS element ON element.tag_numeric_id = assignment.tag_numeric_id AND element.content_element_id = assignment.content_element_id JOIN tag_content_items AS item ON item.content_id = assignment.content_id JOIN tag_content_media_variants AS variant ON variant.content_id = item.content_id WHERE tc.tag_base36_id = ?1 AND tc.content_revision = ?2 AND variant.variant = ?3 AND assignment.content_id = ?4 AND item.status = 'ready' AND item.revoked_at IS NULL LIMIT 1",
   ).bind(body.tagId, record.content_revision, body.variant, contentId).first<MediaVisibilityRow>();
-
-  if (!media
-    || !isVisibleToScope(media.element_visibility, session.scope)
-    || !isVisibleToScope(media.assignment_visibility, session.scope)) return neutral();
-
+  if (!media || !isVisibleToScope(media.element_visibility, session.scope) || !isVisibleToScope(media.assignment_visibility, session.scope)) return neutral();
   let objectKey: string;
   try {
     objectKey = media.scope === "global"
@@ -441,17 +452,13 @@ app.post("/api/get-image-url", async (c) => {
     return neutral();
   }
   if (!objectKey) return neutral();
-
-  const response = await c.env.MEDIA_SIGNER.fetch("https://media-signer.internal/sign", {
+  const signedResponse = await c.env.MEDIA_SIGNER.fetch("https://media-signer.internal/sign", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-myqr24-service-key": c.env.APP_MEDIA_SIGNER_KEY_S01,
-    },
+    headers: { "content-type": "application/json", "x-myqr24-service-key": c.env.APP_MEDIA_SIGNER_KEY_S01 },
     body: JSON.stringify({ objectKey, contentType: media.content_type, expiresIn: 60 }),
   });
-  if (!response.ok) return neutral();
-  const signed = await response.json<unknown>();
+  if (!signedResponse.ok) return neutral();
+  const signed = await signedResponse.json<unknown>();
   return signed && typeof signed === "object" ? json(signed as Record<string, unknown>) : neutral();
 });
 

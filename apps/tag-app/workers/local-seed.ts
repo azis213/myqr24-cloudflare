@@ -46,12 +46,6 @@ const itemDocument = JSON.stringify({
   alt: "Lokales Testbild aus der Docker-Testumgebung",
 });
 
-const coverDocument = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <rect width="64" height="64" fill="#1f513d"/>
-  <text x="32" y="37" font-family="sans-serif" font-size="12" fill="#ffffff" text-anchor="middle">TEST</text>
-</svg>
-`;
-
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -63,24 +57,15 @@ function byteLength(value: string): number {
 
 export async function seedLocalContent(env: AppApiEnv): Promise<void> {
   const tagBytes = byteLength(tagDocument);
-  const coverBytes = byteLength(coverDocument);
-  const [tagHash, coverHash] = await Promise.all([
-    sha256Hex(tagDocument),
-    sha256Hex(coverDocument),
-  ]);
+  const tagHash = await sha256Hex(tagDocument);
 
   await env.PRIVATE_CONTENT.put(`content/v1/tags/${tagNumericId}/${tagFile}`, tagDocument, {
     httpMetadata: { contentType: "application/json" },
   });
   await env.PRIVATE_CONTENT.put(
-    `content/v1/tags/${tagNumericId}/items/${contentId}/item.json`,
-    itemDocument,
-    { httpMetadata: { contentType: "application/json" } },
-  );
-  await env.PRIVATE_CONTENT.put(
-    `content/v1/tags/${tagNumericId}/items/${contentId}/variants/cover`,
-    coverDocument,
-    { httpMetadata: { contentType: "image/svg+xml" } },
+    `content/v1/tags/${tagNumericId}/items/${contentId}/testbild.svg`,
+    new TextEncoder().encode(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#1f513d"/></svg>`),
+    { httpMetadata: { contentType: "image/svg+xml", contentDisposition: "inline" } },
   );
 
   await env.APP_DB.prepare("DELETE FROM tag_content_element_items WHERE tag_numeric_id = ?1").bind(tagNumericId).run();
@@ -123,9 +108,4 @@ export async function seedLocalContent(env: AppApiEnv): Promise<void> {
   ) VALUES (?1, 'cel_gallery', ?2, 'tag', 'testbild.svg', 0, 'public')`)
     .bind(tagNumericId, contentId).run();
 
-  await env.APP_DB.prepare(`INSERT INTO tag_content_media_variants (
-    content_id, variant, content_type, byte_size, sha256,
-    width, height, duration_ms, created_at
-  ) VALUES (?1, 'cover', 'image/svg+xml', ?2, ?3, 64, 64, NULL, ?4)`)
-    .bind(contentId, coverBytes, coverHash, now).run();
 }

@@ -5,3 +5,5 @@ APP_MEDIA_SIGNER_KEY_S01=local-media-signer-key-change-me-000000003
 APP_LOCAL_SEED_KEY=local-seed-key-change-me-000000000000000004
 # Publisher-Secret für PUT /api/v1/tags/{tagId}/content (TAG-Content-Template-Upload).
 APP_CONTENT_PUBLISH_KEY_S01=local-content-publish-key-change-me-0000000005
+# TAG-APP server-to-server content item upload/delete API key.
+TAG_CONTENT_API_KEY_S01=local-content-key-change-mee-00000000000006

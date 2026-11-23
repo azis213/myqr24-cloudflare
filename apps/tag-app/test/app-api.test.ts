@@ -29,6 +29,9 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
   const signerBodies: Array<Record<string, unknown>> = [];
   let accessVersion = 3;
   let signerRequests = 0;
+  const r2Objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
+  const deletedR2Keys: string[] = [];
+  const uploadedFilenames = new Map<number, string>();
   const pinHashPromise = argon2id({ password: "123456", secret: pepper, salt: "local-test-salt", iterations: 1, parallelism: 1, memorySize: 8192, hashLength: 32, outputType: "encoded" });
   const tagDocument = {
     schema: "myqr24-tag-content-v2",
@@ -42,12 +45,25 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
     APP_BOOTSTRAP_SECRET_S01: secret,
     APP_PIN_PEPPER_S01: pepper,
     APP_MEDIA_SIGNER_KEY_S01: "service-key",
+    TAG_CONTENT_API_KEY_S01: "content-api-test-key",
     PRIVATE_CONTENT: {
       get: async (key: string) => {
         r2Keys.push(key);
         if (key === "content/v1/tags/623187229/tag-rev8.json") return { json: async () => tagDocument };
-        return null;
+        const stored = r2Objects.get(key);
+        if (!stored) return null;
+        return {
+          size: stored.bytes.byteLength,
+          body: new ReadableStream({ start(controller) { controller.enqueue(stored.bytes); controller.close(); } }),
+          httpMetadata: { contentType: stored.contentType },
+          httpEtag: '"test-etag"',
+        };
       },
+      put: async (key: string, value: ArrayBuffer | ArrayBufferView | string, options?: { httpMetadata?: { contentType?: string } }) => {
+        const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value instanceof ArrayBuffer ? new Uint8Array(value) : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        r2Objects.set(key, { bytes: new Uint8Array(bytes), contentType: options?.httpMetadata?.contentType ?? "application/octet-stream" });
+      },
+      delete: async (key: string) => { deletedR2Keys.push(key); r2Objects.delete(key); },
     },
     MEDIA_SIGNER: {
       fetch: async (_url: string, init: RequestInit) => {
@@ -63,8 +79,15 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
             return {
               async first() {
                 if (sql.includes("FROM tag_routing")) return { ...routing, protection_mode: protectionMode, access_version: accessVersion };
+                if (sql.includes("FROM tag_content AS tc") && sql.includes("JOIN tag_routing")) return { tag_numeric_id: 623187229, status: "active", target_type: "internal" };
+                if (sql.includes("FROM tag_content_elements AS element") && sql.includes("MAX(assignment.display_order)")) return { content_element_type: "gallery", visibility: "public", max_display_order: -1 };
+                if (sql.includes("FROM tag_content_elements WHERE")) return { visibility: "public" };
+                if (sql.includes("FROM tag_routing WHERE tag_id")) return { status: "active", target_type: "internal" };
                 if (sql.includes("FROM tag_content WHERE tag_base36_id")) return { tag_numeric_id: 623187229, tag_base36_id: "ab12cd", content_revision: 8, content_file: "tag-rev8.json", content_sha256: "a".repeat(64), content_bytes: 1, content_type: "application/json" };
-                if (sql.includes("FROM tag_content AS tc")) return { content_id: 1850000000000000, scope: "tag", owner_tag_numeric_id: 623187229, content_type: "image/webp", element_visibility: "public", assignment_visibility: "public" };
+                if (sql.includes("FROM tag_content AS tc") && sql.includes("JOIN tag_content_element_items") && sql.includes("assignment.content_id")) return { content_id: Number(values[1]), owner_tag_numeric_id: 623187229, content_item_type: "image", original_filename: "same.png", status: "ready", element_visibility: "public", assignment_visibility: "public", content_element_id: "cel_gallery", scope: "tag" };
+                if (sql.includes("FROM tag_content_items WHERE content_id")) return { content_id: Number(values[0]), owner_tag_numeric_id: 623187229, original_filename: uploadedFilenames.get(Number(values[0])) ?? "test.jpg", status: "ready" };
+                if (sql.includes("FROM tag_content AS tc") && sql.includes("assignment.content_id")) return { content_id: Number(values[1]), owner_tag_numeric_id: 623187229, content_item_type: "image", original_filename: "test.jpg", status: "ready", element_visibility: "public", assignment_visibility: "public", content_element_id: "cel_gallery", scope: "tag" };
+                if (sql.includes("FROM tag_content_elements AS element") && sql.includes("MAX(assignment.display_order)")) return { content_element_type: "gallery", visibility: "public", max_display_order: -1 };
                 if (sql.includes("FROM tag_pin_credentials")) return { pin_hash: await pinHashPromise };
                 if (sql.includes("FROM tag_pin_throttles")) return throttles.get(`${values[0]}:${values[1]}`) ?? null;
                 if (sql.includes("FROM tag_access_sessions")) {
@@ -83,7 +106,13 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
                 return { results: [] };
               },
               async run() {
+                if (sql.startsWith("INSERT INTO tag_content_items")) {
+                  uploadedFilenames.set(Number(values[0]), String(values[4]));
+                  return { success: true, meta: { changes: 1 } };
+                }
                 if (sql.startsWith("INSERT INTO tag_access_sessions")) sessions.push({ id: values[0], tag_id: values[1], token_hash: values[2], access_version: values[3], scope: values[4], expires_at: values[5], revoked_at: null });
+                if (sql.startsWith("UPDATE tag_content_items SET status = 'ready'")) return { success: true, meta: { changes: 1 } };
+                if (sql.startsWith("DELETE FROM tag_content_items")) return { success: true, meta: { changes: 1 } };
                 if (sql.startsWith("DELETE FROM tag_pin_throttles")) throttles.delete(`${values[0]}:${values[1]}`);
                 if (sql.startsWith("INSERT INTO tag_pin_throttles")) {
                   const key = `${values[0]}:${values[1]}`;
@@ -97,7 +126,9 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
       },
     },
   } as unknown as Parameters<typeof handleAppApiRequest>[1];
-  return { env, sessions, throttles, r2Keys, signerBodies, setAccessVersion: (value: number) => { accessVersion = value; }, signerRequests: () => signerRequests };
+  const db = env.APP_DB as unknown as { batch: (statements: unknown[]) => Promise<unknown> };
+  db.batch = async () => [];
+  return { env, sessions, throttles, r2Keys, r2Objects, deletedR2Keys, signerBodies, setAccessVersion: (value: number) => { accessVersion = value; }, signerRequests: () => signerRequests };
 }
 
 describe("tag access API", () => {
@@ -123,7 +154,7 @@ describe("tag access API", () => {
     expect(Date.parse(throttle?.locked_until ?? "")).toBeGreaterThan(Date.now() + 14 * 60 * 1000);
   });
 
-  it("issues a PIN session, loads authorized JSON, revokes it through access-version change and signs media server-side", async () => {
+  it("issues a PIN session, loads authorized JSON and revokes it through access-version change", async () => {
     const state = fakeEnvironment();
     const data = await bootstrap();
     const authorized = await handleAppApiRequest(new Request("https://app.test/api/verify-pin", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tagId: "ab12cd", pin: "123456", ...data }) }), state.env);
@@ -142,17 +173,61 @@ describe("tag access API", () => {
     });
     expect(JSON.stringify(contentBody)).not.toContain("object_key");
     expect(state.r2Keys).toEqual(["content/v1/tags/623187229/tag-rev8.json"]);
-    const media = await handleAppApiRequest(new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json", cookie: cookie ?? "" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "1850000000000000", variant: "cover" }) }), state.env);
-    expect(media.status).toBe(200);
-    expect(state.signerRequests()).toBe(1);
-    expect(state.signerBodies[0]).toEqual({
-      objectKey: "content/v1/tags/623187229/items/1850000000000000/variants/cover",
-      contentType: "image/webp",
-      expiresIn: 60,
-    });
     state.setAccessVersion(4);
     const revoked = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/content", { headers: { cookie: cookie ?? "" } }), state.env);
     expect(revoked.status).toBe(404);
+  });
+
+  it("uploads same-name images as distinct items, streams originals only with a session, and deletes by contentId", async () => {
+    const state = fakeEnvironment();
+    const upload = async () => handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/elements/cel_gallery/items", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer content-api-test-key",
+        "x-file-name": "same.png",
+        "content-type": "image/png",
+      },
+      body: Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 1]),
+    }), state.env);
+    const first = await upload();
+    const second = await upload();
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    const firstBody = await first.json<{ contentId: string }>();
+    const secondBody = await second.json<{ contentId: string }>();
+    expect(firstBody.contentId).not.toBe(secondBody.contentId);
+    expect(state.r2Objects.size).toBe(2);
+    expect([...state.r2Objects.keys()]).toEqual([
+      `content/v1/tags/623187229/items/${firstBody.contentId}/same.png`,
+      `content/v1/tags/623187229/items/${secondBody.contentId}/same.png`,
+    ]);
+
+    const bootstrapData = await bootstrap();
+    const authorized = await handleAppApiRequest(new Request("https://app.test/api/verify-pin", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tagId: "ab12cd", pin: "123456", ...bootstrapData }),
+    }), state.env);
+    const cookie = authorized.headers.get("set-cookie") ?? "";
+    const media = await handleAppApiRequest(new Request(`https://app.test/api/v1/tags/ab12cd/items/${firstBody.contentId}/media`, { headers: { cookie } }), state.env);
+    expect(media.status).toBe(200);
+    expect(media.headers.get("content-type")).toBe("image/png");
+    expect(new Uint8Array(await media.arrayBuffer())).toEqual(Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 1]));
+
+    const legacyMedia = await handleAppApiRequest(new Request("https://app.test/api/get-image-url", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ tagId: "ab12cd", contentId: "1850000000000000", variant: "cover" }),
+    }), state.env);
+    expect(legacyMedia.status).toBe(200);
+    expect(state.signerRequests()).toBe(1);
+
+    const deleted = await handleAppApiRequest(new Request(`https://app.test/api/v1/tags/ab12cd/items/${firstBody.contentId}`, {
+      method: "DELETE", headers: { authorization: "Bearer content-api-test-key" },
+    }), state.env);
+    expect(deleted.status).toBe(200);
+    expect(state.deletedR2Keys).toContain(`content/v1/tags/623187229/items/${firstBody.contentId}/same.png`);
+    const deletedObject = await handleAppApiRequest(new Request(`https://app.test/api/v1/tags/ab12cd/items/${firstBody.contentId}/media`, { headers: { cookie } }), state.env);
+    expect(deletedObject.status).toBe(404);
   });
 
   it("issues a public access session through the versioned Hono route", async () => {
@@ -202,16 +277,17 @@ describe("tag access API", () => {
   it("rejects malformed JSON, wrong content types and non-object bodies without side effects", async () => {
     const state = fakeEnvironment();
     const requests = [
-      new Request("https://app.test/api/verify-pin", { method: "POST", headers: { "content-type": "application/json" }, body: "{" }),
-      new Request("https://app.test/api/v1/tags/ab12cd/access/public", { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" }),
-      new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json" }, body: "[]" }),
-      new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "cnt_photo", variant: "cover" }) }),
-      new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "0185000000000000", variant: "cover" }) }),
+      { request: new Request("https://app.test/api/verify-pin", { method: "POST", headers: { "content-type": "application/json" }, body: "{" }), status: 400 },
+      { request: new Request("https://app.test/api/v1/tags/ab12cd/access/public", { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" }), status: 400 },
+      { request: new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json" }, body: "[]" }), status: 400 },
+      { request: new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "cnt_photo", variant: "cover" }) }), status: 400 },
+      { request: new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "0185000000000000", variant: "cover" }) }), status: 400 },
+      { request: new Request("https://app.test/api/get-image-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tagId: "ab12cd", contentId: "1850000000000000", variant: "cover" }) }), status: 404 },
     ];
 
-    for (const request of requests) {
+    for (const { request, status } of requests) {
       const response = await handleAppApiRequest(request, state.env);
-      expect(response.status).toBe(400);
+      expect(response.status, `${request.method} ${new URL(request.url).pathname}`).toBe(status);
       expect(response.headers.get("cache-control")).toBe("no-store");
       expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     }

@@ -22,7 +22,7 @@
 | [`control-plane-routing-admin-api-v1.md`](control-plane-routing-admin-api-v1.md) | TAG Control Plane | `implemented-local` | W3L-Feature-/Zuweisungsverwaltung, vier Ebenen, Diff, atomare Outbox und ausschließlich lokaler Staging-Fake-Publisher |
 | [`tag-pages-runtime-r2-v1.md`](tag-pages-runtime-r2-v1.md) | TAG-App / Pages Functions | `implemented-local` | Öffentliche Pages-HTML- und Medienauflösung aus getrennten R2-Bindings; interne Runtime-API nur per Service Binding |
 | [`tag-edge-d1-routing-v1.md`](tag-edge-d1-routing-v1.md) | TCP / Edge Router | `implemented-local` | D1-abgeleiteter interner/externer Routing-Lookup und signierter React-PWA-Bootstrap |
-| [`tag-app-runtime-api-v1.md`](tag-app-runtime-api-v1.md) | TAG Application API | `implemented-local` | Browser-Runtime: Public-/PIN-Bootstrap, autorisiertes Render-JSON und Medien-URL-Anfrage; Upload/Item-CRUD nicht implementiert |
+| [`tag-app-runtime-api-v1.md`](tag-app-runtime-api-v1.md) | TAG Application API | `implemented-local` | Public-/PIN-Runtime plus serverseitiger API-Key-Upload von Original-Items, sessiongeschütztes Lesen und explizites Bild-Delete; keine PWA-Uploads/Derivate |
 | [`tag-app-content-publish-v1.md`](tag-app-content-publish-v1.md) | TAG Application API | `implemented-local` | Publisher-Bearer: Template-Validierung und Publish via PUT sowie Lesen des aktuellen Runtime-Dokuments via GET |
 | [`tag-app-access-v1.md`](tag-app-access-v1.md) | TAG Application API | `implemented-local` | Ergänzende Access-Sicherheitsregeln: Session, Argon2id/Pepper, Throttle und Sichtbarkeit; Details in Runtime-Contract |
 | `public-tag-view-v1` | TAG Control Plane | `planned` | Öffentliche, datensparsame TAG-App-Read-API |

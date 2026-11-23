@@ -28,9 +28,9 @@ Aktuell implementiert sind nur Public- und PIN-Scanner-Sessions. Login-, Owner- 
 
 ## 3. Medienzugriff und Grenzen
 
-Die Runtime-Medienroute autorisiert TAG, Session, aktuelle Contentrevision, Itemstatus und Sichtbarkeit der Element-/Item-Zuordnung. Der Browser liefert nur `tagId`, dezimale `contentId` und Variante. Bucket, Pfad und Key werden vollständig serverseitig abgeleitet; der Media-Signer erhält nur den abgeleiteten `objectKey`, `contentType`, `expiresIn` und sein internes Service-Key-Headerfeld.
+Die Runtime-Medienroute autorisiert TAG, Session, Itemstatus und Sichtbarkeit der Element-/Item-Zuordnung und streamt das Original direkt aus privatem R2. TAG-/Content-ID und Dateiname werden serverseitig aus D1 abgeleitet; der Client kann keinen Bucket, Pfad oder Key auswählen. Neue Originaldateien liegen unter `content/v1/tags/{tagNumericId}/items/{contentId}/{filename}`.
 
-Der Media-Signer implementiert derzeit noch keine R2-Signatur und antwortet fail-closed. Presigned URLs sind daher nicht als bereits verfügbar vorauszusetzen. Ebenfalls nicht implementiert sind Bild-/Dokument-Upload, Item-CRUD, Galeriezuordnung, Quarantäne-Workflow sowie Owner-/Gastberechtigungen. `slots` und `actions` aus einem Template sind keine Upload-API.
+Vertrauenswürdige Server können Originale mit `TAG_CONTENT_API_KEY_S01` hochladen; derselbe Key schützt das explizite Bild-Delete. Der Key darf nie in Browser/PWA gelangen. Pro Upload entsteht eine neue Content-ID, auch für gleiche Dateinamen. Es gibt kein Update. Dokumente können in dieser Phase nicht per API gelöscht werden. Small-/Medium-Varianten, Owner-/Gastberechtigungen und PIN-Upload existieren nicht; `slots` und `actions` aus einem Template sind keine Upload-API.
 
 ## 4. Datenschutz und Tests
 

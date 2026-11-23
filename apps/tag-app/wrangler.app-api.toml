@@ -10,6 +10,8 @@ binding = "APP_DB"
 database_name = "myqr24-stg-db"
 database_id = "1c93214d-a7ef-423b-912f-6326d0fccf37"
 migrations_dir = "database"
+# `database/main.sql` is the non-destructive initial-install schema snapshot;
+# do not apply it to a database which has already received numbered migrations.
 
 [[env.staging.r2_buckets]]
 binding = "PRIVATE_CONTENT"
@@ -22,5 +24,6 @@ service = "myqr24-media-signer-staging"
 # Required server-only secrets, never browser variables or committed values:
 # APP_BOOTSTRAP_SECRET_S01, APP_PIN_PEPPER_S01, APP_MEDIA_SIGNER_KEY_S01,
 # APP_CONTENT_PUBLISH_KEY_S01 (Publisher für PUT /api/v1/tags/{tagId}/content;
-# fehlt es, antwortet der Pfad fail-closed mit 503).
+# fehlt es, antwortet der Pfad fail-closed mit 503), TAG_CONTENT_API_KEY_S01
+# (server-to-server Upload und explizites Löschen von Content-Items).
 # Production and real deployment remain blocked by W3D.

@@ -66,6 +66,11 @@ export async function getMediaUrl(tagId: string, contentId: string, variant: str
   return value as { url: string; expiresAt: number; contentType: string };
 }
 
+export function getContentItemUrl(tagId: string, contentId: string): string {
+  if (!TAG_ID.test(tagId) || !/^[1-9][0-9]{0,15}$/.test(contentId)) throw new TagAccessError("Die Medienreferenz ist ungültig.");
+  return `/api/v1/tags/${encodeURIComponent(tagId)}/items/${encodeURIComponent(contentId)}/media`;
+}
+
 export function clearBootstrapParameters(): void {
   const url = new URL(window.location.href);
   for (const parameter of ["mode", "av", "rv", "nonce", "exp", "sig"]) url.searchParams.delete(parameter);

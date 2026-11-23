@@ -3,9 +3,10 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const migrations = ["0001_tag_access.sql", "0002_tag_content.sql", "0003_tag_content_element_structure.sql", "0004_tag_app_development_reset.sql"].map((name) =>
+const migrations = ["0001_tag_access.sql", "0002_tag_content.sql", "0003_tag_content_element_structure.sql", "0004_tag_app_development_reset.sql", "0005_tag_content_duplicate_filenames.sql"].map((name) =>
   readFileSync(fileURLToPath(new URL(`../database/${name}`, import.meta.url)), "utf8"),
 );
+const mainSchema = readFileSync(fileURLToPath(new URL("../database/main.sql", import.meta.url)), "utf8");
 
 const now = "2026-11-17T12:00:00.000Z";
 const tagOne = { numeric: 623187229, base36: "ab12cd" };
@@ -27,11 +28,16 @@ function withDatabase(run, applyMigration = true) {
     if (applyMigration) {
       db.exec(migrations[2]);
       db.exec(migrations[3]);
+      db.exec(migrations[4]);
     }
     return run(db);
   } finally {
     db.close();
   }
+}
+
+function schemaSignature(db) {
+  return db.prepare("SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND type IN ('table', 'index', 'trigger') ORDER BY type, name").all();
 }
 
 function insertTagContent(db, tag = tagOne, revision = 8) {
@@ -97,6 +103,22 @@ function assignItem(db, tag = tagOne, elementId = galleryId, item = {}, order = 
 }
 
 describe("TAG Application API operative content schema", () => {
+  it("keeps main.sql exactly aligned with the current non-reset migration schema", () => {
+    const migrated = new DatabaseSync(":memory:");
+    const snapshot = new DatabaseSync(":memory:");
+    try {
+      migrated.exec("PRAGMA foreign_keys = ON");
+      for (const index of [0, 1, 2, 4]) migrated.exec(migrations[index]);
+      snapshot.exec(mainSchema);
+      expect(snapshot.prepare("PRAGMA foreign_keys").get().foreign_keys).toBe(1);
+      expect(snapshot.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      expect(schemaSignature(snapshot)).toEqual(schemaSignature(migrated));
+    } finally {
+      migrated.close();
+      snapshot.close();
+    }
+  });
+
   it("applies the migrations, clears old development data, and keeps the final schema", () => {
     withDatabase((db) => {
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND (name = 'tag_content' OR name LIKE 'tag_content_%') ORDER BY name").all();
@@ -109,6 +131,7 @@ describe("TAG Application API operative content schema", () => {
       ]);
       expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tag_content_revisions'").get()).toBeUndefined();
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'tag_content_element_items_tag_scope_uidx'").get()).toBeUndefined();
       expect(db.prepare("PRAGMA table_info(tag_content_elements)").all().map((row) => row.name)).toEqual([
         "tag_numeric_id", "content_element_id", "content_element_type", "display_order", "visibility",
       ]);
@@ -250,11 +273,11 @@ describe("TAG Application API operative content schema", () => {
       insertItem(db);
       expect(() => assignItem(db, tagTwo, documentsId, { contentId: localImageId })).toThrow(/scope does not match/);
       assignItem(db, tagOne, galleryId, { contentId: localImageId });
-      expect(() => assignItem(db, tagOne, documentsId, { contentId: localImageId })).toThrow();
+      expect(() => assignItem(db, tagOne, documentsId, { contentId: localImageId })).toThrow(/already assigned/);
     });
   });
 
-  it("enforces per-element filename uniqueness and item readiness", () => {
+  it("allows same-name items per element while enforcing readiness", () => {
     withDatabase((db) => {
       insertTagContent(db);
       insertElement(db);
@@ -266,7 +289,11 @@ describe("TAG Application API operative content schema", () => {
         originalFilename: "Titelbild.jpg",
         filenameKey: "titelbild.jpg",
       });
-      expect(() => assignItem(db, tagOne, galleryId, { contentId: replacementImageId })).toThrow();
+      expect(() => assignItem(db, tagOne, galleryId, { contentId: replacementImageId })).not.toThrow();
+      expect(db.prepare("SELECT content_id FROM tag_content_element_items WHERE tag_numeric_id = ? AND content_element_id = ? ORDER BY content_id").all(tagOne.numeric, galleryId)).toEqual([
+        { content_id: localImageId },
+        { content_id: replacementImageId },
+      ]);
       expect(() => assignItem(db, tagOne, galleryId, {
         contentId: replacementImageId,
         filenameKey: "anderes.jpg",

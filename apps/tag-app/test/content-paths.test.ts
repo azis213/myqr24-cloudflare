@@ -11,6 +11,7 @@ import {
   tagElementFileKey,
   tagElementFileName,
   tagItemFileKey,
+  tagItemOriginalKey,
   tagItemVariantKey,
   tagRangeDescriptionFileKey,
 } from "../workers/content-paths";
@@ -33,6 +34,8 @@ describe("content path derivation", () => {
       .toBe("content/v1/tags/623187229/elements/cel_gallery/element-rev8.json");
     expect(tagItemFileKey(623187229, 1850000000000000))
       .toBe("content/v1/tags/623187229/items/1850000000000000/item.json");
+    expect(tagItemOriginalKey(623187229, 1850000000000000, "Titelbild.JPG"))
+      .toBe("content/v1/tags/623187229/items/1850000000000000/Titelbild.JPG");
     expect(tagItemVariantKey(623187229, 1850000000000000, "large"))
       .toBe("content/v1/tags/623187229/items/1850000000000000/variants/large");
     expect(globalItemFileKey(1850000000000001))
@@ -51,6 +54,8 @@ describe("content path derivation", () => {
     expect(() => tagElementFileKey(623187229, "gallery", "element-rev8.json")).toThrow();
     expect(() => tagElementFileKey(623187229, "cel_gallery", "../element.json")).toThrow();
     expect(() => tagItemVariantKey(623187229, 1850000000000000, "../cover")).toThrow();
+    expect(() => tagItemOriginalKey(623187229, 1850000000000000, "../cover.jpg")).toThrow();
+    expect(() => tagItemOriginalKey(623187229, 1850000000000000, "folder/photo.jpg")).toThrow();
     expect(() => tagRangeDescriptionFileKey("../range", "redirect-default", "content-rev1.json")).toThrow();
     expect(() => globalDescriptionFileKey("Redirect Default", "content-rev1.json")).toThrow();
   });

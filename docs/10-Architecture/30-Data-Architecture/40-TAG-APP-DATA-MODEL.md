@@ -1,9 +1,11 @@
 # TAG-App-Datenmodell: operative Contentprojektion
 
-**Status:** operative D1-Struktur mit lokal ausführbaren Migrationen `0001`–`0004`
+**Status:** operative D1-Struktur mit lokal ausführbaren Migrationen `0001`–`0005`
 **Stand:** 2026-11-20
 **Ebene:** logisch und physisch für die TAG Application API
 **Grundlage:** [fachliches Gesamtmodell](10-DOMAIN-DATA-MODEL.md), [Komponentensicht](20-COMPONENT-DATA-ARCHITECTURE.md), [TAG App Access v1](../35-Contracts/tag-app-access-v1.md)
+
+> `apps/tag-app/database/main.sql` ist der kanonische, vollständige DDL-Snapshot für die spätere Erstinstallation/den finalen Deployment-Start aus einer leeren D1-Datenbank. Er enthält das aktuelle Schema aus `0001`, `0002`, `0003` und `0005`, aber weder Seed-Daten noch den destruktiven Dev-Reset `0004`. Während der laufenden Entwicklung bleiben die nummerierten SQL-Dateien der ausführbare Änderungsverlauf; der Schema-Test vergleicht `main.sql` automatisch mit deren resultierendem Zustand. `main.sql` nicht zusätzlich auf eine bereits migrierte Datenbank anwenden.
 
 ## 1. Zweck und Datenhoheit
 
@@ -13,7 +15,7 @@ Dieses Dokument beschreibt die operative D1-Datenbank der TAG Application API. S
 | --- | --- | --- | --- | --- |
 | TAG-Identität, Lifecycle, Owner, redaktioneller Vault | TCP/MySQL | minimale Laufzeitprojektion | nein | nein |
 | aktuelle TAG-/Element-Beschreibung | TCP erzeugt und publiziert | TAG-Pointer plus Elementstruktur/Sichtbarkeit | ein versioniertes TAG-JSON mit `view` + `elements[]` | nur erlaubte API-Antwort |
-| Content-Items und Varianten | TCP/Application API | Item-Identität, Metadaten, Mitgliedschaft, Variantenindex | Item-/Medienbytes | keine Keys, keine persistente private Kopie |
+| Content-Items und Varianten | TAG Application API | Item-Identität, Metadaten, Mitgliedschaft; Variantenindex zunächst ungenutzt | Item-/Medienbytes | keine Keys, keine persistente private Kopie |
 | Scanner-Access, PIN-Throttle, Sessions | TAG Application API | autoritativ für den Laufzeitbereich | nein | nur `HttpOnly`-Cookie |
 | Chat, Guestbook, Check-ins | spätere API-Module | nicht Bestandteil der TAG-Content-Migrationen | spätere private Anhänge | kein persistenter privater Cache |
 
@@ -36,7 +38,7 @@ erDiagram
 | `tag_content` | genau eine Zeile pro TAG mit numerischem PK; Pointer auf die aktuelle TAG-JSON |
 | `tag_content_elements` | aktuelle Elementstruktur eines TAGs: `tag_numeric_id`, `content_element_id`, `content_element_type`, `display_order`, `visibility`; keine Datei-/Hash-/Größenfelder |
 | `tag_content_items` | Item-Identität, Typ, Scope, Owner, Anzeigefelder, Dateiname und Status |
-| `tag_content_element_items` | relationale Mitgliedschaft, Reihenfolge, Sichtbarkeit und Dateinamen-Eindeutigkeit |
+| `tag_content_element_items` | relationale Mitgliedschaft, Reihenfolge und Sichtbarkeit; Dateinamen sind nicht eindeutig |
 | `tag_content_media_variants` | Variantenmetadaten für Signierung und Downloads |
 | `tag_range_content` | aktuelle Beschreibung für eine TAG-Range |
 | `global_content` | aktuelle globale Beschreibung, z. B. ein Redirect-Ziel |
@@ -87,12 +89,12 @@ Ein einzelner 52-Bit-Wert hält den Primary Key und die API-ID einfach. Zwei Spa
 Nur `ready`-Items dürfen einem Element zugeordnet werden. Ein Item kann vor dem ersten Publish existieren; deshalb gibt es keinen Fremdschlüssel von Items auf `tag_content`.
 
 ### 4.2 Paralleler Upload
-
-1. Upload reserviert eine Item-Zeile mit neuer 52-Bit-ID und `status = pending`.
+1. Upload per serverseitigem `TAG_CONTENT_API_KEY_S01` reserviert eine Item-Zeile mit neuer 52-Bit-ID und `status = pending`.
 2. Die Bytes werden unter dem item-spezifischen R2-Prefix geschrieben.
-3. Variantenmetadaten werden gespeichert und das Item auf `ready` gesetzt.
-4. Die Zuordnung zu einem Element erfolgt separat. Der Unique-Constraint auf `(tag_numeric_id, content_element_id, filename_key)` verhindert doppelte Dateinamen.
-5. Ein abgebrochener Upload bleibt `pending` und wird durch einen Cleanup-Lauf entfernt.
+3. Der Original-Key wird aus numerischer TAG-ID, Content-ID und dem validierten Dateinamen gebildet. Upload-Bytes werden unverändert gespeichert; Varianten-Metadaten werden zunächst nicht geschrieben.
+4. Zuordnung und `ready`-Status werden nach erfolgreichem R2-Put in D1 committed. Gleichnamige Uploads sind erlaubt, da jede Datei eine neue `contentId` und einen eigenen R2-Prefix erhält.
+5. Ein abgebrochener Upload bleibt `pending` oder wird beim Fehler kompensierend gelöscht; ein Cleanup-Lauf kann verwaiste R2-Objekte entfernen.
+6. Ein abgebrochener Upload bleibt `pending` oder wird beim Fehler kompensierend gelöscht; ein Cleanup-Lauf kann verwaiste R2-Objekte entfernen.
 
 Jeder Upload schreibt nur seine eigene Item-Zeile, seine eigenen R2-Objekte und seine eigene Zuordnung. Es gibt keine gemeinsame Element-JSON, die parallele Uploads überschreiben könnten.
 
@@ -100,7 +102,7 @@ Die Content-Antwort der Application API liest `view` und Element-Payloads aus de
 
 ### 4.3 Dateinamen
 
-`original_filename` bleibt Anzeige-/Downloadname. `filename_key` wird serverseitig normalisiert und ist pro Element eindeutig. Die Zuordnung kopiert den Key; ein Trigger verhindert abweichende Werte. Ein globales Item kann in mehreren Elementen und TAGs verwendet werden, sofern der jeweilige Dateiname im Element nicht kollidiert. Ein TAG-lokales Item ist pro TAG genau einem Element zugeordnet; für eine zweite Verwendung wird ein eigenes Item oder ein globales Item benötigt. TAG-spezifische Dateinamen- oder Titel-Overrides sind nicht Teil dieses Modells; globale Items behalten ihre kanonischen Anzeigefelder.
+`original_filename` bleibt Anzeige-/Downloadname. `filename_key` wird serverseitig normalisiert, ist aber nicht eindeutig; mehrere Uploads mit gleichem Namen sind zulässig. Die Zuordnung kopiert den Key; ein Trigger verhindert abweichende Werte. Eine TAG-lokale Content-ID kann weiterhin höchstens einem Element des TAG zugeordnet werden. Jedes erneut hochgeladene gleichnamige Item erhält eine eigene Content-ID. TAG-spezifische Dateinamen- oder Titel-Overrides sind nicht Teil dieses Modells.
 
 ### 4.4 Sichtbarkeit
 
@@ -120,6 +122,7 @@ Alle Keys werden serverseitig aus D1-Werten und Konstanten abgeleitet. Der Brows
 content/v1/tags/{tagNumericId}/tag-rev{revision}.json
 content/v1/tags/{tagNumericId}/items/{contentId}/item.json
 content/v1/tags/{tagNumericId}/items/{contentId}/variants/{variant}
+content/v1/tags/{tagNumericId}/items/{contentId}/{originalFilename}
 content/v1/global/items/{contentId}/item.json
 content/v1/global/items/{contentId}/variants/{variant}
 content/v1/tag-ranges/{rangeId}/descriptions/{contentId}/content-rev{revision}.json
@@ -132,6 +135,7 @@ Beispiele:
 content/v1/tags/623187229/tag-rev8.json
 content/v1/tags/623187229/items/1850000000000000/item.json
 content/v1/tags/623187229/items/1850000000000000/variants/large
+content/v1/tags/623187229/items/1850000000000000/Titelbild.jpg
 content/v1/global/items/1850000000000001/item.json
 content/v1/tag-ranges/campaign-summer-6-001/descriptions/redirect-default/content-rev7.json
 content/v1/global/descriptions/redirect-default/content-rev3.json
@@ -141,7 +145,7 @@ Regeln:
 
 - Die numerische TAG-ID stabilisiert den Pfad; Base36 ist nur Such-/Anzeigeinformation.
 - `tag-rev{n}.json` ist das einzige Präsentationsartefakt des TAGs; es enthält `view` und `elements[]`. Elementdateien sind Altbestand und werden nicht mehr geschrieben oder gelesen.
-- `item.json` und Varianten sind pro Content-ID unveränderlich. Ein Ersatz erzeugt eine neue Content-ID.
+- Originaldateien sind pro Content-ID unveränderlich. Jeder Upload erzeugt eine neue Content-ID; Ersetzen/Update wird nicht angeboten. Dateien werden zunächst direkt ohne Varianten unter dem jeweiligen Item-Prefix gespeichert.
 - `tagNumericId` und `contentId` sind kanonisch dezimal; `contentElementId` beginnt mit `cel_`; Varianten und Dateinamen werden allowlistbasiert validiert.
 - `..`, `/`, `\`, Steuerzeichen und reservierte Segmente sind ausgeschlossen.
 
@@ -188,7 +192,7 @@ Redirect-Beschreibungen enthalten ausschließlich validierte Ziele:
 Noch nicht implementiert sind:
 
 - TCP-Publisher und Outbox-Anbindung für `0002`,
-- Owner-/Gastverwaltung und Upload-Endpunkte,
+- Owner-/Gastverwaltung, PIN-/Owner-Uploads und Dokument-Delete,
 - Variantenpipeline und Quarantäne,
 - ZIP-/Download-Autorisierung,
 - Cleanup für `pending`-/verwaiste Items und alte Präsentationsdateien,
@@ -205,6 +209,8 @@ Chat, Lost & Found, Guestbook und Check-ins erhalten eigene Tabellen mit eigener
 | `apps/tag-app/database/0002_tag_content.sql` | operative Contentprojektion, Items, Varianten, Range-/Global-Beschreibungen |
 | `apps/tag-app/database/0003_tag_content_element_structure.sql` | entfernt Element-Datei-Spalten; `_v3` sind temporäre Namen, das finale Schema verwendet die kanonischen Tabellennamen |
 | `apps/tag-app/database/0004_tag_app_development_reset.sql` | destruktiver Reset von D1-Access-/Contentdaten für disposable Dev-/Staging-Umgebungen; nicht produktiv anwenden |
+| `apps/tag-app/database/0005_tag_content_duplicate_filenames.sql` | lockert Dateinamen-Eindeutigkeit der Elementzuordnung; gleiche Namen können über eigene Content-IDs mehrfach existieren |
+| `apps/tag-app/database/main.sql` | vollständiger, nicht-destruktiver DDL-Snapshot zum initialen Aufbau einer leeren D1-Datenbank; wird im Test mit dem Migrationsergebnis verglichen |
 | `apps/tag-app/workers/content-id.ts` | 52-Bit-Content-ID erzeugen, parsen, formatieren |
 | `apps/tag-app/workers/content-paths.ts` | serverseitige R2-Key-Ableitung und Segmentvalidierung |
 | `apps/tag-app/test/database-schema.test.mjs` | SQLite-/D1-Schema, Trigger, Unique- und Scope-Regeln |
@@ -213,6 +219,8 @@ Chat, Lost & Found, Guestbook und Check-ins erhalten eigene Tabellen mit eigener
 | `apps/tag-app/test/app-api.test.ts` | Session-, Content-, Sichtbarkeits- und Signer-Grenzen |
 | `apps/tag-app/wrangler.app-api.toml` | D1-Binding und `migrations_dir = "database"` |
 
-Migration `0004` löscht Daten, nicht das Schema; R2-Objekte werden nicht berührt. Nur auf explizit entbehrlichen Umgebungen ausführen. Staging ist auf `myqr24-stg-db` und `myqr24-stg-blob` gebunden; `0001`–`0004` wurden remote angewendet und per D1-Migrationsliste, Schema-Query, `PRAGMA foreign_key_check` und Zeilenzählung geprüft. R2-Objekte blieben unangetastet. Das Ausführen lokaler Migrationstests ist kein Nachweis eines Cloudflare-D1-Deployments.
+Migration `0004` löscht Daten, nicht das Schema; R2-Objekte werden nicht berührt. Nur auf explizit entbehrlichen Umgebungen ausführen. Staging ist auf `myqr24-stg-db` und `myqr24-stg-blob` gebunden; `0001`–`0004` wurden remote angewendet. Migration `0005` ist neu und muss vor dem Upload-Deployment auf der Ziel-D1-Datenbank angewendet werden; lokale Tests sind kein Nachweis eines Cloudflare-D1-Deployments.
+
+Für eine **neue/leere** D1-Datenbank kann der zum Deployment-Start freigegebene Snapshot beispielsweise mit `wrangler d1 execute <database-name> --remote --file=database/main.sql` eingespielt werden (aus `apps/tag-app`, nach Prüfung von Account/Database und vor dem Anwendungs-Deployment). Diese Erstinstallation ersetzt keine sichere Aktualisierung bestehender D1-Datenbanken; `main.sql` enthält absichtlich kein `DROP`, `DELETE`, Reset oder Seed.
 
 
