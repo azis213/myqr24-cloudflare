@@ -1,0 +1,6 @@
+name: MyQR-Local
+values:
+  - key: hostname-api
+    value: ''
+  - key: token-api
+    value: ''

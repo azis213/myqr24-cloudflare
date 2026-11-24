@@ -1,0 +1,34 @@
+$kind: http-request
+url: "{{hostname-tag-app}}/api/v1/tags/{{tag-id}}/elements/{{element-id}}/items"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: file
+      key: original
+      src: []
+      description: "Erforderlich: Originalbild manuell auswählen"
+    - type: file
+      key: small
+      src: []
+      description: "Optional: Small-Variante aktivieren und Bild manuell auswählen"
+      disabled: true
+    - type: file
+      key: medium
+      src: []
+      description: "Optional: Medium-Variante aktivieren und Bild manuell auswählen"
+      disabled: true
+auth:
+  type: bearer
+  credentials:
+    token: "{{content-api-key}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Multipart-Upload erstellt', function () { pm.response.to.have.status(201); });
+      const result = pm.response.json();
+      if (result.contentId) pm.environment.set('uploaded-content-id', result.contentId);
+      pm.test('Content-ID gespeichert', function () { pm.expect(result.contentId).to.match(/^[1-9][0-9]{0,15}$/); });
+      pm.test('Varianten im Ergebnis enthalten', function () { pm.expect(result.variants).to.be.an('array'); });
+    language: text/javascript
+order: 3000

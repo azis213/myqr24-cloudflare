@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{hostname-tag-app}}/api/v1/tags/{{tag-id}}/content"
+method: GET
+headers:
+  Cookie: "{{tag-session-cookie}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Runtime-Content geladen', function () { pm.response.to.have.status(200); });
+      pm.test('Runtime enthält Galerie', function () { pm.expect(pm.response.json().elements.some(function (item) { return item.id === 'cel_gallery'; })).to.eql(true); });
+    language: text/javascript
+order: 2000

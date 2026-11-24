@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{hostname-tag-app}}/api/local/seed"
+method: POST
+headers:
+  x-myqr24-local-seed: "{{local-seed-key}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Seed erfolgreich', function () { pm.response.to.have.status(200); });
+      pm.test('Seed bestätigt', function () { pm.expect(pm.response.json()).to.have.property('seeded', true); });
+      if (pm.response.code === 200) { pm.environment.set('content-revision', '8'); pm.environment.unset('uploaded-content-id'); pm.environment.unset('tag-session-cookie'); }
+    language: text/javascript
+order: 1000

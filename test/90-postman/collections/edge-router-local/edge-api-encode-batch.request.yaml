@@ -1,0 +1,39 @@
+$kind: http-request
+url: "{{hostname-api}}/api/v1/codec/encode-batch"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"length\": 10,\r
+
+    \  \"values\": [\r
+
+    \    \"2821109907456\",\r
+
+    \    \"2010000000000005\",\r
+
+    \    \"1010000000000000\",\r
+
+    \    \"1010000000000001\",\r
+
+    \    \"1010000000000002\",\r
+
+    \    \"1010000000000003\",\r
+
+    \    \"1010000000000004\",\r
+
+    \    \"1141416615446904\",\r
+
+    \    \"1465794065618480\",\r
+
+    \    \"3656158440062975\"\r
+
+    \  ]\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: "{{token-api}}"
+order: 3000

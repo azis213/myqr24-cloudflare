@@ -136,7 +136,7 @@ Items müssen `ready` und nicht widerrufen sein. In `elements[]` sind `public`-E
 
 ### 4.1 Serverseitiger Upload eines Originals
 
-Nur ein vertrauenswürdiges Backend darf diese Route aufrufen. Der API-Key wird als Worker Secret `TAG_CONTENT_API_KEY_S01` konfiguriert und niemals an Browser/PWA gegeben. Der Body besteht aus rohen Bytes (nicht `multipart/form-data`):
+Nur ein vertrauenswürdiges Backend darf diese Route aufrufen. Der API-Key wird als Worker Secret `TAG_CONTENT_API_KEY_S01` konfiguriert und niemals an Browser/PWA gegeben. Für bestehende Clients werden rohe Datei-Bytes weiterhin unterstützt. Für Bild-Items kann der Body zusätzlich `multipart/form-data` sein, damit ein Original samt optionalen Varianten als ein Item hochgeladen wird:
 
 ```http
 POST /api/v1/tags/ab12cd/elements/cel_gallery/items
@@ -145,10 +145,27 @@ Content-Type: image/jpeg
 X-File-Name: Sommerfoto.jpg
 Content-Length: 524288
 
-<unveränderte Dateibytes>
+<unveränderte Originalbytes>
 ```
 
-Dokumente verwenden denselben Pfad. Unterstützt werden JPEG, PNG, GIF, WebP, PDF und UTF-8-Text. Erweiterung, `Content-Type` und Dateisignatur müssen übereinstimmen. Maximale Dateigröße ist 25 MiB. Elementtyp muss `image`/`gallery` für ein Bild oder `document`/`documents` für ein Dokument sein; der TAG muss aktiv und intern geroutet sein.
+Multipart-Bildupload (in Postman `Body → form-data`; Dateityp je Eintrag `File`):
+
+```http
+POST /api/v1/tags/ab12cd/elements/cel_gallery/items
+Authorization: Bearer <TAG_CONTENT_API_KEY_S01>
+Content-Type: multipart/form-data; boundary=<von-Postman-generiert>
+
+original=<Datei, erforderlich>
+small=<Datei, optional>
+medium=<Datei, optional>
+thumbnail-v2=<Datei, optional>
+```
+
+Die Upload-Antwort liefert `variants[]` mit Schlüsseln, Dateinamen, MIME-Typ und Bytezahl jeder gespeicherten Variante.
+
+`original` ist das einzige erforderliche Datei-Feld. Jedes weitere Feld ist eine optionale Variante desselben Bildes; Variantennamen sind erweiterbar und müssen `[a-z0-9][a-z0-9-]{0,63}` erfüllen. Jeder Feldname darf höchstens einmal vorkommen, Textfelder sind nicht zulässig, und es sind maximal 16 Varianten pro Item erlaubt. Pro Datei gelten JPEG, PNG, GIF und WebP; Endung, vom Multipart-Part gemeldeter MIME-Typ und erkannte Dateisignatur müssen übereinstimmen. Die kombinierte Größe aller Dateiinhalte darf 25 MiB nicht überschreiten (Multipart-Overhead zusätzlich höchstens 1 MiB). Dokumente bleiben über den Raw-Upload mit PDF und UTF-8-Text möglich; Varianten werden in dieser Version nur für Bilder angenommen.
+
+Raw-Uploads und Multipart-Bilduploads dürfen nicht im selben Request gemischt werden. Ein Multipart-Upload erfordert das Feld `original`; zusätzliche Felder entsprechen den variant keys. Postman-Clients sollen den Multipart-Header samt Boundary selbst erzeugen lassen.
 
 Der Worker reserviert eine neue `contentId` und ein `pending`-D1-Item, schreibt die unveränderten Originalbytes in privates R2 und fügt danach Assignment und `ready`-Status hinzu. Der Key wird nur aus numerischer TAG-ID, neuer Content-ID und validiertem Original-Dateinamen gebildet:
 
@@ -156,7 +173,15 @@ Der Worker reserviert eine neue `contentId` und ein `pending`-D1-Item, schreibt 
 content/v1/tags/{tagNumericId}/items/{contentId}/{originalFilename}
 ```
 
-Gleiche Dateinamen sind erlaubt, weil jedes Item eine neue Content-ID erhält. Es gibt keinen Update-/Overwrite-Endpunkt. Originaltyp und Bytes stehen als R2-HTTP-/Custom-Metadaten zur Verfügung; `tag_content_media_variants` bleibt zunächst ungenutzt. Beispielantwort (`201`):
+Eine `contentId` bezeichnet genau ein logisches Item und genau ein Originalbild oder -dokument. Jedes weitere eigenständige Bild einer Galerie beziehungsweise Dokument einer Liste ist ein eigenes Item mit eigener `contentId`; eine Content-ID gruppiert keine mehreren Originaldateien. Gleiche Dateinamen sind erlaubt, weil jedes Item einen eigenen Content-ID-Prefix erhält. Es gibt keinen Update-/Overwrite-Endpunkt. Originaltyp und Bytes stehen als R2-HTTP-/Custom-Metadaten zur Verfügung. Bei einem Multipart-Bildupload werden Original und Varianten als ein Item reserviert; das Item wird erst nach erfolgreichem Schreiben aller R2-Dateien und der Varianteneinträge in D1 `ready`.
+
+Optionale Derivate wie `small` und `medium` sind Varianten desselben Originals, keine weiteren Items. Sie werden – nur wenn ein konkreter Bedarf besteht – unter einem separaten Variantenpfad abgelegt:
+
+```text
+content/v1/tags/{tagNumericId}/items/{contentId}/variants/{variant}
+```
+
+Der Key ist aus validierten TAG-/Content-IDs und einem erlaubten Variantennamen deterministisch ableitbar. Ein direkter Leseweg für eine bekannte Variante muss daher nicht zwingend `tag_content_media_variants` joinen. Die Tabelle bleibt für optionale Metadaten/Verfügbarkeitsinformationen und bestehende Legacy-Pfade erhalten; wenn ein Aufrufer diese Informationen benötigt, darf er sie weiterhin lesen. Der direkte Leseweg muss weiterhin Item-Zuordnung, Status und Sichtbarkeit prüfen. Beispielantwort (`201`):
 
 ```json
 {
@@ -171,7 +196,7 @@ Gleiche Dateinamen sind erlaubt, weil jedes Item eine neue Content-ID erhält. E
 }
 ```
 
-Es werden zunächst nur Originaldateien hochgeladen und gelesen. Small-/Medium-Derivate sind optionaler späterer Ausbau.
+Die Upload-Route speichert vom Client bereitgestellte Bildvarianten unverändert; sie führt keine Bildtransformation durch. Varianten-Erzeugung durch einen Bildprozessor bleibt optionaler Ausbau. Raw-Uploads und Multipart-Requests ohne variant parts funktionieren ohne Varianteneinträge.
 
 ### 4.2 Originaldatei lesen
 

@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{hostname-api}}/api/v1/codec/decode"
+method: POST
+body:
+  type: json
+  content: "{\r\n  \"tagId\": \"hz8w3o25hb\"\r\n}"
+auth:
+  type: bearer
+  credentials:
+    token: "{{token-api}}"
+order: 2000

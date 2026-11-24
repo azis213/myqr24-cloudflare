@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{hostname-tag-app}}/api/v1/tags/{{tag-id}}/items/{{uploaded-content-id}}/media"
+method: GET
+headers:
+  Cookie: "{{tag-session-cookie}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Originaldatei abrufbar', function () { pm.response.to.have.status(200); });
+      pm.test('Bild-MIME-Typ', function () { pm.expect(pm.response.headers.get('Content-Type')).to.match(/^image\/(jpeg|png|gif|webp)$/); });
+    language: text/javascript
+order: 4000

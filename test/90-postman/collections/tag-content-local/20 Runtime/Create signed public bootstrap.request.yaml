@@ -1,0 +1,30 @@
+$kind: http-request
+url: "{{hostname-tag-app}}/api/v1/tags/{{tag-id}}/access/public"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: "{{bootstrap-body}}"
+scripts:
+  - type: beforeRequest
+    code: |-
+      const secret = pm.environment.get('bootstrap-secret');
+      if (!secret) throw new Error('Set bootstrap-secret in the TAG-APP-Local environment.');
+      const nonce = CryptoJS.lib.WordArray.random(18).toString(CryptoJS.enc.Base64).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const exp = Math.floor(Date.now() / 1000) + 50;
+      const mode = 'public';
+      const accessVersion = Number(pm.environment.get('access-version') || '1');
+      const revision = Number(pm.environment.get('content-revision') || '8');
+      const payload = ['myqr24/pwa-bootstrap/v1', 'tag=' + pm.environment.get('tag-id'), 'mode=' + mode, 'accessVersion=' + accessVersion, 'revision=' + revision, 'nonce=' + nonce, 'exp=' + exp].join('\n');
+      const sig = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA256(payload, secret)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      pm.variables.set('bootstrap-body', JSON.stringify({ mode: mode, accessVersion: accessVersion, revision: revision, nonce: nonce, exp: exp, sig: sig }));
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test('Public-Zugang autorisiert', function () { pm.response.to.have.status(200); });
+      const cookie = pm.response.headers.get('Set-Cookie');
+      if (cookie) pm.environment.set('tag-session-cookie', cookie.split(';')[0]);
+      pm.test('Session-Cookie gesetzt', function () { pm.expect(cookie || '').to.include('myqr24_tag_access='); });
+    language: text/javascript
+order: 1000

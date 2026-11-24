@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{hostname-api}}/api/v1/codec/encode"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"length\": 10,\r
+
+    \  \"value\": \"1571283123444343\"\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: Bearer {{token-api}}
+order: 1000

@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{hostname-tag-app}}/api/v1/tags/{{tag-id}}/content/document"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{publisher-key}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Dokument aktuell', function () { pm.response.to.have.status(200); });
+      pm.test('Galerie bleibt erhalten', function () { pm.expect(pm.response.json().elements.some(function (item) { return item.elementId === 'cel_gallery'; })).to.eql(true); });
+    language: text/javascript
+order: 3000

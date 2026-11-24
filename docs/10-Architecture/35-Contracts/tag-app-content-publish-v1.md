@@ -113,6 +113,8 @@ TAG-Typen: `vault`, `lost-found`, `event`, `exhibit`, `maintenance`. Es gelten m
 
 Slots und `actions.upload`/`download`/`delete` sind Konfigurations-/Policy-Metadaten. Sie erzeugen weder Dateien noch D1-Items und implementieren keine Upload-/Download-/Delete-API. `template.status` ist Template-Metadatum, kein separater Approval-Mechanismus: Ein gültiger Publish-Request wird nicht aufgrund von `draft` oder `pending-review` blockiert.
 
+Medien-Items werden unabhängig vom Template über den Runtime-Content-Item-Vertrag verwaltet. Eine `contentId` steht für genau ein Originalbild oder -dokument; jedes weitere Galerie-Bild beziehungsweise Listendokument erhält eine eigene `contentId`. Optionale `small`-/`medium`-Derivate sind Varianten dieses Originals und werden nicht durch den Publish erzeugt oder als eigene Items projiziert.
+
 ### 3.3 Publish-Ablauf und Erfolg
 
 Nach Authentisierung, vollständiger Validierung und Prüfung des aktiven internen Routings projiziert der Worker `view` (Blocks, Theme, Layout) plus vollständige inline-`elements[]`-Payloads. Pro Revision entsteht genau ein R2-Dokument unter einem serverseitig abgeleiteten Key der Form:

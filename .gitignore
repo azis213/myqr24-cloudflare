@@ -30,6 +30,9 @@ apps/tag-control-plane/config/tcp-secrets.local.json
 apps/tag-control-plane/config/tcp-secrets.*.local.json
 apps/tag-control-plane/.env.local
 
+# Local TAG Application runtime configuration and secrets
+postman\.archive
+
 .vscode/
 .DS_Store
 

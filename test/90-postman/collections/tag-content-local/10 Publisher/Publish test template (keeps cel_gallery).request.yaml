@@ -1,0 +1,70 @@
+$kind: http-request
+url: "{{hostname-tag-app}}/api/v1/tags/{{tag-id}}/content"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "tagId": "{{tag-id}}",
+      "tagNumericId": "{{tag-numeric-id}}",
+      "tagName": "Postman-Test-TAG",
+      "template": {
+        "schema": "myqr24-tag-content-template-v1",
+        "schemaVersion": 3,
+        "template": {
+          "templateId": "tct_postman_local",
+          "templateVersion": 1,
+          "tagType": "vault",
+          "name": "Postman-Test-TAG",
+          "locale": "de-DE",
+          "status": "draft"
+        },
+        "shell": {
+          "presentation": "standard",
+          "features": ["vault"],
+          "theme": {
+            "colorMode": "light",
+            "colors": {
+              "background": "#ffffff",
+              "surface": "#fafafa",
+              "text": "#111111",
+              "mutedText": "#666666",
+              "heading": "#111111",
+              "accent": "#2b6cb0",
+              "accentText": "#ffffff",
+              "border": "#dddddd"
+            }
+          }
+        },
+        "layout": {
+          "mode": "grid-flow",
+          "columns": 12,
+          "gap": "md",
+          "responsive": { "autoReflow": true, "preferredColumns": { "mobile": 1, "desktop": 3 } }
+        },
+        "elements": [
+          {
+            "elementId": "cel_gallery",
+            "elementType": "gallery",
+            "displayOrder": 20,
+            "visibility": "public",
+            "payload": { "name": "Postman-Testgalerie" },
+            "slots": [{ "slotId": "images", "accepts": ["image"], "min": 0, "max": 48, "required": false }]
+          }
+        ]
+      }
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{publisher-key}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Publish erfolgreich oder unverändert', function () { pm.expect([200, 201]).to.include(pm.response.code); });
+      pm.test('Publish liefert Revision', function () { pm.expect(pm.response.json()).to.have.property('revision'); });
+      if ([200, 201].includes(pm.response.code)) { pm.environment.set('content-revision', String(pm.response.json().revision)); }
+    language: text/javascript
+order: 2000

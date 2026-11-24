@@ -4,6 +4,8 @@ import { tagItemFileKey, tagItemOriginalKey, tagItemVariantKey } from "../conten
 const TAG_ID = /^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/;
 const ELEMENT_ID = /^cel_[A-Za-z0-9_-]{1,120}$/;
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_MULTIPART_BYTES = MAX_UPLOAD_BYTES + 1024 * 1024;
+const MAX_VARIANTS_PER_ITEM = 16;
 const NO_STORE = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
 const MIME_BY_EXTENSION: Record<string, { itemType: "image" | "document"; contentType: string }> = {
   jpg: { itemType: "image", contentType: "image/jpeg" },
@@ -102,6 +104,10 @@ function matchesSignature(bytes: Uint8Array, contentType: string): boolean {
 }
 
 async function readLimitedBody(request: Request): Promise<Uint8Array | null> {
+  return readBodyUpTo(request, MAX_UPLOAD_BYTES);
+}
+
+async function readBodyUpTo(request: Request, limit: number): Promise<Uint8Array | null> {
   if (!request.body) return new Uint8Array();
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -111,7 +117,7 @@ async function readLimitedBody(request: Request): Promise<Uint8Array | null> {
       const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
-      if (total > MAX_UPLOAD_BYTES) {
+      if (total > limit) {
         await reader.cancel();
         return null;
       }
@@ -127,6 +133,108 @@ async function readLimitedBody(request: Request): Promise<Uint8Array | null> {
     offset += chunk.byteLength;
   }
   return result;
+}
+
+interface UploadFile {
+  field: string;
+  filename: string;
+  contentType: string;
+  bytes: Uint8Array;
+  file: ReturnType<typeof validFilename>;
+}
+
+function isUploadFile(value: FormDataEntryValue): value is File {
+  return typeof value !== "string" && typeof value.name === "string" && typeof value.arrayBuffer === "function";
+}
+
+async function uploadFiles(request: Request): Promise<UploadFile[] | Response> {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+    const filename = validFilename(request.headers.get("x-file-name"));
+    if (!filename) return failure(400, "invalid_file_name", "Dateiname oder Dateiendung ist nicht erlaubt.");
+    const mediaType = MIME_BY_EXTENSION[filename.extension];
+    const rawContentType = contentType.split(";", 1)[0].trim().toLowerCase();
+    if (mediaType.contentType !== rawContentType) return failure(415, "unsupported_media_type", "Content-Type und Dateiendung stimmen nicht überein.");
+    const declaredBytes = Number(request.headers.get("content-length") ?? "0");
+    if (Number.isFinite(declaredBytes) && declaredBytes > MAX_UPLOAD_BYTES) return failure(413, "payload_too_large", "Datei überschreitet 25 MiB.");
+    let bytes: Uint8Array | null;
+    try {
+      bytes = await readLimitedBody(request);
+    } catch {
+      return failure(400, "invalid_request", "Datei konnte nicht gelesen werden.");
+    }
+    if (bytes === null) return failure(413, "payload_too_large", "Datei überschreitet 25 MiB.");
+    return [{ field: "original", filename: filename.filename, contentType: mediaType.contentType, bytes, file: filename }];
+  }
+
+  const declaredBytes = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredBytes) && declaredBytes > MAX_MULTIPART_BYTES) {
+    return failure(413, "payload_too_large", "Multipart-Anfrage überschreitet das Größenlimit.");
+  }
+  let body: Uint8Array | null;
+  try {
+    body = await readBodyUpTo(request, MAX_MULTIPART_BYTES);
+  } catch {
+    return failure(400, "invalid_request", "Multipart-Dateien konnten nicht gelesen werden.");
+  }
+  if (body === null) return failure(413, "payload_too_large", "Multipart-Anfrage überschreitet das Größenlimit.");
+
+  let form: FormData;
+  try {
+    const replayBody = new ArrayBuffer(body.byteLength);
+    new Uint8Array(replayBody).set(body);
+    const replay = new Request("https://tag-content-upload.invalid/", {
+      method: "POST",
+      headers: { "content-type": contentType },
+      body: replayBody,
+    });
+    form = await replay.formData();
+  } catch {
+    return failure(400, "invalid_multipart", "Multipart-Formulardaten sind ungültig.");
+  }
+
+  const files: UploadFile[] = [];
+  let originalSeen = false;
+  let totalFileBytes = 0;
+  for (const [field, value] of form.entries()) {
+    if (field !== "original" && !/^[a-z0-9][a-z0-9-]{0,63}$/.test(field)) {
+      return failure(400, "invalid_variant", "Variantenschlüssel ist ungültig.");
+    }
+    if (field === "original") {
+      if (originalSeen) return failure(400, "duplicate_original", "Es darf genau eine Originaldatei geben.");
+      originalSeen = true;
+    } else if (files.some((file) => file.field === field)) {
+      return failure(400, "duplicate_variant", "Jeder Variantenschlüssel darf nur einmal vorkommen.");
+    }
+    if (!isUploadFile(value)) return failure(400, "invalid_multipart", "Jedes Formularfeld muss eine Datei enthalten.");
+
+    const filename = validFilename(value.name);
+    if (!filename) return failure(400, "invalid_file_name", "Dateiname oder Dateiendung ist nicht erlaubt.");
+    const detected = MIME_BY_EXTENSION[filename.extension];
+    const partContentType = value.type.split(";", 1)[0].trim().toLowerCase();
+    if (detected.itemType !== "image" || detected.contentType !== partContentType) {
+      return failure(415, "unsupported_media_type", "Multipart-Originale und Varianten müssen gültige Bilddateien sein.");
+    }
+    if (field !== "original" && files.length >= MAX_VARIANTS_PER_ITEM + 1) {
+      return failure(400, "too_many_variants", `Pro Item sind höchstens ${MAX_VARIANTS_PER_ITEM} Varianten erlaubt.`);
+    }
+    let bytes: Uint8Array;
+    try {
+      bytes = new Uint8Array(await value.arrayBuffer());
+    } catch {
+      return failure(400, "invalid_multipart", "Datei konnte nicht gelesen werden.");
+    }
+    totalFileBytes += bytes.byteLength;
+    if (bytes.byteLength === 0) return failure(400, "empty_file", "Leere Dateien sind nicht erlaubt.");
+    if (bytes.byteLength > MAX_UPLOAD_BYTES || totalFileBytes > MAX_UPLOAD_BYTES) {
+      return failure(413, "payload_too_large", "Die gesamte Upload-Größe darf 25 MiB nicht überschreiten.");
+    }
+    if (!matchesSignature(bytes, detected.contentType)) return failure(415, "invalid_file_content", "Dateiinhalt passt nicht zum Bildformat.");
+    files.push({ field, filename: filename.filename, contentType: detected.contentType, bytes, file: filename });
+  }
+  if (!originalSeen) return failure(400, "original_required", "Multipart-Upload benötigt eine Datei im Feld original.");
+  if (files.length > MAX_VARIANTS_PER_ITEM + 1) return failure(400, "too_many_variants", `Pro Item sind höchstens ${MAX_VARIANTS_PER_ITEM} Varianten erlaubt.`);
+  return files;
 }
 
 function allowedElement(itemType: "image" | "document", elementType: string): boolean {
@@ -152,23 +260,17 @@ export async function uploadContentItem(
   if (denied) return denied;
   if (!TAG_ID.test(tagId) || !ELEMENT_ID.test(elementId)) return failure(400, "invalid_request", "TAG- oder Element-ID ist ungültig.");
 
-  const file = validFilename(request.headers.get("x-file-name"));
-  if (!file) return failure(400, "invalid_file_name", "Dateiname oder Dateiendung ist nicht erlaubt.");
-  const mediaType = MIME_BY_EXTENSION[file.extension];
-  const contentType = (request.headers.get("content-type") ?? "").split(";", 1)[0].trim().toLowerCase();
-  if (mediaType.contentType !== contentType) return failure(415, "unsupported_media_type", "Content-Type und Dateiendung stimmen nicht überein.");
-
-  const declaredBytes = Number(request.headers.get("content-length") ?? "0");
-  if (Number.isFinite(declaredBytes) && declaredBytes > MAX_UPLOAD_BYTES) return failure(413, "payload_too_large", "Datei überschreitet 25 MiB.");
-  let bytes: Uint8Array | null;
-  try {
-    bytes = await readLimitedBody(request);
-  } catch {
-    return failure(400, "invalid_request", "Datei konnte nicht gelesen werden.");
+  const parsedFiles = await uploadFiles(request);
+  if (parsedFiles instanceof Response) return parsedFiles;
+  const original = parsedFiles.find((file) => file.field === "original")!;
+  for (const file of parsedFiles) {
+    if (file.bytes.byteLength === 0) return failure(400, "empty_file", "Leere Dateien sind nicht erlaubt.");
+    if (file.bytes.byteLength > MAX_UPLOAD_BYTES || !matchesSignature(file.bytes, file.contentType)) {
+      return failure(415, "invalid_file_content", "Dateiinhalt passt nicht zum erlaubten Bildformat.");
+    }
   }
-  if (bytes === null) return failure(413, "payload_too_large", "Datei überschreitet 25 MiB.");
-  if (bytes.byteLength < 1) return failure(400, "empty_file", "Leere Dateien sind nicht erlaubt.");
-  if (!matchesSignature(bytes, contentType)) return failure(415, "invalid_file_content", "Dateiinhalt passt nicht zum erlaubten Format.");
+  const mediaType = MIME_BY_EXTENSION[original.file!.extension];
+  const variants = parsedFiles.filter((file) => file.field !== "original");
 
   const tag = await tagForUpload(env, tagId);
   if (!tag || tag.status !== "active" || tag.target_type !== "internal" || !Number.isSafeInteger(tag.tag_numeric_id)) {
@@ -197,7 +299,7 @@ export async function uploadContentItem(
     const candidate = generateContentId();
     const inserted = await env.APP_DB.prepare(
       "INSERT INTO tag_content_items (content_id, content_item_type, scope, owner_tag_numeric_id, owner_tag_base36_id, title, alt_text, original_filename, filename_key, status, created_at, updated_at, revoked_at) VALUES (?1, ?2, 'tag', ?3, ?4, NULL, NULL, ?5, ?6, 'pending', ?7, ?7, NULL) ON CONFLICT(content_id) DO NOTHING",
-    ).bind(candidate, mediaType.itemType, tag.tag_numeric_id, tagId, file.filename, file.filenameKey, now).run();
+    ).bind(candidate, mediaType.itemType, tag.tag_numeric_id, tagId, original.filename, original.file!.filenameKey, now).run();
     if ((inserted.meta?.changes ?? 0) === 1) {
       contentId = candidate;
       break;
@@ -205,34 +307,47 @@ export async function uploadContentItem(
   }
   if (!contentId) return failure(503, "content_id_unavailable", "Content-ID konnte nicht reserviert werden.");
 
-  let objectKey: string;
+  const objectKeys: string[] = [];
   try {
-    objectKey = tagItemOriginalKey(tag.tag_numeric_id, contentId, file.filename);
+    objectKeys.push(tagItemOriginalKey(tag.tag_numeric_id, contentId, original.filename));
+    for (const variant of variants) objectKeys.push(tagItemVariantKey(tag.tag_numeric_id, contentId, variant.field));
   } catch {
     await env.APP_DB.prepare("DELETE FROM tag_content_items WHERE content_id = ?1").bind(contentId).run();
-    return failure(400, "invalid_file_name", "Dateiname ist nicht als Storage-Segment zulässig.");
+    return failure(400, "invalid_variant", "Dateiname oder Variantenschlüssel ist nicht als Storage-Segment zulässig.");
   }
 
   try {
-    const shaInput = Uint8Array.from(bytes).buffer;
-    const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", shaInput)), (byte) => byte.toString(16).padStart(2, "0")).join("");
-    await env.PRIVATE_CONTENT.put(objectKey, bytes, {
-      httpMetadata: { contentType, contentDisposition: `${mediaType.itemType === "image" ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.filename)}` },
-      customMetadata: { contentId: String(contentId), tagId, elementId, itemType: mediaType.itemType, contentBytes: String(bytes.byteLength), sha256 },
-    });
-    await env.APP_DB.batch([
+    for (const file of parsedFiles) {
+      const key = file.field === "original"
+        ? tagItemOriginalKey(tag.tag_numeric_id, contentId, file.filename)
+        : tagItemVariantKey(tag.tag_numeric_id, contentId, file.field);
+      const shaInput = Uint8Array.from(file.bytes).buffer;
+      const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", shaInput)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      await env.PRIVATE_CONTENT.put(key, file.bytes, {
+        httpMetadata: { contentType: file.contentType, contentDisposition: `inline; filename*=UTF-8''${encodeURIComponent(file.filename)}` },
+        customMetadata: { contentId: String(contentId), tagId, elementId, variant: file.field === "original" ? "original" : file.field, itemType: mediaType.itemType, contentBytes: String(file.bytes.byteLength), sha256 },
+      });
+    }
+    const statements = [
       env.APP_DB.prepare("UPDATE tag_content_items SET status = 'ready', updated_at = ?1 WHERE content_id = ?2 AND status = 'pending'").bind(new Date().toISOString(), contentId),
       env.APP_DB.prepare("INSERT INTO tag_content_element_items (tag_numeric_id, content_element_id, content_id, item_scope, filename_key, display_order, visibility) VALUES (?1, ?2, ?3, 'tag', ?4, ?5, ?6)")
-        .bind(tag.tag_numeric_id, elementId, contentId, file.filenameKey, Math.max(0, element.max_display_order + 1), elementVisibility.visibility),
-    ]);
+        .bind(tag.tag_numeric_id, elementId, contentId, original.file!.filenameKey, Math.max(0, element.max_display_order + 1), elementVisibility.visibility),
+    ];
+    for (const variant of variants) {
+      const shaInput = Uint8Array.from(variant.bytes).buffer;
+      const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", shaInput)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      statements.push(env.APP_DB.prepare("INSERT INTO tag_content_media_variants (content_id, variant, content_type, byte_size, sha256, width, height, duration_ms, created_at) VALUES (?1, ?2, ?3, ?4, ?5, NULL, NULL, NULL, ?6)")
+        .bind(contentId, variant.field, variant.contentType, variant.bytes.byteLength, sha256, new Date().toISOString()));
+    }
+    await env.APP_DB.batch(statements);
   } catch {
-    let objectDeleted = false;
+    let objectsDeleted = true;
     try {
-      await env.PRIVATE_CONTENT.delete(objectKey);
-      objectDeleted = true;
-    } catch { /* Keep pending item so operational cleanup can retry the object deletion. */ }
-    if (objectDeleted) {
+      await Promise.all(objectKeys.map((objectKey) => env.PRIVATE_CONTENT.delete(objectKey)));
+    } catch { objectsDeleted = false; /* Keep pending item so operational cleanup can retry object deletion. */ }
+    if (objectsDeleted) {
       try {
+        await env.APP_DB.prepare("DELETE FROM tag_content_media_variants WHERE content_id = ?1").bind(contentId).run();
         await env.APP_DB.prepare("DELETE FROM tag_content_items WHERE content_id = ?1 AND status = 'pending'").bind(contentId).run();
       } catch { /* Keep the pending row for cleanup/retry if D1 is unavailable. */ }
     }
@@ -245,9 +360,10 @@ export async function uploadContentItem(
     elementId,
     contentId: String(contentId),
     type: mediaType.itemType,
-    filename: file.filename,
-    contentType,
-    contentBytes: bytes.byteLength,
+    filename: original.filename,
+    contentType: original.contentType,
+    contentBytes: original.bytes.byteLength,
+    variants: variants.map((variant) => ({ variant: variant.field, filename: variant.filename, contentType: variant.contentType, contentBytes: variant.bytes.byteLength })),
   }, 201);
 }
 

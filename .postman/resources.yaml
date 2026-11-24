@@ -1,0 +1,20 @@
+# Use this workspace to collaborate
+workspace:
+  id: 4f8d7ff4-4a0a-4bbf-850a-fe320b36a7ee
+
+localResources:
+  collections:
+    - ../test/90-postman/collections/edge-router-local.postman_collection.json
+    - ../test/90-postman/collections/tag-content-local.postman_collection.json
+    - ../test/90-postman/collections/edge-router-local
+    - ../test/90-postman/collections/tag-content-local
+  environments:
+    - ../test/90-postman/environments/MyQR-Local.environment.yaml
+    - ../test/90-postman/environments/MyQR-Staging.environment.yaml
+    - ../test/90-postman/environments/TAG-APP-Local.environment.yaml
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
+cloudResources:
+  collections:
+    ../test/90-postman/collections/edge-router-local: 7424590-de1d50c6-2c2c-4c6e-bd14-bbced915b64b

@@ -1,0 +1,2 @@
+$kind: collection
+description: Lokale TAG-App Runtime-Items- und Publisher-Tests. Startet mit local-seed; lokale Secrets in TAG-APP-Local setzen. Beim Multipart-Upload in original (erforderlich) und optional small/medium jeweils den Feldtyp File wählen und Dateien manuell auswählen. Postman setzt den Multipart-Boundary-Header selbst.

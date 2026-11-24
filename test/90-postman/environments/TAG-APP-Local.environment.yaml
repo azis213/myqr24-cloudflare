@@ -1,0 +1,26 @@
+name: TAG-APP-Local
+values:
+  - key: hostname-tag-app
+    value: 'http://localhost:8787'
+  - key: tag-id
+    value: ab12cd
+  - key: tag-numeric-id
+    value: '623187229'
+  - key: element-id
+    value: cel_gallery
+  - key: access-version
+    value: '1'
+  - key: content-revision
+    value: '8'
+  - key: local-seed-key
+    value: ''
+  - key: bootstrap-secret
+    value: ''
+  - key: publisher-key
+    value: ''
+  - key: content-api-key
+    value: ''
+  - key: tag-session-cookie
+    value: ''
+  - key: uploaded-content-id
+    value: ''

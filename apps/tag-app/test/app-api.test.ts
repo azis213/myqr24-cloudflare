@@ -32,6 +32,8 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
   const r2Objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
   const deletedR2Keys: string[] = [];
   const uploadedFilenames = new Map<number, string>();
+  const uploadedVariants: Array<{ content_id: number; variant: string }> = [];
+  let failNextBatch = false;
   const pinHashPromise = argon2id({ password: "123456", secret: pepper, salt: "local-test-salt", iterations: 1, parallelism: 1, memorySize: 8192, hashLength: 32, outputType: "encoded" });
   const tagDocument = {
     schema: "myqr24-tag-content-v2",
@@ -77,6 +79,8 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
         return {
           bind(...values: unknown[]) {
             return {
+              sql,
+              values,
               async first() {
                 if (sql.includes("FROM tag_routing")) return { ...routing, protection_mode: protectionMode, access_version: accessVersion };
                 if (sql.includes("FROM tag_content AS tc") && sql.includes("JOIN tag_routing")) return { tag_numeric_id: 623187229, status: "active", target_type: "internal" };
@@ -97,6 +101,9 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
                 return null;
               },
               async all() {
+                if (sql.includes("FROM tag_content_media_variants")) {
+                  return { results: uploadedVariants.filter((variant) => variant.content_id === Number(values[0])) };
+                }
                 if (sql.includes("FROM tag_content_element_items AS assignment")) {
                   return { results: [{ content_element_id: "cel_gallery", content_id: 1850000000000000, content_item_type: "image", title: "Testbild", alt_text: "Testbeschreibung", original_filename: "Titelbild.jpg", display_order: 0, visibility: "public", scope: "tag" }] };
                 }
@@ -127,8 +134,24 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
     },
   } as unknown as Parameters<typeof handleAppApiRequest>[1];
   const db = env.APP_DB as unknown as { batch: (statements: unknown[]) => Promise<unknown> };
-  db.batch = async () => [];
-  return { env, sessions, throttles, r2Keys, r2Objects, deletedR2Keys, signerBodies, setAccessVersion: (value: number) => { accessVersion = value; }, signerRequests: () => signerRequests };
+  db.batch = async (statements: unknown[]) => {
+    if (failNextBatch) {
+      failNextBatch = false;
+      throw new Error("simulated D1 batch failure");
+    }
+    for (const statement of statements as Array<{ sql?: string; values?: unknown[] }>) {
+      if (statement.sql?.startsWith("INSERT INTO tag_content_media_variants")) {
+        uploadedVariants.push({ content_id: Number(statement.values?.[0]), variant: String(statement.values?.[1]) });
+      }
+      if (statement.sql?.startsWith("DELETE FROM tag_content_media_variants")) {
+        for (let index = uploadedVariants.length - 1; index >= 0; index--) {
+          if (uploadedVariants[index]?.content_id === Number(statement.values?.[0])) uploadedVariants.splice(index, 1);
+        }
+      }
+    }
+    return [];
+  };
+  return { env, sessions, throttles, r2Keys, r2Objects, deletedR2Keys, uploadedVariants, failBatch: () => { failNextBatch = true; }, signerBodies, setAccessVersion: (value: number) => { accessVersion = value; }, signerRequests: () => signerRequests };
 }
 
 describe("tag access API", () => {
@@ -228,6 +251,83 @@ describe("tag access API", () => {
     expect(state.deletedR2Keys).toContain(`content/v1/tags/623187229/items/${firstBody.contentId}/same.png`);
     const deletedObject = await handleAppApiRequest(new Request(`https://app.test/api/v1/tags/ab12cd/items/${firstBody.contentId}/media`, { headers: { cookie } }), state.env);
     expect(deletedObject.status).toBe(404);
+  });
+
+  it("accepts multipart original and extensible named image variants as one item", async () => {
+    const state = fakeEnvironment();
+    const form = new FormData();
+    const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 1]);
+    form.append("original", new Blob([png], { type: "image/png" }), "summer.png");
+    form.append("small", new Blob([png], { type: "image/png" }), "summer-small.png");
+    form.append("medium", new Blob([png], { type: "image/png" }), "summer-medium.png");
+    form.append("thumbnail-v2", new Blob([png], { type: "image/png" }), "summer-thumbnail.png");
+
+    const uploaded = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/elements/cel_gallery/items", {
+      method: "POST",
+      headers: { authorization: "Bearer content-api-test-key" },
+      body: form,
+    }), state.env);
+
+    expect(uploaded.status).toBe(201);
+    const result = await uploaded.json<{ contentId: string; filename: string; variants: Array<{ variant: string; filename: string }> }>();
+    expect(result.filename).toBe("summer.png");
+    expect(result.variants.map(({ variant }) => variant)).toEqual(["small", "medium", "thumbnail-v2"]);
+    expect(state.r2Objects.size).toBe(4);
+    expect(state.uploadedVariants).toEqual([
+      { content_id: Number(result.contentId), variant: "small" },
+      { content_id: Number(result.contentId), variant: "medium" },
+      { content_id: Number(result.contentId), variant: "thumbnail-v2" },
+    ]);
+    expect([...state.r2Objects.keys()]).toContain(`content/v1/tags/623187229/items/${result.contentId}/summer.png`);
+    for (const variant of ["small", "medium", "thumbnail-v2"]) {
+      expect([...state.r2Objects.keys()]).toContain(`content/v1/tags/623187229/items/${result.contentId}/variants/${variant}`);
+    }
+
+    const deleted = await handleAppApiRequest(new Request(`https://app.test/api/v1/tags/ab12cd/items/${result.contentId}`, {
+      method: "DELETE", headers: { authorization: "Bearer content-api-test-key" },
+    }), state.env);
+    expect(deleted.status).toBe(200);
+    for (const variant of ["small", "medium", "thumbnail-v2"]) {
+      expect(state.deletedR2Keys).toContain(`content/v1/tags/623187229/items/${result.contentId}/variants/${variant}`);
+    }
+  });
+
+  it("rejects multipart uploads without original, with invalid variant keys, or with non-image files", async () => {
+    const state = fakeEnvironment();
+    const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 1]);
+    const requests = [
+      (() => { const form = new FormData(); form.append("small", new Blob([png], { type: "image/png" }), "small.png"); return form; })(),
+      (() => { const form = new FormData(); form.append("original", new Blob([png], { type: "image/png" }), "original.png"); form.append("../small", new Blob([png], { type: "image/png" }), "small.png"); return form; })(),
+      (() => { const form = new FormData(); form.append("original", new Blob([png], { type: "image/png" }), "original.png"); form.append("small", new Blob([png], { type: "image/png" }), "small.png"); form.append("small", new Blob([png], { type: "image/png" }), "small-again.png"); return form; })(),
+      (() => { const form = new FormData(); form.append("original", new Blob(["%PDF-"], { type: "application/pdf" }), "original.pdf"); return form; })(),
+    ];
+    const expectedCodes = ["original_required", "invalid_variant", "duplicate_variant", "unsupported_media_type"];
+    for (let index = 0; index < requests.length; index++) {
+      const response = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/elements/cel_gallery/items", {
+        method: "POST", headers: { authorization: "Bearer content-api-test-key" }, body: requests[index],
+      }), state.env);
+      expect(response.status).toBe(index === 3 ? 415 : 400);
+      expect((await response.json<{ error: { code: string } }>()).error.code).toBe(expectedCodes[index]);
+    }
+    expect(state.r2Objects.size).toBe(0);
+  });
+
+  it("cleans up original and variants when the final D1 batch fails", async () => {
+    const state = fakeEnvironment();
+    const form = new FormData();
+    const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 1]);
+    form.append("original", new Blob([png], { type: "image/png" }), "original.png");
+    form.append("small", new Blob([png], { type: "image/png" }), "small.png");
+    state.failBatch();
+
+    const response = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/elements/cel_gallery/items", {
+      method: "POST", headers: { authorization: "Bearer content-api-test-key" }, body: form,
+    }), state.env);
+
+    expect(response.status).toBe(500);
+    expect((await response.json<{ error: { code: string } }>()).error.code).toBe("upload_failed");
+    expect(state.r2Objects.size).toBe(0);
+    expect(state.uploadedVariants).toHaveLength(0);
   });
 
   it("issues a public access session through the versioned Hono route", async () => {

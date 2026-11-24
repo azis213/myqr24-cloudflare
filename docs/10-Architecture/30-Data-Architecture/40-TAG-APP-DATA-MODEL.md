@@ -15,7 +15,7 @@ Dieses Dokument beschreibt die operative D1-Datenbank der TAG Application API. S
 | --- | --- | --- | --- | --- |
 | TAG-Identität, Lifecycle, Owner, redaktioneller Vault | TCP/MySQL | minimale Laufzeitprojektion | nein | nein |
 | aktuelle TAG-/Element-Beschreibung | TCP erzeugt und publiziert | TAG-Pointer plus Elementstruktur/Sichtbarkeit | ein versioniertes TAG-JSON mit `view` + `elements[]` | nur erlaubte API-Antwort |
-| Content-Items und Varianten | TAG Application API | Item-Identität, Metadaten, Mitgliedschaft; Variantenindex zunächst ungenutzt | Item-/Medienbytes | keine Keys, keine persistente private Kopie |
+| Content-Items und Varianten | TAG Application API | Item-Identität, Metadaten, Mitgliedschaft und optionale Varianteneinträge | Original- und Variantenbytes | keine Keys, keine persistente private Kopie |
 | Scanner-Access, PIN-Throttle, Sessions | TAG Application API | autoritativ für den Laufzeitbereich | nein | nur `HttpOnly`-Cookie |
 | Chat, Guestbook, Check-ins | spätere API-Module | nicht Bestandteil der TAG-Content-Migrationen | spätere private Anhänge | kein persistenter privater Cache |
 
@@ -39,7 +39,7 @@ erDiagram
 | `tag_content_elements` | aktuelle Elementstruktur eines TAGs: `tag_numeric_id`, `content_element_id`, `content_element_type`, `display_order`, `visibility`; keine Datei-/Hash-/Größenfelder |
 | `tag_content_items` | Item-Identität, Typ, Scope, Owner, Anzeigefelder, Dateiname und Status |
 | `tag_content_element_items` | relationale Mitgliedschaft, Reihenfolge und Sichtbarkeit; Dateinamen sind nicht eindeutig |
-| `tag_content_media_variants` | Variantenmetadaten für Signierung und Downloads |
+| `tag_content_media_variants` | optionale Variantenmetadaten; die Tabelle ist kein Pflichtbestandteil jedes Items |
 | `tag_range_content` | aktuelle Beschreibung für eine TAG-Range |
 | `global_content` | aktuelle globale Beschreibung, z. B. ein Redirect-Ziel |
 
@@ -91,12 +91,15 @@ Nur `ready`-Items dürfen einem Element zugeordnet werden. Ein Item kann vor dem
 ### 4.2 Paralleler Upload
 1. Upload per serverseitigem `TAG_CONTENT_API_KEY_S01` reserviert eine Item-Zeile mit neuer 52-Bit-ID und `status = pending`.
 2. Die Bytes werden unter dem item-spezifischen R2-Prefix geschrieben.
-3. Der Original-Key wird aus numerischer TAG-ID, Content-ID und dem validierten Dateinamen gebildet. Upload-Bytes werden unverändert gespeichert; Varianten-Metadaten werden zunächst nicht geschrieben.
-4. Zuordnung und `ready`-Status werden nach erfolgreichem R2-Put in D1 committed. Gleichnamige Uploads sind erlaubt, da jede Datei eine neue `contentId` und einen eigenen R2-Prefix erhält.
+3. Ein Raw-Upload schreibt ein Original. Ein Multipart-Bildupload verlangt das Feld `original` und kann bis zu 16 optionale Bilddateien mit validierten Variantenschlüsseln enthalten. Alle Bytes werden unverändert gespeichert; Varianten erhalten eigene R2-Keys und D1-Metadaten.
+4. Original und Varianten werden unter derselben Content-ID geschrieben. Erst nachdem alle R2-Puts erfolgreich sind, werden Itemstatus `ready`, Assignment und Varianteneinträge gemeinsam in D1 committed. Bei Fehlern wird kompensierend bereinigt; ein verbleibendes `pending`-Item ist nicht auslieferbar und kann durch Cleanup behandelt werden.
 5. Ein abgebrochener Upload bleibt `pending` oder wird beim Fehler kompensierend gelöscht; ein Cleanup-Lauf kann verwaiste R2-Objekte entfernen.
-6. Ein abgebrochener Upload bleibt `pending` oder wird beim Fehler kompensierend gelöscht; ein Cleanup-Lauf kann verwaiste R2-Objekte entfernen.
 
 Jeder Upload schreibt nur seine eigene Item-Zeile, seine eigenen R2-Objekte und seine eigene Zuordnung. Es gibt keine gemeinsame Element-JSON, die parallele Uploads überschreiben könnten.
+
+**Identität eines Originals:** Eine `content_id` bezeichnet genau ein logisches Medien-Item und genau ein Original (ein Bild oder ein Dokument). Jedes weitere eigenständige Bild einer Galerie oder jedes weitere Dokument einer Liste erhält eine eigene `content_id` und eine eigene `tag_content_items`-Zeile. `tag_content_items.original_filename` bezeichnet ausschließlich den Namen dieses einen Originals; eine einzelne Content-ID gruppiert keine mehreren Originaldateien. Die optionalen Varianten sind zusätzliche Repräsentationen dieses Originals und werden in `tag_content_media_variants` mit Variantenschlüssel, MIME-Typ, Größe und SHA-256 registriert.
+
+`small`, `medium` und weitere abgeleitete Größen sind optionale Varianten desselben Originals, keine zusätzlichen Items. Der Varianten-Key ist deterministisch und unabhängig von `tag_content_media_variants` ableitbar. Die Metadatentabelle kann für Registrierung, Verfügbarkeit oder zusätzliche Signierungsinformationen genutzt werden, muss aber bei einem direkten Abruf einer bekannten Variante nicht zwingend gejoint werden. Ein Abruf muss weiterhin die Item-Zuordnung und Sichtbarkeit autorisieren; benötigter Content-Type kann aus verlässlichen R2-HTTP-Metadaten kommen. Ein Legacy-Endpunkt, der Varianten aus der D1-Tabelle auswählt oder deren Metadaten benötigt, darf diese Tabelle weiterhin lesen.
 
 Die Content-Antwort der Application API liest `view` und Element-Payloads aus demselben TAG-JSON (`elements[]`), gleicht die Liste mit D1-Strukturzeilen ab und ergänzt sichtbare Item-Mitgliedschaften aus D1. Elementdateien werden nicht mehr gelesen. Item-Anzeigefelder `contentId`, Typ, Titel, Alt-Text, Dateiname, Reihenfolge und Scope kommen aus D1; `contentId` wird als Dezimalstring ausgeliefert.
 
@@ -134,7 +137,8 @@ Beispiele:
 ```text
 content/v1/tags/623187229/tag-rev8.json
 content/v1/tags/623187229/items/1850000000000000/item.json
-content/v1/tags/623187229/items/1850000000000000/variants/large
+content/v1/tags/623187229/items/1850000000000000/variants/small
+content/v1/tags/623187229/items/1850000000000000/variants/medium
 content/v1/tags/623187229/items/1850000000000000/Titelbild.jpg
 content/v1/global/items/1850000000000001/item.json
 content/v1/tag-ranges/campaign-summer-6-001/descriptions/redirect-default/content-rev7.json
@@ -145,7 +149,11 @@ Regeln:
 
 - Die numerische TAG-ID stabilisiert den Pfad; Base36 ist nur Such-/Anzeigeinformation.
 - `tag-rev{n}.json` ist das einzige Präsentationsartefakt des TAGs; es enthält `view` und `elements[]`. Elementdateien sind Altbestand und werden nicht mehr geschrieben oder gelesen.
-- Originaldateien sind pro Content-ID unveränderlich. Jeder Upload erzeugt eine neue Content-ID; Ersetzen/Update wird nicht angeboten. Dateien werden zunächst direkt ohne Varianten unter dem jeweiligen Item-Prefix gespeichert.
+- Originaldateien sind pro Content-ID unveränderlich. Jeder Upload erzeugt eine neue Content-ID; Ersetzen/Update wird nicht angeboten. Der Raw-Upload speichert nur das Original; Multipart-Bilduploads können optionale Variantendateien mitsenden.
+- Pro Content-ID existiert genau ein Original; jedes weitere eigenständige Bild oder Dokument erhält eine eigene Content-ID. Varianten wie `small`, `medium` oder `thumbnail-v2` gehören zu diesem einen Original und werden als bereitgestellte Dateien unverändert gespeichert.
+- Der Key einer Variante lautet `content/v1/tags/{tagNumericId}/items/{contentId}/variants/{variant}` (global entsprechend unter `content/v1/global/items/{contentId}/variants/{variant}`). Variantenschlüssel werden gegen `[a-z0-9][a-z0-9-]{0,63}` geprüft; pro Multipart-Upload sind bis zu 16 Varianten erlaubt.
+- Der Varianten-Key ist aus validierten IDs und einem syntaktisch validierten Variantensegment deterministisch ableitbar; `tag_content_media_variants` muss dafür nicht bei jedem direkten Medienabruf gejoint werden. Wenn ein Aufrufer Verfügbarkeit oder zusätzliche Metadaten aus der Tabelle benötigt – insbesondere der bestehende Legacy-Signer-Pfad –, darf und soll er sie lesen.
+- Die API transformiert keine Bilder. Ohne im Multipart-Upload geliefertes R2-Objekt gibt es keine entsprechende Variante; Aufrufer dürfen nicht voraussetzen, dass `small` oder `medium` vorhanden ist.
 - `tagNumericId` und `contentId` sind kanonisch dezimal; `contentElementId` beginnt mit `cel_`; Varianten und Dateinamen werden allowlistbasiert validiert.
 - `..`, `/`, `\`, Steuerzeichen und reservierte Segmente sind ausgeschlossen.
 

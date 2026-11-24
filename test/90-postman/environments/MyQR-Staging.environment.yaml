@@ -1,0 +1,6 @@
+name: MyQR-Staging
+values:
+  - key: hostname-api
+    value: ''
+  - key: token-api
+    value: ''

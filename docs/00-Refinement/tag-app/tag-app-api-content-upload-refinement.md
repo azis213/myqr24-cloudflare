@@ -636,6 +636,16 @@ Der Item-Upload wird dieselbe Adressierung verwenden (`tagId` + `tagNumericId`) 
 - Ein Re-Publish mit entfallenem Element **mit** Inhalten wird mit `409 elements_in_use` abgelehnt; Template und D1 bleiben unverändert.
 - Ein geänderter Anzeigename überschreibt die Zeile (Upsert), ohne Items zu verlieren.
 
+### 10.5 Invariante für Originale und optionale Varianten
+
+- Eine `contentId` identifiziert genau ein logisches Item mit genau einem Originalbild oder -dokument. Mehrere eigenständige Bilder einer Galerie beziehungsweise mehrere eigenständige Dokumente einer Liste werden als separate Items mit jeweils eigener `contentId` gespeichert.
+- `small`, `medium` und weitere abgeleitete Größen sind optionale Varianten desselben Originals, keine weiteren Items. Ein vertrauenswürdiger Uploader kann sie als separate Multipart-Datei-Parts mitsenden; die API transformiert sie nicht selbst.
+- Der R2-Key einer Variante wird aus numerischer TAG-ID, `contentId` und Variantennamen abgeleitet: `content/v1/tags/{tagNumericId}/items/{contentId}/variants/{variant}`. Der Variantennamen-Segmentwert wird serverseitig gegen die definierte Allowlist validiert.
+- `tag_content_media_variants` bleibt als optionale Metadaten-/Verfügbarkeitsprojektion bestehen. Ein direkter Leseweg für eine bekannte Variante kann den Key ohne JOIN ableiten; er muss trotzdem Itemstatus, Zuordnung, TAG und effektive Sichtbarkeit autorisieren. Der bestehende Legacy-Signer-Pfad darf die Tabelle weiter verwenden.
+- Eine Content-ID gruppiert keine mehreren benannten Originaldateien. Ersetzen eines Originals durch eine neue Datei ist kein In-place-Overwrite: Das neue Original erhält eine neue Content-ID und eine neue Zuordnung.
+- Der API-Key-geschützte Bild-Upload akzeptiert zusätzlich `multipart/form-data`: genau eine Datei unter `original` und bis zu 16 optionale Datei-Parts mit variant keys wie `small`, `medium` oder `thumbnail-v2`. Variantenschlüssel müssen `[a-z0-9][a-z0-9-]{0,63}` erfüllen; sie sind nicht auf eine feste Liste beschränkt. Alle Multipart-Dateien müssen gültige, signaturgeprüfte JPEG-/PNG-/GIF-/WebP-Bilder sein; die Gesamtgröße der Datei-Parts beträgt höchstens 25 MiB. Die Variante wird unter `variants/{variant}` geschrieben und in `tag_content_media_variants` mit Typ, Größe und SHA-256 registriert.
+- Der Raw-Upload bleibt für bestehende Clients und Dokumente erhalten. Bei Multipart bleiben Item und Assignment `pending`/unveröffentlicht, bis Original, alle Varianten und deren D1-Metadaten erfolgreich geschrieben sind. Fehler lösen kompensierende R2-/D1-Bereinigung aus; ein verbleibendes `pending`-Item signalisiert erforderliche Wiederholung/Cleanup.
+
 ---
 
 ## 11. Sicherheit

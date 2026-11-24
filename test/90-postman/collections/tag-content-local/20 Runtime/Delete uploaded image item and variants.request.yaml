@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{hostname-tag-app}}/api/v1/tags/{{tag-id}}/items/{{uploaded-content-id}}"
+method: DELETE
+auth:
+  type: bearer
+  credentials:
+    token: "{{content-api-key}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Item und Varianten gelöscht', function () { pm.response.to.have.status(200); });
+      pm.test('Gelöschte Content-ID stimmt', function () { pm.expect(pm.response.json().contentId).to.eql(pm.environment.get('uploaded-content-id')); });
+    language: text/javascript
+order: 5000
