@@ -77,6 +77,7 @@ export function App({
   const [error, setError] = useState<string | null>(null);
   const [newTagType, setNewTagType] = useState<TagType>("vault");
   const [publishOpen, setPublishOpen] = useState(false);
+  const [publishDialogTab, setPublishDialogTab] = useState<"publish" | "manage">("publish");
   const [publishEnvironment, setPublishEnvironment] = useState<"local" | "staging">(() => {
     try {
       return window.localStorage.getItem("myqr24.tcd.publish.environment") === "staging" ? "staging" : "local";
@@ -695,6 +696,7 @@ export function App({
     setPublishStatus("");
     setPublishResult(null);
     setPublishConfirm("");
+    setPublishDialogTab("publish");
     setPublishOpen(true);
   }, []);
 
@@ -983,39 +985,17 @@ export function App({
               <h2 id="publish-title">TAG-Content veröffentlichen</h2>
               <button type="button" className="mini secondary" aria-label="Dialog schließen" disabled={publishBusy} onClick={() => setPublishOpen(false)}>×</button>
             </div>
-            <p className="publish-warning">Der Publish ersetzt den gesamten veröffentlichten TAG-Content. Prüfe Ziel und Template sorgfältig.</p>
-            <label>
-              Template
-              <select
-                aria-label="Publish-Template"
-                value={publishTemplateId}
-                disabled={publishBusy}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setPublishTemplateId(value);
-                  const selectedTemplate = bundledTemplates.find((entry) => entry.id === value);
-                  if (selectedTemplate) {
-                    void loadBundledTemplate(selectedTemplate.path, selectedTemplate.samplePath);
-                    setPublishNumericId("");
-                    setPublishConfirm("");
-                    setPublishResult(null);
-                  }
-                  else if (value === doc.template.templateId) {
-                    const serialized = canonicalize(state.doc);
-                    const openedDocument = JSON.parse(serialized) as TagContentDocument;
-                    const found = validateDocument(openedDocument);
-                    setError(found.some((entry) => entry.blocking) ? "Ausgewähltes Template enthält blockierende Validierungsfehler." : null);
-                    dispatch({ type: "load", doc: openedDocument, fileName: state.templateFileName, log: ["Aktuelles Template für Publish ausgewählt."] });
-                    setMessage("Aktuelles Template für Publish ausgewählt.");
-                  }
-                }}
-              >
-                <option value={doc.template.templateId}>Aktuell: {doc.template.name}</option>
-                {bundledTemplates.map((entry) => (
-                  <option key={entry.id} value={entry.id}>{entry.label}</option>
-                ))}
-              </select>
-            </label>
+            <div className="publish-tabs" role="tablist" aria-label="TAG-Aktionen" onKeyDown={(event) => {
+              if (event.key === "ArrowRight" || event.key === "ArrowLeft" || event.key === "Home" || event.key === "End") {
+                event.preventDefault();
+                const nextTab = event.key === "Home" || event.key === "ArrowLeft" ? "publish" : "manage";
+                setPublishDialogTab(nextTab);
+                document.getElementById(nextTab === "publish" ? "publish-tab" : "manage-tab")?.focus();
+              }
+            }}>
+              <button type="button" role="tab" id="publish-tab" aria-controls="publish-panel" aria-selected={publishDialogTab === "publish"} tabIndex={publishDialogTab === "publish" ? 0 : -1} onClick={() => setPublishDialogTab("publish")}>Publish Tag</button>
+              <button type="button" role="tab" id="manage-tab" aria-controls="manage-panel" aria-selected={publishDialogTab === "manage"} tabIndex={publishDialogTab === "manage" ? 0 : -1} onClick={() => setPublishDialogTab("manage")}>Manage Tag</button>
+            </div>
             <label>
               Umgebung
               <select aria-label="Publish-Umgebung" value={publishEnvironment} disabled={publishBusy} onChange={(event) => {
@@ -1055,14 +1035,68 @@ export function App({
                 <button type="button" aria-label="Numeric-ID aktualisieren" title="TAG-ID mit dem Codec auflösen" disabled={publishBusy} onClick={() => void resolvePublishTagId()}>
                   ↻
                 </button>
-                <button type="button" aria-label="Routing laden" title="Lokalen/Staging-Routing-Eintrag laden" disabled={publishBusy || !publishNumericId || !testTagAdminAvailable} onClick={() => void callTestTagAdmin("get")}>
-                  Laden
-                </button>
               </span>
             </label>
+            <section className="publish-tabpanel" role="tabpanel" id="publish-panel" aria-labelledby="publish-tab" hidden={publishDialogTab !== "publish"}>
+              <p className="publish-warning">Der Publish ersetzt den gesamten veröffentlichten TAG-Content. Prüfe Ziel und Template sorgfältig.</p>
+              <label>
+                Template
+                <select
+                  aria-label="Publish-Template"
+                  value={publishTemplateId}
+                  disabled={publishBusy}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setPublishTemplateId(value);
+                    const selectedTemplate = bundledTemplates.find((entry) => entry.id === value);
+                    if (selectedTemplate) {
+                      void loadBundledTemplate(selectedTemplate.path, selectedTemplate.samplePath);
+                      setPublishNumericId("");
+                      setPublishConfirm("");
+                      setPublishResult(null);
+                    }
+                    else if (value === doc.template.templateId) {
+                      const serialized = canonicalize(state.doc);
+                      const openedDocument = JSON.parse(serialized) as TagContentDocument;
+                      const found = validateDocument(openedDocument);
+                      setError(found.some((entry) => entry.blocking) ? "Ausgewähltes Template enthält blockierende Validierungsfehler." : null);
+                      dispatch({ type: "load", doc: openedDocument, fileName: state.templateFileName, log: ["Aktuelles Template für Publish ausgewählt."] });
+                      setMessage("Aktuelles Template für Publish ausgewählt.");
+                    }
+                  }}
+                >
+                  <option value={doc.template.templateId}>Aktuell: {doc.template.name}</option>
+                  {bundledTemplates.map((entry) => (
+                    <option key={entry.id} value={entry.id}>{entry.label}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="publish-preview" aria-label="Publish-Zusammenfassung">
+                <strong>Ziel:</strong> {publishEnvironment === "local" ? "Lokal" : "Staging"} · TAG {publishTagId || "—"}
+                <br />
+                <strong>Template:</strong> {doc.template.name} ({doc.template.templateId} · v{doc.template.templateVersion})
+                <br />
+                <strong>Schema:</strong> {doc.schema} · {doc.elements.length} Elemente
+              </div>
+              <label>
+                Bestätigung (exakt <code>PUBLISH {publishTagId || "TAG-ID"}</code>)
+                <input aria-label="Publish-Bestätigung" type="text" autoComplete="off" value={publishConfirm} disabled={publishBusy} onChange={(event) => setPublishConfirm(event.target.value)} />
+              </label>
+              {publishStatus ? <p className="publish-success" role="status">{publishStatus}</p> : null}
+              {publishError ? <p className="errorbar publish-error" role="alert">{publishError}</p> : null}
+              {publishResult ? <pre className="publish-result" aria-label="Publish-Ergebnis">{JSON.stringify(publishResult, null, 2)}</pre> : null}
+              <div className="publish-actions">
+                <button type="button" disabled={publishBusy} onClick={() => setPublishOpen(false)}>Schließen</button>
+                <button type="button" className="primary" disabled={publishBusy || blocking || !publishNumericId || publishConfirm !== `PUBLISH ${publishTagId.trim().toLowerCase()}`} onClick={() => void publishTagContent()}>
+                  {publishBusy ? "Bitte warten…" : "Jetzt vollständig ersetzen"}
+                </button>
+              </div>
+            </section>
+            <section className="publish-tabpanel" role="tabpanel" id="manage-panel" aria-labelledby="manage-tab" hidden={publishDialogTab !== "manage"}>
             <fieldset className="publish-admin-fields" disabled={publishBusy}>
               <legend>Test-TAG-Verwaltung · {publishEnvironment === "local" ? "Lokal" : "Staging"}</legend>
               <button type="button" disabled={publishBusy} title="Lokal nutzt den lokalen Test-Key; Staging benötigt den getrennten TAG_TEST_ADMIN_KEY_S01. Ohne Freigabe bleiben die Verwaltungsaktionen deaktiviert." onClick={() => void checkTestTagAdmin()}>Verwaltungs-API prüfen</button>
+              <button type="button" aria-label="Routing laden" title="Lokalen/Staging-Routing-Eintrag laden" disabled={publishBusy || !publishNumericId || !testTagAdminAvailable} onClick={() => void callTestTagAdmin("get")}>Routing laden</button>
               {!testTagAdminAvailable ? <p className="publish-admin-note">API nicht freigeschaltet. Verfügbarkeit prüfen; Verwaltungsaktionen bleiben bis zur Bestätigung deaktiviert.</p> : null}
               <p className="publish-admin-note">Verwaltet nur den TAG-Routing-Eintrag in der gewählten Testumgebung. Produktion ist nicht verfügbar.</p>
               <label>Status
@@ -1105,26 +1139,7 @@ export function App({
             {testTagAdminStatus ? <p className="publish-success" role="status">{testTagAdminStatus}</p> : null}
             {testTagAdminError ? <p className="errorbar publish-error" role="alert">{testTagAdminError}</p> : null}
             {testTagAdminResult ? <pre className="publish-result" aria-label="Test-TAG-Verwaltungsergebnis">{JSON.stringify(testTagAdminResult, null, 2)}</pre> : null}
-            <div className="publish-preview" aria-label="Publish-Zusammenfassung">
-              <strong>Ziel:</strong> {publishEnvironment === "local" ? "Lokal" : "Staging"} · TAG {publishTagId || "—"}
-              <br />
-              <strong>Template:</strong> {doc.template.name} ({doc.template.templateId} · v{doc.template.templateVersion})
-              <br />
-              <strong>Schema:</strong> {doc.schema} · {doc.elements.length} Elemente
-            </div>
-            <label>
-              Bestätigung (exakt <code>PUBLISH {publishTagId || "TAG-ID"}</code>)
-              <input aria-label="Publish-Bestätigung" type="text" autoComplete="off" value={publishConfirm} disabled={publishBusy} onChange={(event) => setPublishConfirm(event.target.value)} />
-            </label>
-            {publishStatus ? <p className="publish-success" role="status">{publishStatus}</p> : null}
-            {publishError ? <p className="errorbar publish-error" role="alert">{publishError}</p> : null}
-            {publishResult ? <pre className="publish-result" aria-label="Publish-Ergebnis">{JSON.stringify(publishResult, null, 2)}</pre> : null}
-            <div className="publish-actions">
-              <button type="button" disabled={publishBusy} onClick={() => setPublishOpen(false)}>Schließen</button>
-              <button type="button" className="primary" disabled={publishBusy || blocking || !publishNumericId || publishConfirm !== `PUBLISH ${publishTagId.trim().toLowerCase()}`} onClick={() => void publishTagContent()}>
-                {publishBusy ? "Bitte warten…" : "Jetzt vollständig ersetzen"}
-              </button>
-            </div>
+            </section>
           </section>
         </div>
       ) : null}

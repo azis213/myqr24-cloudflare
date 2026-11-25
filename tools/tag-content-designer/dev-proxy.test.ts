@@ -34,12 +34,16 @@ function createResponse() {
 async function getMiddleware() {
   vi.resetModules();
   const { default: config } = await import("./vite.config");
-  const plugin = (config.plugins ?? []).find((entry) => entry && typeof entry === "object" && entry.name === "tag-content-designer-publish-dev-api");
+  const plugin = (config.plugins ?? []).find((entry) =>
+    entry !== null && typeof entry === "object" && !Array.isArray(entry) &&
+    "name" in entry && entry.name === "tag-content-designer-publish-dev-api",
+  );
   if (!plugin || typeof plugin === "string" || Array.isArray(plugin) || !("configureServer" in plugin) || typeof plugin.configureServer !== "function") {
     throw new Error("Publish dev plugin fehlt.");
   }
+  const configureServer = plugin.configureServer as unknown as (server: never) => void;
   let middleware: (request: IncomingMessage, response: ServerResponse, next: (error?: unknown) => void) => void;
-  plugin.configureServer({
+  configureServer({
     middlewares: {
       use(handler: typeof middleware) {
         middleware = handler;
@@ -192,7 +196,7 @@ describe("TAG-Content Dev-Proxy", () => {
     };
     process.env.MYQR_STAGING_TAG_APP_API_BASE_URL = "https://tag-api.example.test";
     process.env.MYQR_STAGING_TAG_TEST_ADMIN_KEY = "test-admin-key";
-    const fetchMock = vi.fn(async () => Response.json({ enabled: true, environment: "staging" }));
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json({ enabled: true, environment: "staging" }));
     vi.stubGlobal("fetch", fetchMock);
     try {
       const middleware = await getMiddleware();
@@ -201,7 +205,7 @@ describe("TAG-Content Dev-Proxy", () => {
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.body)).toEqual({ enabled: true, environment: "staging" });
       expect(fetchMock).toHaveBeenCalledOnce();
-      const [, init] = fetchMock.mock.calls[0];
+      const [, init] = fetchMock.mock.calls[0]!;
       expect(new Headers(init?.headers).get("authorization")).toBe("Bearer test-admin-key");
       expect(response.body).not.toContain("test-admin-key");
     } finally {

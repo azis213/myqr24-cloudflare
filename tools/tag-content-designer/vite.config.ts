@@ -213,6 +213,10 @@ function publishDevApi() {
           }
 
           if (pathname === "/__tag-content/resolve") {
+            if (typeof tagId !== "string" || !/^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/u.test(tagId)) {
+              jsonResponse(response, 400, { error: "Base36-TAG-ID ist ungültig." });
+              return;
+            }
             const decoded = await fetch(new URL("/api/v1/codec/decode", codecBaseUrl), {
               method: "POST",
               headers: { authorization: `Bearer ${codecToken}`, "content-type": "application/json" },

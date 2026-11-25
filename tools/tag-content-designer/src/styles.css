@@ -86,6 +86,12 @@ input[type="color"] { width: 2.2rem; padding: 0; height: 1.9rem; border: 1px sol
 .publish-heading h2 { margin: 0; font-size: 1.15rem; }
 .publish-dialog > label { display: flex; flex-direction: column; gap: 0.35rem; color: var(--muted); font-size: 0.88rem; }
 .publish-dialog label input, .publish-dialog label select { color: var(--text); }
+.publish-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); }
+.publish-tabs [role="tab"] { flex: 1; padding: 0.65rem 0.8rem; border: 0; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; background: transparent; color: var(--muted); font-weight: 650; }
+.publish-tabs [role="tab"][aria-selected="true"] { border-bottom-color: var(--accent, #72a7ff); background: var(--panel-2); color: var(--text); }
+.publish-tabs [role="tab"]:focus-visible { outline: 2px solid var(--accent, #72a7ff); outline-offset: -2px; }
+.publish-tabpanel { display: flex; flex-direction: column; gap: 0.85rem; }
+.publish-tabpanel[hidden] { display: none; }
 .publish-id-row input { flex: 1; }
 .publish-id-row button { flex: 0 0 auto; min-width: 2.5rem; font-size: 1.2rem; }
 .publish-warning { margin: 0; padding: 0.7rem; background: #3a1c1a; color: #ffb4ad; border-radius: 6px; }

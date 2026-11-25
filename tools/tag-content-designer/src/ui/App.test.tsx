@@ -127,6 +127,11 @@ describe("App", () => {
 
     fireEvent.click(within(container).getByRole("button", { name: "Publish…" }));
     const dialog = within(container).getByRole("dialog", { name: "TAG-Content veröffentlichen" });
+    const tabs = within(dialog).getAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["Publish Tag", "Manage Tag"]);
+    expect(tabs[0].getAttribute("aria-selected")).toBe("true");
+    expect(dialog.querySelector("#publish-panel")?.hasAttribute("hidden")).toBe(false);
+    expect(dialog.querySelector("#manage-panel")?.hasAttribute("hidden")).toBe(true);
     expect((within(dialog).getByLabelText("Publish-Umgebung") as HTMLSelectElement).value).toBe("staging");
     expect((within(dialog).getByLabelText("Base36-TAG-ID") as HTMLInputElement).value).toBe("ab12cd");
     expect((within(dialog).getByLabelText("Numeric-ID") as HTMLInputElement).value).toBe("");
@@ -174,6 +179,9 @@ describe("App", () => {
     const { container } = setup();
     fireEvent.click(within(container).getByRole("button", { name: "Publish…" }));
     const dialog = within(container).getByRole("dialog", { name: "TAG-Content veröffentlichen" });
+    fireEvent.click(within(dialog).getByRole("tab", { name: "Manage Tag" }));
+    expect(dialog.querySelector("#manage-panel")?.hasAttribute("hidden")).toBe(false);
+    expect(dialog.querySelector("#publish-panel")?.hasAttribute("hidden")).toBe(true);
     fireEvent.click(within(dialog).getByRole("button", { name: "Numeric-ID aktualisieren" }));
     await waitFor(() => expect((within(dialog).getByLabelText("Numeric-ID") as HTMLInputElement).value).toBe("623187229"));
     fireEvent.click(within(dialog).getByRole("button", { name: "Verwaltungs-API prüfen" }));
