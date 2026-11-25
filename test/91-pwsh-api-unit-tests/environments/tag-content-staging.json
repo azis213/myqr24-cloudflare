@@ -1,0 +1,71 @@
+{
+  "name": "tag-content-staging",
+  "environment": "staging",
+  "baseUrl": "https://myqr24-tag-app-api-staging.azis213.workers.dev",
+  "tagId": "",
+  "tagNumericId": "",
+  "elementId": "cel_gallery",
+  "accessVersion": 1,
+  "contentRevision": 1,
+  "localSeedKey": "",
+  "bootstrapSecret": "",
+  "publisherKey": "",
+  "contentApiKey": "",
+  "uploadFile": "../collections/tag-content-local/assets/upload-test.png",
+  "publishTemplate": {
+    "schema": "myqr24-tag-content-template-v1",
+    "schemaVersion": 3,
+    "template": {
+      "templateId": "tct_postman_local",
+      "templateVersion": 1,
+      "tagType": "vault",
+      "name": "Staging API-Test-TAG",
+      "locale": "de-DE",
+      "status": "draft"
+    },
+    "shell": {
+      "presentation": "standard",
+      "features": ["vault"],
+      "theme": {
+        "colorMode": "light",
+        "colors": {
+          "background": "#ffffff",
+          "surface": "#fafafa",
+          "text": "#111111",
+          "mutedText": "#666666",
+          "heading": "#111111",
+          "accent": "#2b6cb0",
+          "accentText": "#ffffff",
+          "border": "#dddddd"
+        }
+      }
+    },
+    "layout": {
+      "mode": "grid-flow",
+      "columns": 12,
+      "gap": "md",
+      "responsive": {
+        "autoReflow": true,
+        "preferredColumns": { "mobile": 1, "desktop": 3 }
+      }
+    },
+    "elements": [
+      {
+        "elementId": "cel_gallery",
+        "elementType": "gallery",
+        "displayOrder": 20,
+        "visibility": "public",
+        "payload": { "name": "Staging-Testgalerie" },
+        "slots": [
+          {
+            "slotId": "images",
+            "accepts": ["image"],
+            "min": 0,
+            "max": 48,
+            "required": false
+          }
+        ]
+      }
+    ]
+  }
+}

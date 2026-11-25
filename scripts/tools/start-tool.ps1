@@ -25,6 +25,20 @@ $tools = @(
         Description = "TAG-Bereiche generieren, etikettieren und exportieren"
         RelativePath = "tools\tag-gen"
         DefaultPort = 5174
+    },
+    [PSCustomObject]@{
+        Id          = "tag-content-designer"
+        Name        = "TAG-Content-Designer"
+        Description = "TAG-Content definieren und gestalten"
+        RelativePath = "tools\tag-content-designer"
+        DefaultPort = 5175
+    },
+        [PSCustomObject]@{
+        Id          = "tag-lab"
+        Name        = "TAG-Lab"
+        Description = "TAG-Lab: Experimente mit TAG-Content und Edge-Router"
+        RelativePath = "tools\tag-lab"
+        DefaultPort = 5176
     }
 )
 

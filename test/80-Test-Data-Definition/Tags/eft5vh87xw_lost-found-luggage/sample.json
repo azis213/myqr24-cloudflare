@@ -1,0 +1,35 @@
+{
+  "schema": "myqr24-tag-content-sample-v1",
+  "schemaVersion": 1,
+  "tag": { "id": "koffer24", "displayName": "Reisekoffer – Fundmeldung" },
+  "media": [
+    {
+      "contentId": "m_luggage",
+      "alt": "Dunkelblauer Handgepäckkoffer",
+      "caption": "Koffer am Fundort",
+      "variants": {
+        "thumb": "/templates/examples/assets/luggage.svg",
+        "large": "/templates/examples/assets/luggage.svg"
+      }
+    },
+    {
+      "contentId": "m_label",
+      "alt": "Nahaufnahme des Kofferanhängers",
+      "caption": "Anhänger am Griff",
+      "variants": {
+        "thumb": "/templates/examples/assets/luggage-tag.svg",
+        "large": "/templates/examples/assets/luggage-tag.svg"
+      }
+    }
+  ],
+  "documents": [],
+  "entries": [],
+  "contributions": [
+    { "contentId": "c_find", "principal": "guest", "mediaId": "m_luggage", "state": "pending", "ownerName": "Fundmeldung" },
+    { "contentId": "c_detail", "principal": "guest", "mediaId": "m_label", "state": "pending", "ownerName": "Detailfoto" }
+  ],
+  "slotFill": {
+    "cel_theme": { "tag-background": [] },
+    "cel_form": { "photos": ["m_luggage", "m_label"] }
+  }
+}

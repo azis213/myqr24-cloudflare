@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1100" width="800" height="1100" role="img" aria-label="Wartungsprotokoll Seite 1">
+  <rect width="800" height="1100" fill="#ffffff"/>
+  <rect x="0" y="0" width="800" height="120" fill="#e8ecea"/>
+  <text x="60" y="78" font-family="system-ui, sans-serif" font-size="34" fill="#21302a">Wartungsprotokoll</text>
+  <rect x="60" y="170" width="680" height="10" rx="4" fill="#c9d1cb"/>
+  <rect x="60" y="210" width="520" height="10" rx="4" fill="#e2e7e4"/>
+  <rect x="60" y="250" width="600" height="10" rx="4" fill="#e2e7e4"/>
+  <rect x="60" y="320" width="680" height="2" fill="#dde3df"/>
+  <rect x="60" y="355" width="300" height="10" rx="4" fill="#c9d1cb"/>
+  <rect x="60" y="395" width="640" height="10" rx="4" fill="#e2e7e4"/>
+  <rect x="60" y="435" width="580" height="10" rx="4" fill="#e2e7e4"/>
+  <rect x="60" y="475" width="620" height="10" rx="4" fill="#e2e7e4"/>
+  <text x="60" y="1040" font-family="system-ui, sans-serif" font-size="20" fill="#5f6863">Beispieldokument (SVG-Platzhalter)</text>
+</svg>

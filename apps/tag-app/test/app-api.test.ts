@@ -1,6 +1,7 @@
 import { argon2id } from "hash-wasm";
 import { describe, expect, it } from "vitest";
 import { handleAppApiRequest } from "../workers/app-api";
+import { handleTagTestAdminRequest } from "../workers/tag-test-admin";
 
 const secret = "bootstrap-test-secret";
 const pepper = "server-only-pepper";
@@ -155,6 +156,48 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
 }
 
 describe("tag access API", () => {
+  it("keeps staging test-admin closed without the dedicated key/environment gate", async () => {
+    const env = { APP_DB: {}, PRIVATE_CONTENT: {}, TAG_TEST_ADMIN_ENVIRONMENT: "production", TAG_TEST_ADMIN_KEY_S01: "publisher-key" } as never;
+    const response = await handleTagTestAdminRequest(new Request("https://api.example.test/api/test-admin/tags/ab12cd", { headers: { authorization: "Bearer publisher-key" } }), env, "staging");
+    expect(response.status).toBe(404);
+  });
+
+  it("validates routing mode, HTTPS external URL, version defaults and exact delete confirmation", async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = [];
+    const env = {
+      TAG_TEST_ADMIN_ENVIRONMENT: "staging",
+      TAG_TEST_ADMIN_KEY_S01: "test-admin-key",
+      APP_DB: {
+        prepare(sql: string) {
+          return { bind(...values: unknown[]) { return {
+            sql,
+            values,
+            async first() { calls.push({ sql, values }); return null; },
+            async run() { calls.push({ sql, values }); return { meta: { changes: 1 } }; },
+          }; } };
+        },
+      },
+      PRIVATE_CONTENT: { list: async () => ({ objects: [], truncated: false }), delete: async () => undefined },
+    } as never;
+    const headers = { authorization: "Bearer test-admin-key", "content-type": "application/json" };
+    const base = { tagNumericId: "623187229", status: "active", targetType: "internal", protectionMode: "public", externalUrl: null, accessVersion: 1, contentRevision: 1, schemaVersion: 1 };
+    const invalidExternal = await handleTagTestAdminRequest(new Request("https://api.example.test/api/test-admin/tags/ab12cd", {
+      method: "PUT", headers, body: JSON.stringify({ ...base, targetType: "external", externalUrl: "http://unsafe.example" }),
+    }), env, "staging");
+    expect(invalidExternal.status).toBe(400);
+
+    const save = await handleTagTestAdminRequest(new Request("https://api.example.test/api/test-admin/tags/ab12cd", {
+      method: "PUT", headers, body: JSON.stringify(base),
+    }), env, "staging");
+    expect(save.status).toBe(200);
+    expect(calls.some((entry) => entry.sql.startsWith("INSERT INTO tag_routing"))).toBe(true);
+
+    const badDelete = await handleTagTestAdminRequest(new Request("https://api.example.test/api/test-admin/tags/ab12cd", {
+      method: "DELETE", headers, body: JSON.stringify({ tagNumericId: "623187229", confirm: "DELETE ab12cd" }),
+    }), env, "staging");
+    expect(badDelete.status).toBe(400);
+  });
+
   it("issues an HttpOnly public access session only for a valid public bootstrap", async () => {
     const state = fakeEnvironment();
     const data = await bootstrap("public");

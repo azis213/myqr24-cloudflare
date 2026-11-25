@@ -1,0 +1,52 @@
+{
+  "schema": "myqr24-tag-content-sample-v1",
+  "schemaVersion": 1,
+  "tag": { "id": "party2024", "displayName": "Hochzeit – Abendparty" },
+  "media": [
+    {
+      "contentId": "m_hero",
+      "alt": "Abendparty mit Lichtern",
+      "caption": "Abendparty",
+      "variants": {
+        "thumb": "/templates/examples/assets/party-hero.svg",
+        "large": "/templates/examples/assets/party-hero.svg"
+      }
+    },
+    {
+      "contentId": "m_dance",
+      "alt": "Tanzfläche mit Lichtern",
+      "caption": "Tanzfläche",
+      "variants": {
+        "thumb": "/templates/examples/assets/party-1.svg",
+        "large": "/templates/examples/assets/party-1.svg"
+      }
+    },
+    {
+      "contentId": "m_bar",
+      "alt": "Bar mit Flaschen",
+      "caption": "Bar",
+      "variants": {
+        "thumb": "/templates/examples/assets/party-2.svg",
+        "large": "/templates/examples/assets/party-2.svg"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "contentId": "d_plan",
+      "title": "Ablaufplan Abend",
+      "kind": "other",
+      "description": "Zeiten ab 20 Uhr",
+      "variant": "/templates/examples/assets/garden-menu.svg",
+      "availableLabel": "Jetzt verfügbar"
+    }
+  ],
+  "entries": [],
+  "contributions": [],
+  "slotFill": {
+    "cel_theme": { "tag-background": [] },
+    "cel_hero": { "cover": ["m_hero"] },
+    "cel_gallery": { "images": ["m_dance", "m_bar", "m_hero"] },
+    "cel_docs": { "documents": ["d_plan"] }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema": "myqr24-tag-test-definition-v1",
+  "schemaVersion": 1,
+  "fixture": "wedding-party",
+  "reservationGroup": "vault",
+  "tagType": "event",
+  "slot": 102,
+  "tagLength": 10,
+  "tagNumericId": "2821109907557",
+  "tagId": null,
+  "tagIdStatus": "pending-user-assignment",
+  "sourceExample": "tools/tag-content-designer/public/templates/examples/wedding-party"
+}

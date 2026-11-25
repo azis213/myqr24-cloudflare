@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" role="img" aria-label="Gartenfeier">
+  <rect width="1200" height="800" fill="#dfe8d3"/>
+  <circle cx="980" cy="150" r="90" fill="#f6efd8"/>
+  <path d="M0 620 Q300 520 600 600 T1200 560 V800 H0Z" fill="#9fb287"/>
+  <path d="M0 690 Q320 610 640 670 T1200 640 V800 H0Z" fill="#7c8f6b" opacity="0.8"/>
+  <text x="60" y="730" font-family="system-ui, sans-serif" font-size="48" fill="#2b2a26">Gartenfeier</text>
+  <text x="62" y="775" font-family="system-ui, sans-serif" font-size="26" fill="#4a5142">Beispielfoto (SVG-Platzhalter)</text>
+</svg>

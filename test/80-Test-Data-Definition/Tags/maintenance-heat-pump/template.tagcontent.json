@@ -1,0 +1,218 @@
+{
+  "schema": "myqr24-tag-content-template-v1",
+  "schemaVersion": 3,
+  "template": {
+    "templateId": "tct_example_maintenance_heat_pump",
+    "templateVersion": 1,
+    "tagType": "maintenance",
+    "name": "Wartung – Wärmepumpe",
+    "description": "Beispiel: Wartungshistorie mit Dokumenten, Wartungstabelle, Typenschild und Sicherheitshinweis.",
+    "locale": "de-DE",
+    "status": "draft",
+    "compatibility": {
+      "protectionModes": ["public", "pin_required"],
+      "presentations": ["standard"]
+    }
+  },
+  "shell": {
+    "presentation": "standard",
+    "features": ["vault"],
+    "theme": {
+      "colorMode": "light",
+      "colors": {
+        "background": "#f4f5f4",
+        "surface": "#ffffff",
+        "text": "#1f2321",
+        "mutedText": "#5f6863",
+        "heading": "#21302a",
+        "accent": "#3f6b52",
+        "accentText": "#ffffff",
+        "border": "#dde3df",
+        "danger": "#a6402e",
+        "success": "#1b6b3a"
+      },
+      "typography": { "fontFamily": "system", "headingScale": 1, "bodySize": 16, "lineHeight": 1.5 },
+      "layout": { "contentWidth": "narrow", "density": "compact", "cornerStyle": "none" }
+    },
+    "navigation": { "mode": "single", "items": [] },
+    "statusBar": { "showTagId": true, "showPresentation": false }
+  },
+  "layout": {
+    "mode": "grid-flow",
+    "columns": 12,
+    "gap": "sm",
+    "container": { "maxWidth": "narrow", "padding": "normal" },
+    "responsive": {
+      "autoReflow": true,
+      "minColumnWidth": { "tablet": "16rem", "desktop": "18rem" },
+      "preferredColumns": { "mobile": 1, "tablet": 2, "desktop": 3 }
+    }
+  },
+  "elements": [
+    {
+      "elementId": "cel_theme",
+      "elementType": "theme-assets",
+      "displayOrder": 0,
+      "visibility": "public",
+      "hidden": true,
+      "payload": { "role": "background" },
+      "slots": [
+        { "slotId": "tag-background", "accepts": ["image"], "min": 0, "max": 1, "required": false }
+      ]
+    },
+    {
+      "elementId": "cel_history",
+      "elementType": "maintenance-history",
+      "displayOrder": 10,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 8 },
+        "order": { "mobile": 10, "tablet": 10, "desktop": 10 }
+      },
+      "style": { "background": { "type": "solid", "color": "surface" }, "padding": "md" },
+      "payload": { "groupBy": "year", "showTotals": true, "dateFormat": "de-DE" },
+      "content": { "paragraphs": [{ "heading": 3, "runs": [{ "text": "Wartungshistorie" }] }] },
+      "actions": {
+        "upload": {
+          "enabled": true,
+          "principals": ["owner"],
+          "acceptedTypes": ["document", "image"],
+          "maxItemsPerPrincipal": 4,
+          "maxFileSizeMb": 10,
+          "afterUpload": "quarantine"
+        },
+        "download": { "enabled": true, "principals": ["guest", "owner"] }
+      },
+      "slots": [
+        { "slotId": "entries", "accepts": ["document", "image"], "min": 0, "max": 64, "required": false }
+      ]
+    },
+    {
+      "elementId": "cel_plate",
+      "elementType": "image",
+      "displayOrder": 20,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 4 },
+        "order": { "mobile": 20, "tablet": 20, "desktop": 20 }
+      },
+      "payload": { "fit": "contain", "zoom": "tap", "maxHeight": "auto" },
+      "content": { "paragraphs": [{ "heading": 4, "runs": [{ "text": "Typenschild" }] }] },
+      "slots": [
+        { "slotId": "image", "accepts": ["image"], "min": 0, "max": 1, "required": false, "presentation": { "fit": "contain", "caption": "optional" } }
+      ]
+    },
+    {
+      "elementId": "cel_log",
+      "elementType": "text",
+      "displayOrder": 30,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 30, "tablet": 30, "desktop": 30 }
+      },
+      "style": { "padding": "md" },
+      "payload": { "headingLevel": "h2", "align": "start", "maxParagraphs": 8 },
+      "content": {
+        "paragraphs": [
+          { "heading": 3, "runs": [{ "text": "Wartungen im Überblick" }] },
+          {
+            "type": "table",
+            "columns": [{ "align": "start" }, { "align": "start" }, { "align": "start" }, { "align": "end" }],
+            "rows": [
+              {
+                "header": true,
+                "cells": [
+                  { "runs": [{ "text": "Datum" }], "background": "#e9eeeb" },
+                  { "runs": [{ "text": "Arbeit" }], "background": "#e9eeeb" },
+                  { "runs": [{ "text": "Techniker" }], "background": "#e9eeeb" },
+                  { "runs": [{ "text": "Status" }], "background": "#e9eeeb" }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "04.11.2024" }] },
+                  { "runs": [{ "text": "Jahreswartung, Filterwechsel" }] },
+                  { "runs": [{ "text": "H. Weber" }] },
+                  { "runs": [{ "text": "erledigt", "color": "#1b6b3a" }] }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "16.05.2024" }], "background": "#f7f9f8" },
+                  { "runs": [{ "text": "Kältemittel geprüft" }], "background": "#f7f9f8" },
+                  { "runs": [{ "text": "H. Weber" }], "background": "#f7f9f8" },
+                  { "runs": [{ "text": "erledigt", "color": "#1b6b3a" }], "background": "#f7f9f8" }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "08.11.2023" }] },
+                  { "runs": [{ "text": "Jahreswartung" }] },
+                  { "runs": [{ "text": "M. Sanz" }] },
+                  { "runs": [{ "text": "erledigt", "color": "#1b6b3a" }] }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "10.02.2026" }], "background": "#f7f9f8" },
+                  { "runs": [{ "text": "Termin mit Fachbetrieb" }], "background": "#f7f9f8" },
+                  { "runs": [{ "text": "offen" }], "background": "#f7f9f8" },
+                  { "runs": [{ "text": "geplant", "color": "#a6402e" }], "background": "#f7f9f8" }
+                ]
+              }
+            ],
+            "border": { "color": "#c9d1cb", "style": "solid", "width": 1 }
+          }
+        ]
+      }
+    },
+    {
+      "elementId": "cel_safety",
+      "elementType": "callout",
+      "displayOrder": 40,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 8 },
+        "order": { "mobile": 40, "tablet": 40, "desktop": 40 }
+      },
+      "payload": { "tone": "safety" },
+      "content": {
+        "paragraphs": [
+          { "heading": 4, "runs": [{ "text": "Sicherheit" }] },
+          { "runs": [{ "text": "Arbeiten an Kältemittelkreis und Elektrik nur durch Fachbetriebe. Vor dem Öffnen: Anlage spannungsfrei schalten und absperren." }] }
+        ]
+      }
+    },
+    {
+      "elementId": "cel_docs",
+      "elementType": "documents",
+      "displayOrder": 50,
+      "visibility": "shared",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 4 },
+        "order": { "mobile": 50, "tablet": 50, "desktop": 50 }
+      },
+      "payload": { "view": "list", "showMeta": true, "sort": "date-desc", "maxItems": 32 },
+      "content": { "paragraphs": [{ "heading": 4, "runs": [{ "text": "Prüfprotokolle" }] }] },
+      "actions": {
+        "upload": { "enabled": true, "principals": ["owner"], "acceptedTypes": ["document"], "maxItemsPerPrincipal": 4, "maxFileSizeMb": 10, "afterUpload": "ready" },
+        "download": { "enabled": true, "principals": ["guest", "owner"] }
+      },
+      "slots": [
+        { "slotId": "documents", "accepts": ["document"], "min": 0, "max": 32, "required": false }
+      ]
+    },
+    {
+      "elementId": "cel_divider",
+      "elementType": "divider",
+      "displayOrder": 60,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 60, "tablet": 60, "desktop": 60 }
+      },
+      "payload": { "style": "line" }
+    }
+  ]
+}

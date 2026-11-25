@@ -1,0 +1,13 @@
+{
+  "schema": "myqr24-tag-test-definition-v1",
+  "schemaVersion": 1,
+  "fixture": "lost-found-luggage",
+  "reservationGroup": "lost-found",
+  "tagType": "lost-found",
+  "slot": 1,
+  "tagLength": 10,
+  "tagNumericId": "2821109907456",
+  "tagId": null,
+  "tagIdStatus": "pending-user-assignment",
+  "sourceExample": "tools/tag-content-designer/public/templates/examples/lost-found-luggage"
+}

@@ -1,0 +1,81 @@
+{
+  "schema": "myqr24-tag-content-sample-v1",
+  "schemaVersion": 1,
+  "tag": { "id": "hochzeit1", "displayName": "Hochzeit Anna & Ben" },
+  "media": [
+    {
+      "contentId": "m_hero",
+      "alt": "Garten mit Lichterkette",
+      "caption": "Gartenfeier",
+      "variants": {
+        "thumb": "/templates/examples/assets/garden-hero.svg",
+        "large": "/templates/examples/assets/garden-hero.svg"
+      }
+    },
+    {
+      "contentId": "m_couple",
+      "alt": "Paar im Garten",
+      "caption": "Anna & Ben",
+      "variants": {
+        "thumb": "/templates/examples/assets/couple.svg",
+        "large": "/templates/examples/assets/couple.svg"
+      }
+    },
+    {
+      "contentId": "m_g1",
+      "alt": "Tischdekoration mit Blumen",
+      "caption": "Tischdeko",
+      "variants": {
+        "thumb": "/templates/examples/assets/garden-1.svg",
+        "large": "/templates/examples/assets/garden-1.svg"
+      }
+    },
+    {
+      "contentId": "m_g2",
+      "alt": "Lichterkette über dem Garten",
+      "caption": "Abendlicht",
+      "variants": {
+        "thumb": "/templates/examples/assets/garden-2.svg",
+        "large": "/templates/examples/assets/garden-2.svg"
+      }
+    },
+    {
+      "contentId": "m_g3",
+      "alt": "Blumenstrauß auf dem Tisch",
+      "caption": "Blumen",
+      "variants": {
+        "thumb": "/templates/examples/assets/garden-3.svg",
+        "large": "/templates/examples/assets/garden-3.svg"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "contentId": "d_invitation",
+      "title": "Einladung zur Hochzeit",
+      "kind": "invitation",
+      "variant": "/templates/examples/assets/garden-menu.svg",
+      "availableLabel": "Jetzt verfügbar"
+    },
+    {
+      "contentId": "d_menu",
+      "title": "Speisekarte (PDF)",
+      "kind": "menu",
+      "variant": "/templates/examples/assets/garden-menu.svg",
+      "availableLabel": "Jetzt verfügbar"
+    }
+  ],
+  "entries": [],
+  "contributions": [
+    { "contentId": "c_1", "principal": "guest", "mediaId": "m_g1", "state": "ready", "ownerName": "Clara" },
+    { "contentId": "c_2", "principal": "guest", "mediaId": "m_g2", "state": "ready", "ownerName": "Jonas" },
+    { "contentId": "c_3", "principal": "guest", "mediaId": "m_g3", "state": "pending", "ownerName": "Du", "isOwn": true }
+  ],
+  "slotFill": {
+    "cel_theme": { "tag-background": [] },
+    "cel_hero": { "cover": ["m_hero"] },
+    "cel_photo": { "image": ["m_couple"] },
+    "cel_gallery": { "images": ["m_g1", "m_g2", "m_g3"] },
+    "cel_docs": { "documents": ["d_invitation", "d_menu"] }
+  }
+}

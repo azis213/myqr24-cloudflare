@@ -1,0 +1,84 @@
+{
+  "schema": "myqr24-tag-content-sample-v1",
+  "schemaVersion": 1,
+  "tag": { "id": "waermp24", "displayName": "Wärmepumpe – Wartung" },
+  "media": [
+    {
+      "contentId": "m_plate",
+      "alt": "Typenschild der Wärmepumpe",
+      "caption": "WP-24-A, 8 kW",
+      "variants": {
+        "thumb": "/templates/examples/assets/nameplate.svg",
+        "large": "/templates/examples/assets/nameplate.svg"
+      }
+    },
+    {
+      "contentId": "m_service",
+      "alt": "Wartung an der Anlage",
+      "caption": "Wartung vor Ort",
+      "variants": {
+        "thumb": "/templates/examples/assets/maintenance-1.svg",
+        "large": "/templates/examples/assets/maintenance-1.svg"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "contentId": "d_protocol_2024",
+      "title": "Wartungsprotokoll 2024",
+      "kind": "other",
+      "description": "Filterwechsel, Dichtheitsprüfung",
+      "variant": "/templates/examples/assets/protocol.svg",
+      "availableLabel": "Jetzt verfügbar"
+    },
+    {
+      "contentId": "d_protocol_2023",
+      "title": "Wartungsprotokoll 2023",
+      "kind": "other",
+      "variant": "/templates/examples/assets/protocol.svg",
+      "availableLabel": "Jetzt verfügbar"
+    }
+  ],
+  "entries": [
+    {
+      "contentId": "e_2024_11",
+      "date": "2024-11-04",
+      "title": "Jährliche Wartung",
+      "summary": "Filterwechsel, Dichtheitsprüfung",
+      "technician": "H. Weber",
+      "status": "done",
+      "documentIds": ["d_protocol_2024"]
+    },
+    {
+      "contentId": "e_2024_05",
+      "date": "2024-05-16",
+      "title": "Kältemittel geprüft",
+      "summary": "Füllstand und Druck in Ordnung",
+      "technician": "H. Weber",
+      "status": "done"
+    },
+    {
+      "contentId": "e_2023_11",
+      "date": "2023-11-08",
+      "title": "Jährliche Wartung",
+      "summary": "Reinigung Verdampfer",
+      "technician": "M. Sanz",
+      "status": "done",
+      "documentIds": ["d_protocol_2023"]
+    },
+    {
+      "contentId": "e_2026_02",
+      "date": "2026-02-10",
+      "title": "Nächste Wartung geplant",
+      "summary": "Termin mit Fachbetrieb abstimmen",
+      "status": "open"
+    }
+  ],
+  "contributions": [],
+  "slotFill": {
+    "cel_theme": { "tag-background": [] },
+    "cel_history": { "entries": ["e_2024_11", "e_2024_05", "e_2023_11", "e_2026_02"] },
+    "cel_plate": { "image": ["m_plate"] },
+    "cel_docs": { "documents": ["d_protocol_2024", "d_protocol_2023"] }
+  }
+}

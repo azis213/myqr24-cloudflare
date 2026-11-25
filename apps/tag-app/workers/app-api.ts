@@ -5,6 +5,7 @@ import { globalItemVariantKey, tagContentFileKey, tagItemVariantKey } from "./co
 import { deleteContentItem, readContentItem, uploadContentItem } from "./tag-content/items";
 import { publishTagContent } from "./tag-content/publish";
 import { getTagContentDocument } from "./tag-content/read";
+import { handleTagTestAdminRequest } from "./tag-test-admin";
 
 const TAG_ID = /^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/;
 const VARIANT = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -29,6 +30,10 @@ export interface AppApiEnv {
   APP_CONTENT_PUBLISH_KEY_S01?: string;
   /** Server-to-server Content-Item upload/delete key; never sent to browser code. */
   TAG_CONTENT_API_KEY_S01?: string;
+  /** Dedicated test-only routing admin key; configured only on staging worker. */
+  TAG_TEST_ADMIN_KEY_S01?: string;
+  /** Exact environment gate; production does not set this binding. */
+  TAG_TEST_ADMIN_ENVIRONMENT?: string;
   MEDIA_SIGNER: Fetcher;
 }
 
@@ -387,6 +392,16 @@ app.post("/api/verify-pin", async (c) => {
 
 app.put("/api/v1/tags/:tagId/content", async (c) => {
   return publishTagContent(c.req.raw, c.env, c.req.param("tagId"));
+});
+
+app.all("/api/test-admin/tags/:tagId", async (c) => {
+  if (c.env.TAG_TEST_ADMIN_ENVIRONMENT !== "staging") return neutral();
+  return handleTagTestAdminRequest(c.req.raw, c.env, "staging");
+});
+
+app.get("/api/test-admin/status", async (c) => {
+  if (c.env.TAG_TEST_ADMIN_ENVIRONMENT !== "staging") return neutral();
+  return handleTagTestAdminRequest(c.req.raw, c.env, "staging");
 });
 
 app.get("/api/v1/tags/:tagId/content/document", async (c) => {

@@ -24,6 +24,16 @@ Danach im Browser öffnen:
 http://127.0.0.1:5180
 ```
 
+### TAG-Content publishen (nur im lokalen Dev-Server)
+
+Der Button **Publish…** steht im `npm run dev`-Modus neben Save/Download. Der Proxy ist Teil des Vite-Entwicklungsservers; er ist nicht im Build oder Preview enthalten. Der Dev-Server bindet ausschließlich `127.0.0.1`.
+
+- **Lokal:** Zugangsdaten kommen serverseitig aus `apps/tag-app/.dev.vars` (`APP_CONTENT_PUBLISH_KEY_S01`, `APP_LOCAL_SEED_KEY`) und `apps/edge-router/.dev.vars` (`TAG_CODEC_API_KEY_S01`). Die lokale TAG-Verwaltung nutzt den Seed-Key, nicht den Publisher-Key. Beide Dateien werden nie an den Browser ausgegeben. Worker: 8787 (TAG-App), 8788 (Codec).
+- **Staging:** Vor dem Start des Dev-Servers dessen Prozessumgebung setzen: `MYQR_STAGING_TAG_APP_API_BASE_URL`, `MYQR_STAGING_CODEC_BASE_URL`, `MYQR_STAGING_PUBLISH_KEY`, `MYQR_STAGING_TAG_TEST_ADMIN_KEY` (separater TAG-Testverwaltungs-Key) und `TAG_CODEC_API_KEY_S01` (Codec-Bearer-Key). URLs müssen HTTPS verwenden. Der Staging-Worker braucht zusätzlich das Secret `TAG_TEST_ADMIN_KEY_S01` und `TAG_TEST_ADMIN_ENVIRONMENT=staging`. Das Secret niemals mit dem Publisher-Key gleichsetzen.
+- **Test-TAG-Verwaltung:** Im Dialog Routing-TAGs lokal oder in Staging laden, anlegen und ändern. Status, Zieltyp (`internal`/`external`), Schutzmodus, External-HTTPS-URL und Versionswerte sind konfigurierbar; `updated_at` setzt die API. Die Standardwerte sind `active`, `internal`, `public` und Version 1. Vollständiges Löschen entfernt ausschließlich TAG-eigene D1-/R2-Daten; globale R2-Objekte bleiben unberührt. In Staging kann dies jeden TAG betreffen und ist daher ausdrücklich destruktiv. Produktion ist nicht freigeschaltet.
+- Der Browser speichert nur Umgebung, Base36-TAG-ID und Template-Auswahl lokal. Die numeric ID wird jeweils über den serverseitig authentifizierten Codec ermittelt und nicht persistent abgelegt.
+- Vor dem vollständigen Ersatz zeigt der Dialog Ziel und Template und verlangt die exakte Eingabe `PUBLISH <Base36-TAG-ID>`. Vor dem Klick bleiben Auflösung und Validierung lokal; für Implementierungs-/Build-Tests keinen Publish auslösen.
+
 Weitere Befehle:
 
 | Befehl                 | Zweck                                                       |

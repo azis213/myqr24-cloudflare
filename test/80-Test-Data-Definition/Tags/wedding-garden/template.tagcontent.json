@@ -1,0 +1,342 @@
+{
+  "schema": "myqr24-tag-content-template-v1",
+  "schemaVersion": 3,
+  "template": {
+    "templateId": "tct_example_wedding_garden",
+    "templateVersion": 1,
+    "tagType": "event",
+    "name": "Hochzeit – Gartenfeier",
+    "description": "Beispiel: Übersicht mit Bild, Willkommen, Ablauf und Speisekarte als Tabellen, Gästegalerie und Dokumente.",
+    "locale": "de-DE",
+    "status": "draft",
+    "compatibility": {
+      "protectionModes": ["public", "pin_required"],
+      "presentations": ["wedding"]
+    }
+  },
+  "shell": {
+    "presentation": "wedding",
+    "features": ["vault"],
+    "theme": {
+      "colorMode": "light",
+      "colors": {
+        "background": "#fbf7f0",
+        "surface": "#ffffff",
+        "text": "#2b2a26",
+        "mutedText": "#6b655c",
+        "heading": "#3d4a3a",
+        "accent": "#7c8f6b",
+        "accentText": "#ffffff",
+        "border": "#e6ddcf",
+        "danger": "#a6402e",
+        "success": "#4b6b45"
+      },
+      "typography": { "fontFamily": "serif", "headingScale": 1.05, "bodySize": 16, "lineHeight": 1.6 },
+      "layout": { "contentWidth": "narrow", "density": "comfortable", "cornerStyle": "soft" }
+    },
+    "navigation": { "mode": "single", "items": [] },
+    "statusBar": { "showTagId": true, "showPresentation": false }
+  },
+  "layout": {
+    "mode": "grid-flow",
+    "columns": 12,
+    "gap": "md",
+    "container": { "maxWidth": "narrow", "padding": "normal" },
+    "responsive": {
+      "autoReflow": true,
+      "minColumnWidth": { "tablet": "16rem", "desktop": "18rem" },
+      "preferredColumns": { "mobile": 1, "tablet": 2, "desktop": 3 }
+    }
+  },
+  "elements": [
+    {
+      "elementId": "cel_theme",
+      "elementType": "theme-assets",
+      "displayOrder": 0,
+      "visibility": "public",
+      "hidden": true,
+      "payload": { "role": "background" },
+      "slots": [
+        { "slotId": "tag-background", "accepts": ["image"], "min": 0, "max": 1, "required": false }
+      ]
+    },
+    {
+      "elementId": "cel_hero",
+      "elementType": "hero",
+      "displayOrder": 10,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 10, "tablet": 10, "desktop": 10 }
+      },
+      "payload": { "variant": "cover" },
+      "bindings": { "title": { "from": "tag.displayName" } },
+      "content": {
+        "paragraphs": [
+          { "runs": [{ "text": "Wir feiern im Garten – mit euch." }], "align": "start" }
+        ]
+      },
+      "slots": [
+        { "slotId": "cover", "accepts": ["image"], "min": 0, "max": 1, "required": false, "presentation": { "fit": "cover" } }
+      ]
+    },
+    {
+      "elementId": "cel_welcome",
+      "elementType": "text",
+      "displayOrder": 20,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 8 },
+        "order": { "mobile": 20, "tablet": 20, "desktop": 20 }
+      },
+      "style": { "background": { "type": "solid", "color": "surface" }, "padding": "md" },
+      "payload": { "headingLevel": "h2", "align": "start", "maxParagraphs": 8 },
+      "content": {
+        "paragraphs": [
+          { "heading": 2, "runs": [{ "text": "Willkommen" }] },
+          {
+            "runs": [
+              { "text": "Schön, dass ihr dabei seid. " },
+              { "text": "Alle Zeiten sind Richtwerte", "marks": [{ "type": "bold" }] },
+              { "text": " – wir freuen uns auf einen entspannten Tag mit euch." }
+            ]
+          },
+          {
+            "runs": [
+              { "text": "Bei Regen ziehen wir in die Scheune um. " },
+              { "text": "Feste Schuhe sind im Garten hilfreich.", "marks": [{ "type": "italic" }] }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "elementId": "cel_photo",
+      "elementType": "image",
+      "displayOrder": 30,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 4 },
+        "order": { "mobile": 30, "tablet": 30, "desktop": 30 }
+      },
+      "payload": { "fit": "contain", "zoom": "tap", "maxHeight": "auto" },
+      "slots": [
+        { "slotId": "image", "accepts": ["image"], "min": 0, "max": 1, "required": false, "presentation": { "fit": "contain" } }
+      ]
+    },
+    {
+      "elementId": "cel_schedule",
+      "elementType": "text",
+      "displayOrder": 40,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 40, "tablet": 40, "desktop": 40 }
+      },
+      "style": { "padding": "md" },
+      "payload": { "headingLevel": "h2", "align": "start", "maxParagraphs": 8 },
+      "content": {
+        "paragraphs": [
+          { "heading": 3, "runs": [{ "text": "Ablauf" }] },
+          {
+            "type": "table",
+            "columns": [{ "align": "start" }, { "align": "start" }, { "align": "start" }],
+            "rows": [
+              {
+                "header": true,
+                "cells": [
+                  { "runs": [{ "text": "Zeit" }], "background": "#eef2e6" },
+                  { "runs": [{ "text": "Programmpunkt" }], "background": "#eef2e6" },
+                  { "runs": [{ "text": "Ort" }], "background": "#eef2e6" }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "15:00" }] },
+                  { "runs": [{ "text": "Ankommen und Sektempfang" }] },
+                  { "runs": [{ "text": "Garten" }] }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "16:00" }], "background": "#f7f9f3" },
+                  { "runs": [{ "text": "Trauung" }], "background": "#f7f9f3" },
+                  { "runs": [{ "text": "Pavillon" }], "background": "#f7f9f3" }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "17:30" }] },
+                  { "runs": [{ "text": "Fototermin für alle" }] },
+                  { "runs": [{ "text": "Wiese" }] }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "19:00" }], "background": "#f7f9f3" },
+                  { "runs": [{ "text": "Abendessen an der langen Tafel" }], "background": "#f7f9f3" },
+                  { "runs": [{ "text": "Scheune" }], "background": "#f7f9f3" }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "21:00" }] },
+                  { "runs": [{ "text": "Eröffnungstanz und Party" }] },
+                  { "runs": [{ "text": "Scheune" }] }
+                ]
+              }
+            ],
+            "border": { "color": "#b9c4a8", "style": "solid", "width": 1 }
+          }
+        ]
+      }
+    },
+    {
+      "elementId": "cel_menu",
+      "elementType": "text",
+      "displayOrder": 50,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 50, "tablet": 50, "desktop": 50 }
+      },
+      "style": { "background": { "type": "solid", "color": "surface" }, "padding": "md" },
+      "payload": { "headingLevel": "h2", "align": "start", "maxParagraphs": 8 },
+      "content": {
+        "paragraphs": [
+          { "heading": 3, "runs": [{ "text": "Speisekarte" }] },
+          {
+            "type": "table",
+            "columns": [{ "align": "start" }, { "align": "start" }, { "align": "start" }],
+            "rows": [
+              {
+                "header": true,
+                "cells": [
+                  { "runs": [{ "text": "Gang" }], "background": "#efe9dc" },
+                  { "runs": [{ "text": "Gericht" }], "background": "#efe9dc" },
+                  { "runs": [{ "text": "Hinweis" }], "background": "#efe9dc" }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "Vorspeise" }] },
+                  { "runs": [{ "text": "Rote-Bete-Carpaccio mit Ziegenkäse" }] },
+                  { "runs": [{ "text": "vegetarisch" }] }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "Hauptgang" }], "background": "#f8f4ea" },
+                  { "runs": [{ "text": "Geschmorte Ochsenbacke auf Polenta" }], "background": "#f8f4ea" },
+                  { "runs": [{ "text": "mit Rotweinjus" }], "background": "#f8f4ea" }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "Hauptgang" }] },
+                  { "runs": [{ "text": "Ofengemüse mit Kräuterrisotto" }] },
+                  { "runs": [{ "text": "vegan" }] }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "Dessert" }], "background": "#f8f4ea" },
+                  { "runs": [{ "text": "Lavendel-Panna-Cotta" }], "background": "#f8f4ea" },
+                  { "runs": [{ "text": "mit Himbeeren" }], "background": "#f8f4ea" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "elementId": "cel_gallery",
+      "elementType": "gallery",
+      "displayOrder": 60,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 8 },
+        "order": { "mobile": 60, "tablet": 60, "desktop": 60 }
+      },
+      "payload": {
+        "name": "Gästefotos",
+        "picker": { "axis": "horizontal", "thumbSize": "md", "showCounter": true },
+        "viewer": { "sizeMode": "medium", "swipe": true, "loop": false, "showCaptions": true },
+        "lightbox": true,
+        "maxImages": 48
+      },
+      "content": { "paragraphs": [{ "heading": 3, "runs": [{ "text": "Gästefotos" }] }] },
+      "actions": {
+        "upload": {
+          "enabled": true,
+          "principals": ["guest", "owner"],
+          "acceptedTypes": ["image"],
+          "maxItemsPerPrincipal": 3,
+          "maxFileSizeMb": 10,
+          "afterUpload": "quarantine"
+        },
+        "download": { "enabled": true, "principals": ["scanner", "guest", "owner"] },
+        "delete": { "enabled": true, "principals": ["owner", "guest"], "guestScope": "ownOnly" }
+      },
+      "slots": [
+        {
+          "slotId": "images",
+          "accepts": ["image"],
+          "min": 0,
+          "max": 48,
+          "required": false,
+          "presentation": { "fit": "cover", "caption": "optional" }
+        }
+      ]
+    },
+    {
+      "elementId": "cel_docs",
+      "elementType": "documents",
+      "displayOrder": 70,
+      "visibility": "shared",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 4 },
+        "order": { "mobile": 70, "tablet": 70, "desktop": 70 }
+      },
+      "payload": { "view": "list", "showMeta": true, "sort": "date-desc", "maxItems": 32 },
+      "content": { "paragraphs": [{ "heading": 3, "runs": [{ "text": "Dokumente" }] }] },
+      "actions": {
+        "upload": { "enabled": false },
+        "download": { "enabled": true, "principals": ["guest", "owner"] }
+      },
+      "slots": [
+        { "slotId": "documents", "accepts": ["document"], "min": 0, "max": 32, "required": false }
+      ]
+    },
+    {
+      "elementId": "cel_contact",
+      "elementType": "text",
+      "displayOrder": 80,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 80, "tablet": 80, "desktop": 80 }
+      },
+      "style": { "padding": "md" },
+      "payload": { "headingLevel": "h2", "align": "start", "maxParagraphs": 8 },
+      "content": {
+        "paragraphs": [
+          { "heading": 4, "runs": [{ "text": "Fragen am Tag selbst?" }] },
+          { "runs": [{ "text": "Meldet euch bei Clara oder Jonas – sie koordinieren Ablauf und Sitzplan." }] }
+        ]
+      }
+    },
+    {
+      "elementId": "cel_divider",
+      "elementType": "divider",
+      "displayOrder": 90,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 90, "tablet": 90, "desktop": 90 }
+      },
+      "payload": { "style": "line" }
+    }
+  ]
+}

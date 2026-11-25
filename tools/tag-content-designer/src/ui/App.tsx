@@ -76,6 +76,61 @@ export function App({
   );
   const [error, setError] = useState<string | null>(null);
   const [newTagType, setNewTagType] = useState<TagType>("vault");
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishEnvironment, setPublishEnvironment] = useState<"local" | "staging">(() => {
+    try {
+      return window.localStorage.getItem("myqr24.tcd.publish.environment") === "staging" ? "staging" : "local";
+    } catch {
+      return "local";
+    }
+  });
+  const [publishTemplateId, setPublishTemplateId] = useState(() => {
+    try {
+      return window.localStorage.getItem("myqr24.tcd.publish.templateId") ?? initialDoc.template.templateId;
+    } catch {
+      return initialDoc.template.templateId;
+    }
+  });
+  const [publishTagId, setPublishTagId] = useState(() => {
+    try {
+      return window.localStorage.getItem("myqr24.tcd.publish.tagId") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [publishNumericId, setPublishNumericId] = useState("");
+  const [publishStatus, setPublishStatus] = useState("");
+  const [publishError, setPublishError] = useState("");
+  const [publishResult, setPublishResult] = useState<Record<string, unknown> | null>(null);
+  const [publishConfirm, setPublishConfirm] = useState("");
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [testTagRouting, setTestTagRouting] = useState({
+    status: "active",
+    targetType: "internal",
+    protectionMode: "public",
+    externalUrl: "",
+    accessVersion: "1",
+    contentRevision: "1",
+    schemaVersion: "1",
+  });
+  const [testTagAdminConfirm, setTestTagAdminConfirm] = useState("");
+  const [testTagDeleteConfirmOpen, setTestTagDeleteConfirmOpen] = useState(false);
+  const [testTagExists, setTestTagExists] = useState(false);
+  const [testTagHasData, setTestTagHasData] = useState(false);
+  const [testTagAdminAvailable, setTestTagAdminAvailable] = useState(false);
+  const [testTagAdminResult, setTestTagAdminResult] = useState<Record<string, unknown> | null>(null);
+  const [testTagAdminStatus, setTestTagAdminStatus] = useState("");
+  const [testTagAdminError, setTestTagAdminError] = useState("");
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("myqr24.tcd.publish.environment", publishEnvironment);
+      window.localStorage.setItem("myqr24.tcd.publish.tagId", publishTagId);
+      window.localStorage.setItem("myqr24.tcd.publish.templateId", publishTemplateId);
+    } catch {
+      /* Publish-Komfort, kein Muss; hier werden keine Secrets gespeichert. */
+    }
+  }, [publishEnvironment, publishTagId, publishTemplateId]);
 
   const doc = state.doc;
   const fileApiAvailable = useMemo(() => supportsFileSystemAccess(), []);
@@ -440,6 +495,209 @@ export function App({
     }
   }, [blocking, dispatch, doc.template.templateId, doc.template.templateVersion, state.doc]);
 
+  const resolvePublishTagId = useCallback(async () => {
+    setPublishError("");
+    setPublishStatus("");
+    setPublishResult(null);
+    setPublishNumericId("");
+    const tagId = publishTagId.trim().toLowerCase();
+    if (!/^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/u.test(tagId)) {
+      setPublishError("Base36-TAG-ID muss 6, 8 oder 10 Zeichen lang sein.");
+      return;
+    }
+    setPublishBusy(true);
+    try {
+      const response = await fetch("/__tag-content/resolve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ environment: publishEnvironment, tagId }),
+      });
+      const result = await response.json() as { tagNumericId?: unknown; error?: unknown };
+      if (!response.ok || typeof result.tagNumericId !== "string") {
+        throw new Error(typeof result.error === "string" ? result.error : `ID konnte nicht aufgelöst werden (HTTP ${response.status}).`);
+      }
+      setPublishTagId(tagId);
+      setPublishNumericId(result.tagNumericId);
+      setPublishStatus("Numeric-ID erfolgreich über den Codec ermittelt.");
+    } catch (caught) {
+      setPublishError(caught instanceof Error ? caught.message : "Codec-Lookup fehlgeschlagen.");
+    } finally {
+      setPublishBusy(false);
+    }
+  }, [publishEnvironment, publishTagId]);
+
+  const callTestTagAdmin = useCallback(async (operation: "get" | "save" | "delete") => {
+    setTestTagAdminError("");
+    setTestTagAdminStatus("");
+    setTestTagAdminResult(null);
+    const tagId = publishTagId.trim().toLowerCase();
+    if (!publishNumericId || !/^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/u.test(tagId)) {
+      setTestTagAdminError("Löse zuerst die Base36-ID mit dem Codec auf.");
+      return;
+    }
+    if (publishEnvironment !== "local" && publishEnvironment !== "staging") {
+      setTestTagAdminError("Test-TAG-Verwaltung ist nur lokal und in Staging verfügbar.");
+      return;
+    }
+    if (operation === "save" && testTagRouting.targetType === "external") {
+      try {
+        const external = new URL(testTagRouting.externalUrl);
+        if (external.protocol !== "https:" || external.username || external.password) throw new Error();
+      } catch {
+        setTestTagAdminError("External URL muss eine gültige HTTPS-URL ohne Zugangsdaten sein.");
+        return;
+      }
+    }
+    const expectedConfirmation = operation === "delete" ? `DELETE ${publishEnvironment.toUpperCase()} ${tagId}` : "";
+    if (operation === "delete" && testTagAdminConfirm !== expectedConfirmation) {
+      setTestTagAdminError(`Gib ${expectedConfirmation} exakt ein, um alle D1-/R2-Daten dieses TAGs zu löschen.`);
+      return;
+    }
+
+    setPublishBusy(true);
+    try {
+      const response = await fetch("/__tag-content/admin", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          operation,
+          environment: publishEnvironment,
+          tagId,
+          tagNumericId: publishNumericId,
+          confirm: expectedConfirmation,
+          status: testTagRouting.status,
+          targetType: testTagRouting.targetType,
+          protectionMode: testTagRouting.protectionMode,
+          externalUrl: testTagRouting.targetType === "external" ? testTagRouting.externalUrl : null,
+          accessVersion: Number(testTagRouting.accessVersion),
+          contentRevision: Number(testTagRouting.contentRevision),
+          schemaVersion: Number(testTagRouting.schemaVersion),
+        }),
+      });
+      const result = await response.json() as Record<string, unknown>;
+      setTestTagAdminResult(result);
+      if (!response.ok && !(operation === "get" && response.status === 404 && result.exists === false)) {
+        const detail = typeof result.error === "string" ? result.error : `Test-TAG-Verwaltung fehlgeschlagen (HTTP ${response.status}).`;
+        throw new Error(detail);
+      }
+      if (operation === "get") {
+        const exists = result.exists === true;
+        setTestTagExists(exists);
+        setTestTagHasData(exists || result.hasData === true);
+        if (exists) {
+          setTestTagRouting({
+            status: String(result.status),
+            targetType: String(result.target_type),
+            protectionMode: String(result.protection_mode),
+            externalUrl: typeof result.external_url === "string" ? result.external_url : "",
+            accessVersion: String(result.access_version),
+            contentRevision: String(result.content_revision),
+            schemaVersion: String(result.schema_version),
+          });
+          setTestTagAdminStatus("Lokaler/Staging-Routing-Eintrag geladen.");
+        } else {
+          setTestTagAdminStatus("Noch kein Routing-Eintrag vorhanden; Speichern legt den TAG an.");
+        }
+      } else if (operation === "save") {
+        setTestTagExists(true);
+        setTestTagHasData(true);
+        setTestTagAdminStatus(`TAG-Routing in ${publishEnvironment} gespeichert.`);
+      } else {
+        setTestTagExists(false);
+        setTestTagHasData(false);
+        setPublishNumericId("");
+        setPublishConfirm("");
+        setTestTagAdminConfirm("");
+        setTestTagDeleteConfirmOpen(false);
+        setTestTagAdminStatus(`TAG ${tagId} und seine TAG-eigenen D1-/R2-Daten wurden in ${publishEnvironment} gelöscht.`);
+      }
+    } catch (caught) {
+      setTestTagAdminError(caught instanceof Error ? caught.message : "Test-TAG-Verwaltung fehlgeschlagen.");
+    } finally {
+      setPublishBusy(false);
+    }
+  }, [publishEnvironment, publishNumericId, publishTagId, testTagAdminConfirm, testTagRouting]);
+
+  const checkTestTagAdmin = useCallback(async () => {
+    setTestTagAdminAvailable(false);
+    try {
+      const response = await fetch("/__tag-content/admin-status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ environment: publishEnvironment }),
+      });
+      const result = await response.json() as { enabled?: unknown };
+      setTestTagAdminAvailable(response.ok && result.enabled === true);
+      if (!response.ok || result.enabled !== true) setTestTagAdminError("Test-TAG-API ist für diese Umgebung nicht freigeschaltet; Verwaltungsaktionen bleiben deaktiviert.");
+      else setTestTagAdminError("");
+    } catch {
+      setTestTagAdminAvailable(false);
+      setTestTagAdminError("Test-TAG-API ist nicht erreichbar; Verwaltungsaktionen bleiben deaktiviert.");
+    }
+  }, [publishEnvironment]);
+
+  const publishTagContent = useCallback(async () => {
+    setPublishError("");
+    setPublishStatus("");
+    setPublishResult(null);
+    if (blocking) {
+      setPublishError("Template enthält blockierende Validierungsfehler und kann nicht veröffentlicht werden.");
+      return;
+    }
+    if (testTagRouting.status !== "active" || testTagRouting.targetType !== "internal") {
+      setPublishError("Content-Publish ist nur für active/internal TAG-Routing möglich. Ändere zuerst die lokale/Staging-Routingkonfiguration.");
+      return;
+    }
+    const tagId = publishTagId.trim().toLowerCase();
+    if (!publishNumericId || !/^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/u.test(tagId)) {
+      setPublishError("Bitte zuerst eine gültige TAG-ID auflösen.");
+      return;
+    }
+    if (publishConfirm !== `PUBLISH ${tagId}`) {
+      setPublishError(`Gib PUBLISH ${tagId} exakt ein, um den vollständigen Ersatz zu bestätigen.`);
+      return;
+    }
+    setPublishBusy(true);
+    try {
+      const response = await fetch("/__tag-content/publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          environment: publishEnvironment,
+          tagId,
+          tagNumericId: publishNumericId,
+          tagName: doc.template.name,
+          confirm: publishConfirm,
+          template: state.doc,
+        }),
+      });
+      const result = await response.json() as Record<string, unknown>;
+      if (!response.ok) {
+        const apiError = result.error;
+        const detail = apiError && typeof apiError === "object" && "message" in apiError
+          ? String((apiError as { message: unknown }).message)
+          : typeof apiError === "string" ? apiError : `Publish fehlgeschlagen (HTTP ${response.status}).`;
+        setPublishResult(result);
+        throw new Error(detail);
+      }
+      setPublishResult(result);
+      setPublishStatus(`Erfolgreich veröffentlicht: Revision ${String(result.revision ?? "unbekannt")} · ${String(result.status ?? "OK")}.`);
+      setPublishConfirm("");
+    } catch (caught) {
+      setPublishError(caught instanceof Error ? caught.message : "Publish fehlgeschlagen.");
+    } finally {
+      setPublishBusy(false);
+    }
+  }, [blocking, doc.template.name, publishConfirm, publishEnvironment, publishNumericId, publishTagId, state.doc, testTagRouting.status, testTagRouting.targetType]);
+
+  const openPublishDialog = useCallback(() => {
+    setPublishError("");
+    setPublishStatus("");
+    setPublishResult(null);
+    setPublishConfirm("");
+    setPublishOpen(true);
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey)) return;
@@ -632,6 +890,11 @@ export function App({
           <button type="button" onClick={downloadJson}>
             Download
           </button>
+          {import.meta.env.DEV ? (
+            <button type="button" disabled={blocking} onClick={openPublishDialog}>
+              Publish…
+            </button>
+          ) : null}
         </div>
 
         <div className="group">
@@ -710,6 +973,161 @@ export function App({
       <p className="statusbar">
         {message} · {errors} Fehler · {warnings} Warnungen
       </p>
+
+      {import.meta.env.DEV && publishOpen ? (
+        <div className="publish-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !publishBusy) setPublishOpen(false);
+        }}>
+          <section className="publish-dialog" role="dialog" aria-modal="true" aria-labelledby="publish-title">
+            <div className="publish-heading">
+              <h2 id="publish-title">TAG-Content veröffentlichen</h2>
+              <button type="button" className="mini secondary" aria-label="Dialog schließen" disabled={publishBusy} onClick={() => setPublishOpen(false)}>×</button>
+            </div>
+            <p className="publish-warning">Der Publish ersetzt den gesamten veröffentlichten TAG-Content. Prüfe Ziel und Template sorgfältig.</p>
+            <label>
+              Template
+              <select
+                aria-label="Publish-Template"
+                value={publishTemplateId}
+                disabled={publishBusy}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setPublishTemplateId(value);
+                  const selectedTemplate = bundledTemplates.find((entry) => entry.id === value);
+                  if (selectedTemplate) {
+                    void loadBundledTemplate(selectedTemplate.path, selectedTemplate.samplePath);
+                    setPublishNumericId("");
+                    setPublishConfirm("");
+                    setPublishResult(null);
+                  }
+                  else if (value === doc.template.templateId) {
+                    const serialized = canonicalize(state.doc);
+                    const openedDocument = JSON.parse(serialized) as TagContentDocument;
+                    const found = validateDocument(openedDocument);
+                    setError(found.some((entry) => entry.blocking) ? "Ausgewähltes Template enthält blockierende Validierungsfehler." : null);
+                    dispatch({ type: "load", doc: openedDocument, fileName: state.templateFileName, log: ["Aktuelles Template für Publish ausgewählt."] });
+                    setMessage("Aktuelles Template für Publish ausgewählt.");
+                  }
+                }}
+              >
+                <option value={doc.template.templateId}>Aktuell: {doc.template.name}</option>
+                {bundledTemplates.map((entry) => (
+                  <option key={entry.id} value={entry.id}>{entry.label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Umgebung
+              <select aria-label="Publish-Umgebung" value={publishEnvironment} disabled={publishBusy} onChange={(event) => {
+                setPublishEnvironment(event.target.value as "local" | "staging");
+                setPublishNumericId("");
+                setPublishStatus("");
+                setPublishError("");
+                setTestTagExists(false);
+                setTestTagHasData(false);
+                setTestTagAdminConfirm("");
+                setTestTagAdminStatus("");
+                setTestTagAdminError("");
+                setTestTagAdminAvailable(false);
+                setTestTagRouting({ status: "active", targetType: "internal", protectionMode: "public", externalUrl: "", accessVersion: "1", contentRevision: "1", schemaVersion: "1" });
+              }}>
+                <option value="local">Lokal</option>
+                <option value="staging">Staging</option>
+              </select>
+            </label>
+            <label>
+              Base36-TAG-ID
+              <input aria-label="Base36-TAG-ID" type="text" autoComplete="off" spellCheck={false} maxLength={10} value={publishTagId} disabled={publishBusy} onChange={(event) => {
+                setPublishTagId(event.target.value.toLowerCase());
+                setPublishNumericId("");
+                setTestTagExists(false);
+                setTestTagHasData(false);
+                setTestTagDeleteConfirmOpen(false);
+                setTestTagAdminConfirm("");
+                setPublishStatus("");
+                setPublishError("");
+              }} />
+            </label>
+            <label>
+              Numeric-ID
+              <span className="publish-id-row">
+                <input aria-label="Numeric-ID" type="text" readOnly value={publishNumericId} placeholder="Noch nicht ermittelt" />
+                <button type="button" aria-label="Numeric-ID aktualisieren" title="TAG-ID mit dem Codec auflösen" disabled={publishBusy} onClick={() => void resolvePublishTagId()}>
+                  ↻
+                </button>
+                <button type="button" aria-label="Routing laden" title="Lokalen/Staging-Routing-Eintrag laden" disabled={publishBusy || !publishNumericId || !testTagAdminAvailable} onClick={() => void callTestTagAdmin("get")}>
+                  Laden
+                </button>
+              </span>
+            </label>
+            <fieldset className="publish-admin-fields" disabled={publishBusy}>
+              <legend>Test-TAG-Verwaltung · {publishEnvironment === "local" ? "Lokal" : "Staging"}</legend>
+              <button type="button" disabled={publishBusy} title="Lokal nutzt den lokalen Test-Key; Staging benötigt den getrennten TAG_TEST_ADMIN_KEY_S01. Ohne Freigabe bleiben die Verwaltungsaktionen deaktiviert." onClick={() => void checkTestTagAdmin()}>Verwaltungs-API prüfen</button>
+              {!testTagAdminAvailable ? <p className="publish-admin-note">API nicht freigeschaltet. Verfügbarkeit prüfen; Verwaltungsaktionen bleiben bis zur Bestätigung deaktiviert.</p> : null}
+              <p className="publish-admin-note">Verwaltet nur den TAG-Routing-Eintrag in der gewählten Testumgebung. Produktion ist nicht verfügbar.</p>
+              <label>Status
+                <select aria-label="TAG-Status" value={testTagRouting.status} onChange={(event) => setTestTagRouting((current) => ({ ...current, status: event.target.value }))}>
+                  <option value="active">active</option><option value="suspended">suspended</option><option value="deactivated">deactivated</option><option value="expired">expired</option>
+                </select>
+              </label>
+              <label>Zieltyp
+                <select aria-label="TAG-Zieltyp" value={testTagRouting.targetType} onChange={(event) => setTestTagRouting((current) => ({ ...current, targetType: event.target.value }))}>
+                  <option value="internal">internal</option><option value="external">external</option>
+                </select>
+              </label>
+              {testTagRouting.targetType === "external" ? (
+                <label>External URL
+                  <input aria-label="External URL" type="url" placeholder="https://example.org/" value={testTagRouting.externalUrl} onChange={(event) => setTestTagRouting((current) => ({ ...current, externalUrl: event.target.value }))} />
+                </label>
+              ) : null}
+              <label>Protection Mode
+                <select aria-label="Protection Mode" value={testTagRouting.protectionMode} onChange={(event) => setTestTagRouting((current) => ({ ...current, protectionMode: event.target.value }))}>
+                  <option value="public">public</option><option value="pin_required">pin_required</option><option value="login_required">login_required</option><option value="closed">closed</option>
+                </select>
+              </label>
+              <div className="publish-version-grid">
+                <label>Access Version<input aria-label="Access Version" type="number" min="1" step="1" value={testTagRouting.accessVersion} onChange={(event) => setTestTagRouting((current) => ({ ...current, accessVersion: event.target.value }))} /></label>
+                <label>Content Revision<input aria-label="Content Revision" type="number" min="1" step="1" value={testTagRouting.contentRevision} onChange={(event) => setTestTagRouting((current) => ({ ...current, contentRevision: event.target.value }))} /></label>
+                <label>Schema Version<input aria-label="Schema Version" type="number" min="1" step="1" value={testTagRouting.schemaVersion} onChange={(event) => setTestTagRouting((current) => ({ ...current, schemaVersion: event.target.value }))} /></label>
+              </div>
+              <p className="publish-admin-note">Updated At wird beim Speichern automatisch auf die Serverzeit gesetzt. Content Revision muss zum veröffentlichten Content passen, sonst ist der Runtime-Bootstrap nicht konsistent.</p>
+              <div className="publish-actions">
+                <button type="button" title={testTagAdminAvailable ? "TAG-Routing in der gewählten Testumgebung anlegen oder ändern" : "API noch nicht freigeschaltet – Verwaltungs-API prüfen"} disabled={!publishNumericId || blocking || !testTagAdminAvailable} onClick={() => void callTestTagAdmin("save")}>{testTagExists ? "Routing ändern" : "TAG anlegen / Routing speichern"}</button>
+                <button type="button" className="danger-button" disabled={!publishNumericId || !testTagHasData || !testTagAdminAvailable} title={!testTagAdminAvailable ? "API noch nicht freigeschaltet – Verwaltungs-API prüfen" : "Löscht Routing, TAG-Content, TAG-Items und TAG-eigene R2-Objekte. Globale Daten bleiben erhalten."} onClick={() => { setTestTagAdminConfirm(""); setTestTagDeleteConfirmOpen(true); }}>Löschbestätigung vorbereiten</button>
+              </div>
+              {testTagDeleteConfirmOpen ? (
+                <label className="publish-delete-confirm">Destruktiv: TAG, D1-Daten und TAG-eigene R2-Dateien in {publishEnvironment.toUpperCase()} werden gelöscht. Gib exakt <code>DELETE {publishEnvironment.toUpperCase()} {publishTagId.trim().toLowerCase()}</code> ein.
+                  <input aria-label="TAG-Löschbestätigung" value={testTagAdminConfirm} onChange={(event) => setTestTagAdminConfirm(event.target.value)} />
+                  <button type="button" className="danger-button" disabled={!publishNumericId || !testTagAdminAvailable || testTagAdminConfirm !== `DELETE ${publishEnvironment.toUpperCase()} ${publishTagId.trim().toLowerCase()}`} onClick={() => void callTestTagAdmin("delete")}>TAG vollständig löschen</button>
+                </label>
+              ) : null}
+            </fieldset>
+            {testTagAdminStatus ? <p className="publish-success" role="status">{testTagAdminStatus}</p> : null}
+            {testTagAdminError ? <p className="errorbar publish-error" role="alert">{testTagAdminError}</p> : null}
+            {testTagAdminResult ? <pre className="publish-result" aria-label="Test-TAG-Verwaltungsergebnis">{JSON.stringify(testTagAdminResult, null, 2)}</pre> : null}
+            <div className="publish-preview" aria-label="Publish-Zusammenfassung">
+              <strong>Ziel:</strong> {publishEnvironment === "local" ? "Lokal" : "Staging"} · TAG {publishTagId || "—"}
+              <br />
+              <strong>Template:</strong> {doc.template.name} ({doc.template.templateId} · v{doc.template.templateVersion})
+              <br />
+              <strong>Schema:</strong> {doc.schema} · {doc.elements.length} Elemente
+            </div>
+            <label>
+              Bestätigung (exakt <code>PUBLISH {publishTagId || "TAG-ID"}</code>)
+              <input aria-label="Publish-Bestätigung" type="text" autoComplete="off" value={publishConfirm} disabled={publishBusy} onChange={(event) => setPublishConfirm(event.target.value)} />
+            </label>
+            {publishStatus ? <p className="publish-success" role="status">{publishStatus}</p> : null}
+            {publishError ? <p className="errorbar publish-error" role="alert">{publishError}</p> : null}
+            {publishResult ? <pre className="publish-result" aria-label="Publish-Ergebnis">{JSON.stringify(publishResult, null, 2)}</pre> : null}
+            <div className="publish-actions">
+              <button type="button" disabled={publishBusy} onClick={() => setPublishOpen(false)}>Schließen</button>
+              <button type="button" className="primary" disabled={publishBusy || blocking || !publishNumericId || publishConfirm !== `PUBLISH ${publishTagId.trim().toLowerCase()}`} onClick={() => void publishTagContent()}>
+                {publishBusy ? "Bitte warten…" : "Jetzt vollständig ersetzen"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       <main
         className="workspace"

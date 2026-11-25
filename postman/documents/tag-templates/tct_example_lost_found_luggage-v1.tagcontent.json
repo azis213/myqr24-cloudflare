@@ -1,0 +1,477 @@
+{
+  "elements": [
+    {
+      "displayOrder": 0,
+      "elementId": "cel_theme",
+      "elementType": "theme-assets",
+      "hidden": true,
+      "payload": {
+        "role": "background"
+      },
+      "slots": [
+        {
+          "accepts": [
+            "image"
+          ],
+          "max": 1,
+          "min": 0,
+          "required": false,
+          "slotId": "tag-background"
+        }
+      ],
+      "visibility": "public"
+    },
+    {
+      "content": {
+        "paragraphs": [
+          {
+            "heading": 2,
+            "runs": [
+              {
+                "text": "Sie haben diesen Koffer gefunden?"
+              }
+            ]
+          },
+          {
+            "runs": [
+              {
+                "text": "Bitte nutzen Sie die Funktion "
+              },
+              {
+                "marks": [
+                  {
+                    "type": "bold"
+                  }
+                ],
+                "text": "Fund melden"
+              },
+              {
+                "text": ", damit die Eigentümerin informiert wird. Der Koffer muss nicht mitgenommen werden."
+              }
+            ]
+          }
+        ]
+      },
+      "displayOrder": 10,
+      "elementId": "cel_finder",
+      "elementType": "finder-notice",
+      "payload": {
+        "urgency": "normal"
+      },
+      "placement": {
+        "order": {
+          "desktop": 10,
+          "mobile": 10,
+          "tablet": 10
+        },
+        "span": {
+          "desktop": 12,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "visibility": "public"
+    },
+    {
+      "content": {
+        "paragraphs": [
+          {
+            "heading": 4,
+            "runs": [
+              {
+                "text": "Fund melden"
+              }
+            ]
+          },
+          {
+            "runs": [
+              {
+                "text": "Ort und Zeit genügen. Fotos helfen bei der Zuordnung, sind aber freiwillig."
+              }
+            ]
+          }
+        ]
+      },
+      "displayOrder": 20,
+      "elementId": "cel_form",
+      "elementType": "finder-form",
+      "payload": {
+        "channel": "server-mediated"
+      },
+      "placement": {
+        "order": {
+          "desktop": 20,
+          "mobile": 20,
+          "tablet": 20
+        },
+        "span": {
+          "desktop": 8,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "slots": [
+        {
+          "accepts": [
+            "image"
+          ],
+          "max": 3,
+          "min": 0,
+          "presentation": {
+            "caption": "optional",
+            "fit": "cover"
+          },
+          "required": false,
+          "slotId": "photos"
+        }
+      ],
+      "style": {
+        "background": {
+          "color": "surface",
+          "type": "solid"
+        },
+        "padding": "md"
+      },
+      "visibility": "public"
+    },
+    {
+      "content": {
+        "paragraphs": [
+          {
+            "heading": 3,
+            "runs": [
+              {
+                "text": "Funddaten"
+              }
+            ]
+          },
+          {
+            "border": {
+              "color": "#c6d4e1",
+              "style": "solid",
+              "width": 1
+            },
+            "columns": [
+              {
+                "align": "start"
+              },
+              {
+                "align": "start"
+              }
+            ],
+            "rows": [
+              {
+                "cells": [
+                  {
+                    "background": "#e8eef4",
+                    "runs": [
+                      {
+                        "text": "Merkmal"
+                      }
+                    ]
+                  },
+                  {
+                    "background": "#e8eef4",
+                    "runs": [
+                      {
+                        "text": "Angabe"
+                      }
+                    ]
+                  }
+                ],
+                "header": true
+              },
+              {
+                "cells": [
+                  {
+                    "runs": [
+                      {
+                        "text": "Gegenstand"
+                      }
+                    ]
+                  },
+                  {
+                    "runs": [
+                      {
+                        "text": "Handgepäckkoffer, dunkelblau"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "background": "#f6f9fc",
+                    "runs": [
+                      {
+                        "text": "Fundort"
+                      }
+                    ]
+                  },
+                  {
+                    "background": "#f6f9fc",
+                    "runs": [
+                      {
+                        "text": "Bahnhof, Gleis 3"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "runs": [
+                      {
+                        "text": "Fundzeit"
+                      }
+                    ]
+                  },
+                  {
+                    "runs": [
+                      {
+                        "text": "12. Mai, ca. 18:40"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "background": "#f6f9fc",
+                    "runs": [
+                      {
+                        "text": "Zustand"
+                      }
+                    ]
+                  },
+                  {
+                    "background": "#f6f9fc",
+                    "runs": [
+                      {
+                        "text": "verschlossen, Rollen intakt"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "type": "table"
+          }
+        ]
+      },
+      "displayOrder": 30,
+      "elementId": "cel_facts",
+      "elementType": "text",
+      "payload": {
+        "align": "start",
+        "headingLevel": "h2",
+        "maxParagraphs": 8
+      },
+      "placement": {
+        "order": {
+          "desktop": 30,
+          "mobile": 30,
+          "tablet": 30
+        },
+        "span": {
+          "desktop": 4,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "style": {
+        "padding": "md"
+      },
+      "visibility": "public"
+    },
+    {
+      "content": {
+        "paragraphs": [
+          {
+            "heading": 4,
+            "runs": [
+              {
+                "text": "Was hier nicht steht"
+              }
+            ]
+          },
+          {
+            "runs": [
+              {
+                "text": "Eigentümernamen, Adressen und Kontaktdaten werden öffentlich nicht angezeigt. Die Fundmeldung wird serverseitig weitergeleitet."
+              }
+            ]
+          }
+        ]
+      },
+      "displayOrder": 40,
+      "elementId": "cel_privacy",
+      "elementType": "callout",
+      "payload": {
+        "tone": "info"
+      },
+      "placement": {
+        "order": {
+          "desktop": 40,
+          "mobile": 40,
+          "tablet": 40
+        },
+        "span": {
+          "desktop": 12,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "visibility": "public"
+    },
+    {
+      "content": {
+        "paragraphs": [
+          {
+            "heading": 4,
+            "runs": [
+              {
+                "text": "Direkter Kontakt"
+              }
+            ]
+          },
+          {
+            "runs": [
+              {
+                "text": "Für Rückfragen zur Abholung – nur für Personen mit Zugangscode sichtbar."
+              }
+            ]
+          }
+        ]
+      },
+      "displayOrder": 50,
+      "elementId": "cel_contact",
+      "elementType": "contact-channel",
+      "payload": {
+        "method": "form"
+      },
+      "placement": {
+        "order": {
+          "desktop": 50,
+          "mobile": 50,
+          "tablet": 50
+        },
+        "span": {
+          "desktop": 12,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "style": {
+        "padding": "md"
+      },
+      "visibility": "shared"
+    },
+    {
+      "displayOrder": 60,
+      "elementId": "cel_divider",
+      "elementType": "divider",
+      "payload": {
+        "style": "line"
+      },
+      "placement": {
+        "order": {
+          "desktop": 60,
+          "mobile": 60,
+          "tablet": 60
+        },
+        "span": {
+          "desktop": 12,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "visibility": "public"
+    }
+  ],
+  "layout": {
+    "columns": 12,
+    "container": {
+      "maxWidth": "narrow",
+      "padding": "normal"
+    },
+    "gap": "md",
+    "mode": "grid-flow",
+    "responsive": {
+      "autoReflow": true,
+      "minColumnWidth": {
+        "desktop": "18rem",
+        "tablet": "16rem"
+      },
+      "preferredColumns": {
+        "desktop": 3,
+        "mobile": 1,
+        "tablet": 2
+      }
+    }
+  },
+  "schema": "myqr24-tag-content-template-v1",
+  "schemaVersion": 3,
+  "shell": {
+    "features": [
+      "vault",
+      "lost-found"
+    ],
+    "navigation": {
+      "items": [],
+      "mode": "single"
+    },
+    "presentation": "standard",
+    "statusBar": {
+      "showPresentation": false,
+      "showTagId": true
+    },
+    "theme": {
+      "colorMode": "light",
+      "colors": {
+        "accent": "#2b6cb0",
+        "accentText": "#ffffff",
+        "background": "#f2f5f8",
+        "border": "#dbe3ea",
+        "danger": "#b3261e",
+        "heading": "#14314d",
+        "mutedText": "#5b6672",
+        "success": "#1b6b3a",
+        "surface": "#ffffff",
+        "text": "#20262c"
+      },
+      "layout": {
+        "contentWidth": "narrow",
+        "cornerStyle": "soft",
+        "density": "compact"
+      },
+      "typography": {
+        "bodySize": 16,
+        "fontFamily": "system",
+        "headingScale": 1,
+        "lineHeight": 1.55
+      }
+    }
+  },
+  "template": {
+    "compatibility": {
+      "presentations": [
+        "standard"
+      ],
+      "protectionModes": [
+        "public",
+        "pin_required"
+      ]
+    },
+    "description": "Beispiel: Fundhinweis, Funddaten als Tabelle, Fundmeldung mit Fotos und Kontaktweg.",
+    "locale": "de-DE",
+    "name": "Lost & Found – Reisekoffer",
+    "status": "draft",
+    "tagType": "lost-found",
+    "templateId": "tct_example_lost_found_luggage",
+    "templateVersion": 1
+  }
+}

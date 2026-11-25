@@ -5,6 +5,11 @@ compatibility_date = "2026-10-31"
 [env.staging]
 name = "myqr24-tag-app-api-staging"
 
+[env.staging.vars]
+# Enables test TAG routing administration only on the explicitly named staging
+# Worker. Without the dedicated secret below, the endpoint remains fail-closed.
+TAG_TEST_ADMIN_ENVIRONMENT = "staging"
+
 [[env.staging.d1_databases]]
 binding = "APP_DB"
 database_name = "myqr24-stg-db"
@@ -24,5 +29,7 @@ service = "myqr24-media-signer-staging"
 # APP_BOOTSTRAP_SECRET_S01, APP_PIN_PEPPER_S01, APP_MEDIA_SIGNER_KEY_S01,
 # APP_CONTENT_PUBLISH_KEY_S01 (Publisher für PUT /api/v1/tags/{tagId}/content;
 # fehlt es, antwortet der Pfad fail-closed mit 503), TAG_CONTENT_API_KEY_S01
-# (server-to-server Upload und explizites Löschen von Content-Items).
+# (Server-to-server Content-Item upload/delete key), TAG_TEST_ADMIN_KEY_S01
+# (separater Test-Verwaltungsschlüssel für /api/test-admin/tags/{tagId}; niemals
+# den Publisher-Key dafür wiederverwenden). Für Produktion nicht konfigurieren.
 # Production and real deployment remain blocked by W3D.

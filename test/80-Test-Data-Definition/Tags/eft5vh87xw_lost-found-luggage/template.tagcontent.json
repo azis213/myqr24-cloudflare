@@ -1,0 +1,210 @@
+{
+  "schema": "myqr24-tag-content-template-v1",
+  "schemaVersion": 3,
+  "template": {
+    "templateId": "tct_example_lost_found_luggage",
+    "templateVersion": 1,
+    "tagType": "lost-found",
+    "name": "Lost & Found – Reisekoffer",
+    "description": "Beispiel: Fundhinweis, Funddaten als Tabelle, Fundmeldung mit Fotos und Kontaktweg.",
+    "locale": "de-DE",
+    "status": "draft",
+    "compatibility": {
+      "protectionModes": ["public", "pin_required"],
+      "presentations": ["standard"]
+    }
+  },
+  "shell": {
+    "presentation": "standard",
+    "features": ["vault", "lost-found"],
+    "theme": {
+      "colorMode": "light",
+      "colors": {
+        "background": "#f2f5f8",
+        "surface": "#ffffff",
+        "text": "#20262c",
+        "mutedText": "#5b6672",
+        "heading": "#14314d",
+        "accent": "#2b6cb0",
+        "accentText": "#ffffff",
+        "border": "#dbe3ea",
+        "danger": "#b3261e",
+        "success": "#1b6b3a"
+      },
+      "typography": { "fontFamily": "system", "headingScale": 1, "bodySize": 16, "lineHeight": 1.55 },
+      "layout": { "contentWidth": "narrow", "density": "compact", "cornerStyle": "soft" }
+    },
+    "navigation": { "mode": "single", "items": [] },
+    "statusBar": { "showTagId": true, "showPresentation": false }
+  },
+  "layout": {
+    "mode": "grid-flow",
+    "columns": 12,
+    "gap": "md",
+    "container": { "maxWidth": "narrow", "padding": "normal" },
+    "responsive": {
+      "autoReflow": true,
+      "minColumnWidth": { "tablet": "16rem", "desktop": "18rem" },
+      "preferredColumns": { "mobile": 1, "tablet": 2, "desktop": 3 }
+    }
+  },
+  "elements": [
+    {
+      "elementId": "cel_theme",
+      "elementType": "theme-assets",
+      "displayOrder": 0,
+      "visibility": "public",
+      "hidden": true,
+      "payload": { "role": "background" },
+      "slots": [
+        { "slotId": "tag-background", "accepts": ["image"], "min": 0, "max": 1, "required": false }
+      ]
+    },
+    {
+      "elementId": "cel_finder",
+      "elementType": "finder-notice",
+      "displayOrder": 10,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 10, "tablet": 10, "desktop": 10 }
+      },
+      "payload": { "urgency": "normal" },
+      "content": {
+        "paragraphs": [
+          { "heading": 2, "runs": [{ "text": "Sie haben diesen Koffer gefunden?" }] },
+          { "runs": [{ "text": "Bitte nutzen Sie die Funktion " }, { "text": "Fund melden", "marks": [{ "type": "bold" }] }, { "text": ", damit die Eigentümerin informiert wird. Der Koffer muss nicht mitgenommen werden." }] }
+        ]
+      }
+    },
+    {
+      "elementId": "cel_form",
+      "elementType": "finder-form",
+      "displayOrder": 20,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 8 },
+        "order": { "mobile": 20, "tablet": 20, "desktop": 20 }
+      },
+      "style": { "background": { "type": "solid", "color": "surface" }, "padding": "md" },
+      "payload": { "channel": "server-mediated" },
+      "content": {
+        "paragraphs": [
+          { "heading": 4, "runs": [{ "text": "Fund melden" }] },
+          { "runs": [{ "text": "Ort und Zeit genügen. Fotos helfen bei der Zuordnung, sind aber freiwillig." }] }
+        ]
+      },
+      "slots": [
+        {
+          "slotId": "photos",
+          "accepts": ["image"],
+          "min": 0,
+          "max": 3,
+          "required": false,
+          "presentation": { "fit": "cover", "caption": "optional" }
+        }
+      ]
+    },
+    {
+      "elementId": "cel_facts",
+      "elementType": "text",
+      "displayOrder": 30,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 4 },
+        "order": { "mobile": 30, "tablet": 30, "desktop": 30 }
+      },
+      "style": { "padding": "md" },
+      "payload": { "headingLevel": "h2", "align": "start", "maxParagraphs": 8 },
+      "content": {
+        "paragraphs": [
+          { "heading": 3, "runs": [{ "text": "Funddaten" }] },
+          {
+            "type": "table",
+            "columns": [{ "align": "start" }, { "align": "start" }],
+            "rows": [
+              {
+                "header": true,
+                "cells": [
+                  { "runs": [{ "text": "Merkmal" }], "background": "#e8eef4" },
+                  { "runs": [{ "text": "Angabe" }], "background": "#e8eef4" }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "Gegenstand" }] },
+                  { "runs": [{ "text": "Handgepäckkoffer, dunkelblau" }] }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "Fundort" }], "background": "#f6f9fc" },
+                  { "runs": [{ "text": "Bahnhof, Gleis 3" }], "background": "#f6f9fc" }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "Fundzeit" }] },
+                  { "runs": [{ "text": "12. Mai, ca. 18:40" }] }
+                ]
+              },
+              {
+                "cells": [
+                  { "runs": [{ "text": "Zustand" }], "background": "#f6f9fc" },
+                  { "runs": [{ "text": "verschlossen, Rollen intakt" }], "background": "#f6f9fc" }
+                ]
+              }
+            ],
+            "border": { "color": "#c6d4e1", "style": "solid", "width": 1 }
+          }
+        ]
+      }
+    },
+    {
+      "elementId": "cel_privacy",
+      "elementType": "callout",
+      "displayOrder": 40,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 40, "tablet": 40, "desktop": 40 }
+      },
+      "payload": { "tone": "info" },
+      "content": {
+        "paragraphs": [
+          { "heading": 4, "runs": [{ "text": "Was hier nicht steht" }] },
+          { "runs": [{ "text": "Eigentümernamen, Adressen und Kontaktdaten werden öffentlich nicht angezeigt. Die Fundmeldung wird serverseitig weitergeleitet." }] }
+        ]
+      }
+    },
+    {
+      "elementId": "cel_contact",
+      "elementType": "contact-channel",
+      "displayOrder": 50,
+      "visibility": "shared",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 50, "tablet": 50, "desktop": 50 }
+      },
+      "style": { "padding": "md" },
+      "payload": { "method": "form" },
+      "content": {
+        "paragraphs": [
+          { "heading": 4, "runs": [{ "text": "Direkter Kontakt" }] },
+          { "runs": [{ "text": "Für Rückfragen zur Abholung – nur für Personen mit Zugangscode sichtbar." }] }
+        ]
+      }
+    },
+    {
+      "elementId": "cel_divider",
+      "elementType": "divider",
+      "displayOrder": 60,
+      "visibility": "public",
+      "placement": {
+        "span": { "mobile": 12, "tablet": 12, "desktop": 12 },
+        "order": { "mobile": 60, "tablet": 60, "desktop": 60 }
+      },
+      "payload": { "style": "line" }
+    }
+  ]
+}

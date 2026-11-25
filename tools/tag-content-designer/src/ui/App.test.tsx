@@ -105,6 +105,96 @@ describe("App", () => {
     expect(container.querySelector(".tcp-meta")?.textContent).toContain("Fit (1280 px)");
   });
 
+  it("stellt nur nicht geheime Publish-Eingaben wieder her und fordert vor dem PUT Bestätigung", async () => {
+    window.localStorage.setItem("myqr24.tcd.publish.environment", "staging");
+    window.localStorage.setItem("myqr24.tcd.publish.tagId", "ab12cd");
+    window.localStorage.setItem("myqr24.tcd.publish.templateId", template().template.templateId);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/admin-status")) {
+        return { ok: true, status: 200, json: async () => ({ enabled: true, environment: "staging" }) } as Response;
+      }
+      if (String(input).endsWith("/resolve")) {
+        return { ok: true, status: 200, json: async () => ({ tagId: "ab12cd", tagNumericId: "623187229" }) } as Response;
+      }
+      return {
+        ok: true,
+        status: 201,
+        json: async () => ({ status: "created", revision: 1, request: init?.body }),
+      } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { container } = setup();
+
+    fireEvent.click(within(container).getByRole("button", { name: "Publish…" }));
+    const dialog = within(container).getByRole("dialog", { name: "TAG-Content veröffentlichen" });
+    expect((within(dialog).getByLabelText("Publish-Umgebung") as HTMLSelectElement).value).toBe("staging");
+    expect((within(dialog).getByLabelText("Base36-TAG-ID") as HTMLInputElement).value).toBe("ab12cd");
+    expect((within(dialog).getByLabelText("Numeric-ID") as HTMLInputElement).value).toBe("");
+    expect(window.localStorage.getItem("myqr24.tcd.publish.environment")).toBe("staging");
+    expect(window.localStorage.getItem("myqr24.tcd.publish.tagId")).toBe("ab12cd");
+    expect(Object.keys(window.localStorage).some((key) => /secret|token|key/i.test(key))).toBe(false);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Numeric-ID aktualisieren" }));
+    await waitFor(() => expect((within(dialog).getByLabelText("Numeric-ID") as HTMLInputElement).value).toBe("623187229"));
+    const publishButton = within(dialog).getByRole("button", { name: "Jetzt vollständig ersetzen" });
+    expect((publishButton as HTMLButtonElement).disabled).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(within(dialog).getByLabelText("Publish-Bestätigung"), { target: { value: "PUBLISH ab12cd" } });
+    expect((publishButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(publishButton);
+    await waitFor(() => expect(within(dialog).getByRole("status").textContent).toContain("Revision 1"));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+    expect(requestBody.environment).toBe("staging");
+    expect(requestBody.tagNumericId).toBe("623187229");
+    expect(requestBody.confirm).toBe("PUBLISH ab12cd");
+    expect(requestBody.template).toEqual(template());
+  });
+
+  it("lädt Routing für die Test-TAG-Verwaltung und löscht erst nach exakter Umgebungsbestätigung", async () => {
+    window.localStorage.setItem("myqr24.tcd.publish.environment", "staging");
+    window.localStorage.setItem("myqr24.tcd.publish.tagId", "ab12cd");
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/admin-status")) {
+        return { ok: true, status: 200, json: async () => ({ enabled: true, environment: "staging" }) } as Response;
+      }
+      if (String(input).endsWith("/resolve")) {
+        return { ok: true, status: 200, json: async () => ({ tagNumericId: "623187229" }) } as Response;
+      }
+      if (String(input).endsWith("/admin")) {
+        if (init?.body && JSON.parse(String(init.body)).operation === "get") {
+          return { ok: true, status: 200, json: async () => ({ exists: true, hasData: true, status: "active", target_type: "internal", protection_mode: "public", external_url: null, access_version: 1, content_revision: 2, schema_version: 1 }) } as Response;
+        }
+        return { ok: true, status: 200, json: async () => ({ status: "deleted", deletedObjects: 3 }) } as Response;
+      }
+      throw new Error("Content publish must not be called in this test.");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { container } = setup();
+    fireEvent.click(within(container).getByRole("button", { name: "Publish…" }));
+    const dialog = within(container).getByRole("dialog", { name: "TAG-Content veröffentlichen" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Numeric-ID aktualisieren" }));
+    await waitFor(() => expect((within(dialog).getByLabelText("Numeric-ID") as HTMLInputElement).value).toBe("623187229"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Verwaltungs-API prüfen" }));
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Routing laden" }).hasAttribute("disabled")).toBe(false));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Routing laden" }));
+    await waitFor(() => expect((within(dialog).getByLabelText("Content Revision") as HTMLInputElement).value).toBe("2"));
+    expect((within(dialog).getByLabelText("TAG-Zieltyp") as HTMLSelectElement).value).toBe("internal");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Löschbestätigung vorbereiten" }));
+    const deleteButton = within(dialog).getByRole("button", { name: "TAG vollständig löschen" });
+    expect((deleteButton as HTMLButtonElement).disabled).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    fireEvent.change(within(dialog).getByLabelText("TAG-Löschbestätigung"), { target: { value: "DELETE STAGING ab12cd" } });
+    expect((deleteButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(deleteButton);
+    await waitFor(() => expect(within(dialog).getAllByRole("status").some((status) => status.textContent?.includes("gelöscht"))).toBe(true));
+    const calls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/admin"));
+    expect(calls).toHaveLength(2);
+    expect(JSON.parse(String(calls[1][1]?.body))).toMatchObject({ operation: "delete", confirm: "DELETE STAGING ab12cd" });
+  });
+
   it("zeigt Layout-Hinweise unter der Vorschau, wenn Spalten zu schmal sind", () => {
     const { container } = setup();
     const group = container.querySelector('[role="group"][aria-label="Vorschau-Breite"]') as HTMLElement;

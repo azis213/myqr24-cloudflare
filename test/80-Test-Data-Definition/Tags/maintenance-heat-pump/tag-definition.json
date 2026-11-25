@@ -1,0 +1,13 @@
+{
+  "schema": "myqr24-tag-test-definition-v1",
+  "schemaVersion": 1,
+  "fixture": "maintenance-heat-pump",
+  "reservationGroup": "maintenance",
+  "tagType": "maintenance",
+  "slot": 201,
+  "tagLength": 10,
+  "tagNumericId": "2821109907656",
+  "tagId": null,
+  "tagIdStatus": "pending-user-assignment",
+  "sourceExample": "tools/tag-content-designer/public/templates/examples/maintenance-heat-pump"
+}
