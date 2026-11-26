@@ -24,7 +24,19 @@ workers_dev = false
 
 [env.staging]
 name = "myqr24-tag-codec-staging"
-routes = [{ pattern = "internal.s.myqr24.com/api/v1/codec/*", zone_name = "myqr24.com" }]
+# Keep the dashboard-configured host custom domain in Wrangler so deployments
+# do not remove it. The TAG-App API has the more-specific /api/* route on the
+# same host; the codec path remains explicitly routed to this Worker.
+routes = [
+  { pattern = "internal.s.myqr24.com", custom_domain = true, enabled = true, previews_enabled = true },
+  { pattern = "internal.s.myqr24.com/api/v1/codec/*", zone_name = "myqr24.com" },
+]
+
+[env.staging.observability.logs]
+enabled = true
+
+[env.staging.observability.issues]
+enabled = true
 
 [env.production]
 name = "myqr24-tag-codec"

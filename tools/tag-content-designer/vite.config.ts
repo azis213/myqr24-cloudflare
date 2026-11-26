@@ -12,6 +12,20 @@ const MAX_PROXY_BODY_BYTES = 140 * 1024;
 
 type LocalSecrets = Record<string, string>;
 
+export function resolveStagingDesignerConfig(
+  processEnvironment: Record<string, string | undefined>,
+  tagSecrets: LocalSecrets,
+  codecSecrets: LocalSecrets,
+) {
+  return {
+    apiBaseUrl: processEnvironment.MYQR_STAGING_TAG_APP_API_BASE_URL || "https://internal.s.myqr24.com",
+    codecBaseUrl: processEnvironment.MYQR_STAGING_CODEC_BASE_URL || "https://internal.s.myqr24.com",
+    publishKey: processEnvironment.MYQR_STAGING_PUBLISH_KEY || tagSecrets.APP_CONTENT_PUBLISH_KEY_S01 || "",
+    codecToken: processEnvironment.TAG_CODEC_API_KEY_S01 || codecSecrets.TAG_CODEC_API_KEY_S01 || "",
+    testAdminKey: processEnvironment.MYQR_STAGING_TAG_TEST_ADMIN_KEY || tagSecrets.TAG_TEST_ADMIN_KEY_S01 || tagSecrets.APP_LOCAL_SEED_KEY || "",
+  };
+}
+
 function parseDevVars(text: string): LocalSecrets {
   const result: LocalSecrets = {};
   for (const line of text.split(/\r?\n/u)) {
@@ -121,11 +135,13 @@ function publishDevApi() {
             codecToken = codecSecrets.TAG_CODEC_API_KEY_S01 ?? "";
             testAdminKey = tagSecrets.APP_LOCAL_SEED_KEY ?? "";
           } else {
-            apiBaseUrl = process.env.MYQR_STAGING_TAG_APP_API_BASE_URL ?? "";
-            codecBaseUrl = process.env.MYQR_STAGING_CODEC_BASE_URL ?? "";
-            publishKey = process.env.MYQR_STAGING_PUBLISH_KEY ?? "";
-            codecToken = process.env.TAG_CODEC_API_KEY_S01 ?? "";
-            testAdminKey = process.env.MYQR_STAGING_TAG_TEST_ADMIN_KEY ?? "";
+            const [tagSecrets, codecSecrets] = await Promise.all([
+              readLocalSecrets(resolve(repositoryRoot, "apps/tag-app/.dev.vars")),
+              readLocalSecrets(resolve(repositoryRoot, "apps/edge-router/.dev.vars")),
+            ]);
+            // Staging's dedicated admin secret is provisioned from APP_LOCAL_SEED_KEY
+            // by deploy-tag-app-api-staging.ps1. Keep the value server-side only.
+            ({ apiBaseUrl, codecBaseUrl, publishKey, codecToken, testAdminKey } = resolveStagingDesignerConfig(process.env, tagSecrets, codecSecrets));
           }
 
           if (pathname === "/__tag-content/admin") {
@@ -199,7 +215,21 @@ function publishDevApi() {
               signal: AbortSignal.timeout(10_000),
             });
             const statusBody: unknown = await statusResponse.json().catch(() => null);
-            jsonResponse(response, statusResponse.ok ? 200 : 200, statusBody && typeof statusBody === "object" ? statusBody : { enabled: false, environment });
+            if (!statusResponse.ok) {
+              jsonResponse(response, 200, {
+                enabled: false,
+                environment,
+                error: statusResponse.status === 404 || statusResponse.status === 401
+                  ? "Staging-Worker hat die Admin-Prüfung abgelehnt. Prüfe TAG_TEST_ADMIN_KEY_S01 und starte den Designer-Dev-Server neu."
+                  : `Staging-Worker antwortete mit HTTP ${statusResponse.status}; die Admin-API bleibt deaktiviert.`,
+              });
+              return;
+            }
+            if (statusBody && typeof statusBody === "object" && !Array.isArray(statusBody)) {
+              jsonResponse(response, 200, statusBody);
+              return;
+            }
+            jsonResponse(response, 200, { enabled: false, environment, error: "Staging-Worker lieferte keine gültige Statusantwort." });
             return;
           }
 

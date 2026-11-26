@@ -627,9 +627,9 @@ export function App({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ environment: publishEnvironment }),
       });
-      const result = await response.json() as { enabled?: unknown };
+      const result = await response.json() as { enabled?: unknown; error?: unknown };
       setTestTagAdminAvailable(response.ok && result.enabled === true);
-      if (!response.ok || result.enabled !== true) setTestTagAdminError("Test-TAG-API ist für diese Umgebung nicht freigeschaltet; Verwaltungsaktionen bleiben deaktiviert.");
+      if (!response.ok || result.enabled !== true) setTestTagAdminError(typeof result.error === "string" ? result.error : "Test-TAG-API ist für diese Umgebung nicht freigeschaltet; Verwaltungsaktionen bleiben deaktiviert.");
       else setTestTagAdminError("");
     } catch {
       setTestTagAdminAvailable(false);

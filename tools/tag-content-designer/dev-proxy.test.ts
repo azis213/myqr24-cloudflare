@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it, vi } from "vitest";
-import { isLoopbackHost } from "./vite.config";
+import { isLoopbackHost, resolveStagingDesignerConfig } from "./vite.config";
 
 function createRequest(url: string, body: unknown, headers: Record<string, string> = {}) {
   const request = new EventEmitter() as EventEmitter & IncomingMessage;
@@ -62,6 +62,26 @@ describe("TAG-Content Dev-Proxy", () => {
     expect(isLoopbackHost("192.168.1.5:5180")).toBe(false);
   });
 
+  it("verwendet Staging-Defaults aus .dev.vars und bevorzugt explizite Prozesswerte", () => {
+    expect(resolveStagingDesignerConfig({}, {
+      APP_CONTENT_PUBLISH_KEY_S01: "local-publisher",
+      APP_LOCAL_SEED_KEY: "staging-admin-seed",
+    }, { TAG_CODEC_API_KEY_S01: "local-codec-key" })).toEqual({
+      apiBaseUrl: "https://internal.s.myqr24.com",
+      codecBaseUrl: "https://internal.s.myqr24.com",
+      publishKey: "local-publisher",
+      codecToken: "local-codec-key",
+      testAdminKey: "staging-admin-seed",
+    });
+    expect(resolveStagingDesignerConfig({
+      MYQR_STAGING_TAG_APP_API_BASE_URL: "https://override.example.test",
+      MYQR_STAGING_TAG_TEST_ADMIN_KEY: "explicit-admin-key",
+    }, { APP_LOCAL_SEED_KEY: "fallback-admin-key" }, {})).toMatchObject({
+      apiBaseUrl: "https://override.example.test",
+      testAdminKey: "explicit-admin-key",
+    });
+  });
+
   it("lehnt unbekannte Route und fremde Origin ab, bevor ein Backend aufgerufen wird", async () => {
     const middleware = await getMiddleware();
     const next = vi.fn();
@@ -95,13 +115,21 @@ describe("TAG-Content Dev-Proxy", () => {
     expect(badTag.body).toContain("Base36-TAG-ID ist ungültig");
   });
 
-  it("gibt keinen Secret-Wert zurück, wenn Credentials fehlen", async () => {
+  it("verwendet keine secret Werte aus der Fallback-Konfiguration in der Browser-Antwort", async () => {
     const middleware = await getMiddleware();
+    const fetchMock = vi.fn(async () => Response.json({ enabled: false, environment: "staging" }, { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
     const response = createResponse();
-    await middleware(createRequest("/__tag-content/resolve", { environment: "staging", tagId: "ab12cd" }), response, vi.fn());
-    expect(response.statusCode).toBe(503);
-    expect(response.body).toContain("Codec-Credentials");
-    expect(response.body).not.toMatch(/Bearer|APP_CONTENT_PUBLISH_KEY|TAG_CODEC_API_KEY/);
+    try {
+      await middleware(createRequest("/__tag-content/admin-status", { environment: "staging" }), response, vi.fn());
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toMatchObject({ enabled: false, environment: "staging" });
+      expect(response.body).toMatch(/Staging-Worker hat die Admin-Prüfung abgelehnt/u);
+      expect(response.body).not.toMatch(/Bearer|APP_LOCAL_SEED_KEY|APP_CONTENT_PUBLISH_KEY|TAG_CODEC_API_KEY/);
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("authentifiziert den Codec-Lookup mit TAG_CODEC_API_KEY_S01 und nutzt das längere Timeout", async () => {
@@ -208,6 +236,34 @@ describe("TAG-Content Dev-Proxy", () => {
       const [, init] = fetchMock.mock.calls[0]!;
       expect(new Headers(init?.headers).get("authorization")).toBe("Bearer test-admin-key");
       expect(response.body).not.toContain("test-admin-key");
+    } finally {
+      vi.unstubAllGlobals();
+      if (previous.api === undefined) delete process.env.MYQR_STAGING_TAG_APP_API_BASE_URL;
+      else process.env.MYQR_STAGING_TAG_APP_API_BASE_URL = previous.api;
+      if (previous.admin === undefined) delete process.env.MYQR_STAGING_TAG_TEST_ADMIN_KEY;
+      else process.env.MYQR_STAGING_TAG_TEST_ADMIN_KEY = previous.admin;
+    }
+  });
+
+  it("liefert eine konkrete Erklärung, wenn der Staging-Worker den Admin-Key ablehnt", async () => {
+    const previous = {
+      api: process.env.MYQR_STAGING_TAG_APP_API_BASE_URL,
+      admin: process.env.MYQR_STAGING_TAG_TEST_ADMIN_KEY,
+    };
+    process.env.MYQR_STAGING_TAG_APP_API_BASE_URL = "https://tag-api.example.test";
+    process.env.MYQR_STAGING_TAG_TEST_ADMIN_KEY = "stale-admin-key";
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ enabled: false, environment: "staging" }, { status: 404 })));
+    try {
+      const middleware = await getMiddleware();
+      const response = createResponse();
+      await middleware(createRequest("/__tag-content/admin-status", { environment: "staging" }), response, vi.fn());
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual({
+        enabled: false,
+        environment: "staging",
+        error: "Staging-Worker hat die Admin-Prüfung abgelehnt. Prüfe TAG_TEST_ADMIN_KEY_S01 und starte den Designer-Dev-Server neu.",
+      });
+      expect(response.body).not.toContain("stale-admin-key");
     } finally {
       vi.unstubAllGlobals();
       if (previous.api === undefined) delete process.env.MYQR_STAGING_TAG_APP_API_BASE_URL;

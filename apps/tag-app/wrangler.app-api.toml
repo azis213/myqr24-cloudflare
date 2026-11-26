@@ -4,6 +4,9 @@ compatibility_date = "2026-10-31"
 
 [env.staging]
 name = "myqr24-tag-app-api-staging"
+# Private staging API host; the codec's more specific /api/v1/codec/* route
+# continues to target the separate codec Worker.
+routes = [{ pattern = "internal.s.myqr24.com/api/*", zone_name = "myqr24.com" }]
 
 [env.staging.vars]
 # Enables test TAG routing administration only on the explicitly named staging

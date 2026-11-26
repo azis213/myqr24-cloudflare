@@ -7,3 +7,6 @@ APP_LOCAL_SEED_KEY=local-seed-key-change-me-000000000000000004
 APP_CONTENT_PUBLISH_KEY_S01=local-content-publish-key-change-me-0000000005
 # TAG-APP server-to-server content item upload/delete API key.
 TAG_CONTENT_API_KEY_S01=local-content-key-change-mee-00000000000006
+
+TAG-TEST-ADMIN-KEY-S01=local-test-admin-key-000000000000000007
+TAG_TEST_ADMIN_ENVIRONMENT=staging
