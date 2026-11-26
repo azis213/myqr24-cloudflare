@@ -251,6 +251,21 @@ bleibt davon unabhängig. Die PWA-Preview verwendet HTTP; eine Installation auf
 einem Mobilgerät benötigt HTTPS und muss daher über ein HTTPS-Deployment oder
 einen HTTPS-Tunnel erfolgen.
 
+Um alle lokalen Compose-Dienste samt Cloudflare-Profil und PWA ohne Build-Cache
+neu zu bauen und neu zu erstellen, anschließend Seed und Smoke-Tests auszuführen:
+
+```powershell
+.\test\00-Test-Scripts\rebuild-local-docker.ps1
+```
+
+Das Skript erhält benannte Daten-Volumes (einschließlich MySQL- und Worker-Daten)
+und führt kein Cloudflare-Remote-Deployment aus. Vorab lässt sich die Compose-
+Konfiguration ohne Änderungen prüfen:
+
+```powershell
+.\test\00-Test-Scripts\rebuild-local-docker.ps1 -DryRun
+```
+
 Zusätzlich startet der Testlauf den Compose-internen Private-Codec. Die
 dedizierten TCP-Integrationstests aktivieren den HTTP-Driver nur testlokal und
 prüfen die 6-/8-/10-stellige Reservierung über den echten Worker. Der

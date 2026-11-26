@@ -33,6 +33,27 @@ describe("TAG Application D1 initial schema", () => {
     }
   });
 
+  it("can be reapplied without dropping existing tables or data", () => {
+    const db = openDatabase(schema);
+    try {
+      db.exec(`INSERT INTO global_content (
+        content_id, content_revision, schema_version, content_file,
+        content_sha256, content_bytes, content_type, published_at, updated_at
+      ) VALUES ('existing-content', 1, 1, 'content.json', 'hash', 1,
+        'application/json', 'now', 'now')`);
+
+      expect(() => db.exec(schema)).not.toThrow();
+      expect(db.prepare("SELECT content_id FROM global_content").get()).toEqual({
+        content_id: "existing-content",
+      });
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'tag_routing_active_lookup_idx'").get()).toEqual({
+        name: "tag_routing_active_lookup_idx",
+      });
+    } finally {
+      db.close();
+    }
+  });
+
   it("keeps simple keys, enum lists, value bounds and state invariants", () => {
     const db = openDatabase(schema);
     try {

@@ -5,7 +5,7 @@
 PRAGMA foreign_keys = ON;
 
 -- table: global_content
-CREATE TABLE global_content (
+CREATE TABLE IF NOT EXISTS global_content (
   content_id TEXT PRIMARY KEY,
   content_revision INTEGER NOT NULL CHECK (content_revision >= 1),
   schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
@@ -18,7 +18,7 @@ CREATE TABLE global_content (
 );
 
 -- table: tag_access_sessions
-CREATE TABLE tag_access_sessions (
+CREATE TABLE IF NOT EXISTS tag_access_sessions (
   id TEXT PRIMARY KEY,
   tag_id TEXT NOT NULL REFERENCES tag_routing(tag_id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
@@ -31,7 +31,7 @@ CREATE TABLE tag_access_sessions (
 );
 
 -- table: tag_content
-CREATE TABLE tag_content (
+CREATE TABLE IF NOT EXISTS tag_content (
   tag_numeric_id INTEGER PRIMARY KEY CHECK (tag_numeric_id > 0),
   tag_base36_id TEXT NOT NULL UNIQUE,
   content_revision INTEGER NOT NULL CHECK (content_revision >= 1),
@@ -45,7 +45,7 @@ CREATE TABLE tag_content (
 );
 
 -- table: tag_content_element_items
-CREATE TABLE "tag_content_element_items" (
+CREATE TABLE IF NOT EXISTS "tag_content_element_items" (
   tag_numeric_id INTEGER NOT NULL,
   content_element_id TEXT NOT NULL,
   content_id INTEGER NOT NULL
@@ -63,7 +63,7 @@ CREATE TABLE "tag_content_element_items" (
 );
 
 -- table: tag_content_elements
-CREATE TABLE "tag_content_elements" (
+CREATE TABLE IF NOT EXISTS "tag_content_elements" (
   tag_numeric_id INTEGER NOT NULL
     REFERENCES tag_content(tag_numeric_id) ON DELETE CASCADE,
   content_element_id TEXT NOT NULL,
@@ -76,7 +76,7 @@ CREATE TABLE "tag_content_elements" (
 );
 
 -- table: tag_content_items
-CREATE TABLE tag_content_items (
+CREATE TABLE IF NOT EXISTS tag_content_items (
   content_id INTEGER PRIMARY KEY CHECK (content_id > 0),
   content_item_type TEXT NOT NULL,
   scope TEXT NOT NULL CHECK (scope IN ('tag', 'global')),
@@ -108,7 +108,7 @@ CREATE TABLE tag_content_items (
 );
 
 -- table: tag_content_media_variants
-CREATE TABLE tag_content_media_variants (
+CREATE TABLE IF NOT EXISTS tag_content_media_variants (
   content_id INTEGER NOT NULL
     REFERENCES tag_content_items(content_id) ON DELETE CASCADE,
   variant TEXT NOT NULL,
@@ -123,7 +123,7 @@ CREATE TABLE tag_content_media_variants (
 );
 
 -- table: tag_pin_credentials
-CREATE TABLE tag_pin_credentials (
+CREATE TABLE IF NOT EXISTS tag_pin_credentials (
   tag_id TEXT PRIMARY KEY REFERENCES tag_routing(tag_id) ON DELETE CASCADE,
   pin_hash TEXT NOT NULL,
   pin_version INTEGER NOT NULL CHECK (pin_version >= 1),
@@ -131,7 +131,7 @@ CREATE TABLE tag_pin_credentials (
 );
 
 -- table: tag_pin_throttles
-CREATE TABLE tag_pin_throttles (
+CREATE TABLE IF NOT EXISTS tag_pin_throttles (
   tag_id TEXT NOT NULL,
   client_key TEXT NOT NULL,
   failed_attempts INTEGER NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0),
@@ -141,7 +141,7 @@ CREATE TABLE tag_pin_throttles (
 );
 
 -- table: tag_range_content
-CREATE TABLE tag_range_content (
+CREATE TABLE IF NOT EXISTS tag_range_content (
   range_id TEXT PRIMARY KEY,
   content_id TEXT NOT NULL,
   content_revision INTEGER NOT NULL CHECK (content_revision >= 1),
@@ -155,7 +155,7 @@ CREATE TABLE tag_range_content (
 );
 
 -- table: tag_routing
-CREATE TABLE tag_routing (
+CREATE TABLE IF NOT EXISTS tag_routing (
   tag_id TEXT PRIMARY KEY,
   status TEXT NOT NULL CHECK (status IN ('active', 'suspended', 'deactivated', 'expired')),
   target_type TEXT NOT NULL CHECK (target_type IN ('internal', 'external')),
@@ -168,29 +168,29 @@ CREATE TABLE tag_routing (
 );
 
 -- index: tag_access_sessions_lookup_idx
-CREATE INDEX tag_access_sessions_lookup_idx
+CREATE INDEX IF NOT EXISTS tag_access_sessions_lookup_idx
   ON tag_access_sessions (tag_id, token_hash, expires_at);
 
 -- index: tag_content_element_items_content_idx
-CREATE INDEX tag_content_element_items_content_idx
+CREATE INDEX IF NOT EXISTS tag_content_element_items_content_idx
   ON tag_content_element_items (tag_numeric_id, content_id);
 
 -- index: tag_content_element_items_order_idx
-CREATE INDEX tag_content_element_items_order_idx
+CREATE INDEX IF NOT EXISTS tag_content_element_items_order_idx
   ON tag_content_element_items (tag_numeric_id, content_element_id, display_order, content_id);
 
 -- index: tag_content_elements_order_idx
-CREATE INDEX tag_content_elements_order_idx
+CREATE INDEX IF NOT EXISTS tag_content_elements_order_idx
   ON tag_content_elements (tag_numeric_id, display_order, content_element_id);
 
 -- index: tag_content_items_owner_idx
-CREATE INDEX tag_content_items_owner_idx
+CREATE INDEX IF NOT EXISTS tag_content_items_owner_idx
   ON tag_content_items (owner_tag_numeric_id, status, created_at);
 
 -- index: tag_content_items_status_idx
-CREATE INDEX tag_content_items_status_idx
+CREATE INDEX IF NOT EXISTS tag_content_items_status_idx
   ON tag_content_items (status, updated_at);
 
 -- index: tag_routing_active_lookup_idx
-CREATE INDEX tag_routing_active_lookup_idx
+CREATE INDEX IF NOT EXISTS tag_routing_active_lookup_idx
   ON tag_routing (tag_id, status);
