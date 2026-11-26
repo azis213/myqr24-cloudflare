@@ -1,6 +1,6 @@
 {
   "schema": "myqr24-tag-content-template-v1",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "template": {
     "templateId": "tct_example_lost_found_luggage",
     "templateVersion": 1,
@@ -52,6 +52,7 @@
     {
       "elementId": "cel_theme",
       "elementType": "theme-assets",
+      "items": { "mode": "none" },
       "displayOrder": 0,
       "visibility": "public",
       "hidden": true,
@@ -63,6 +64,7 @@
     {
       "elementId": "cel_finder",
       "elementType": "finder-notice",
+      "items": { "mode": "none" },
       "displayOrder": 10,
       "visibility": "public",
       "placement": {
@@ -80,6 +82,7 @@
     {
       "elementId": "cel_form",
       "elementType": "finder-form",
+      "items": { "mode": "dynamic", "slotIds": ["photos"] },
       "displayOrder": 20,
       "visibility": "public",
       "placement": {
@@ -108,6 +111,7 @@
     {
       "elementId": "cel_facts",
       "elementType": "text",
+      "items": { "mode": "none" },
       "displayOrder": 30,
       "visibility": "public",
       "placement": {
@@ -163,6 +167,7 @@
     {
       "elementId": "cel_privacy",
       "elementType": "callout",
+      "items": { "mode": "none" },
       "displayOrder": 40,
       "visibility": "public",
       "placement": {
@@ -180,6 +185,7 @@
     {
       "elementId": "cel_contact",
       "elementType": "contact-channel",
+      "items": { "mode": "none" },
       "displayOrder": 50,
       "visibility": "shared",
       "placement": {
@@ -198,6 +204,7 @@
     {
       "elementId": "cel_divider",
       "elementType": "divider",
+      "items": { "mode": "none" },
       "displayOrder": 60,
       "visibility": "public",
       "placement": {

@@ -12,8 +12,8 @@ describe("validateDocument", () => {
   it("akzeptiert die ausgelieferten Golden Files ohne Fehler", () => {
     expect(blockers(vaultTemplate)).toHaveLength(0);
     expect(blockers(lostFoundTemplate)).toHaveLength(0);
-    // Golden Files liegen auf schemaVersion 3 und nutzen Absatz-Überschriften.
-    expect((vaultTemplate as { schemaVersion: number }).schemaVersion).toBe(3);
+    // Golden Files liegen auf schemaVersion 4 und nutzen Absatz-Überschriften.
+    expect((vaultTemplate as { schemaVersion: number }).schemaVersion).toBe(4);
     expect(JSON.stringify(vaultTemplate)).toContain('"heading":3');
   });
 
@@ -144,6 +144,34 @@ describe("validateDocument", () => {
     element.content!.heading = "Altbestand";
     expect(codes(doc)).toContain("CONTENT_HEADING_DEPRECATED");
     // Hinweis, kein Blocker.
+    expect(blockers(doc)).toHaveLength(0);
+  });
+
+  it("prüft die Item-Fähigkeit je Element", () => {
+    const doc = clone() as unknown as { elements: Array<Record<string, unknown>> };
+
+    delete doc.elements[1].items;
+    expect(codes(doc)).toContain("ELEMENT_ITEMS_MISSING");
+
+    doc.elements[1].items = { mode: "manchmal" };
+    expect(codes(doc)).toContain("ELEMENT_ITEMS_MODE_INVALID");
+
+    // Text kann keine eigenen Items besitzen.
+    doc.elements[1].items = { mode: "dynamic" };
+    expect(codes(doc)).toContain("ELEMENT_ITEMS_NOT_SUPPORTED");
+
+    // Eine Galerie braucht eigene Items.
+    const gallery = doc.elements.find((entry) => entry.elementType === "gallery");
+    if (gallery) {
+      gallery.items = { mode: "none" };
+      expect(codes(doc)).toContain("ELEMENT_ITEMS_MODE_MISMATCH");
+      gallery.items = { mode: "dynamic", slotIds: ["unbekannt"] };
+      expect(codes(doc)).toContain("ELEMENT_ITEMS_SLOT_UNKNOWN");
+      gallery.items = { mode: "dynamic", slotIds: ["images"] };
+      expect(codes(doc)).not.toContain("ELEMENT_ITEMS_SLOT_UNKNOWN");
+    }
+
+    doc.elements[1].items = { mode: "none" };
     expect(blockers(doc)).toHaveLength(0);
   });
 

@@ -1,0 +1,717 @@
+{
+  "elements": [
+    {
+      "displayOrder": 0,
+      "elementId": "cel_theme",
+      "elementType": "theme-assets",
+      "hidden": true,
+      "items": {
+        "mode": "none"
+      },
+      "payload": {
+        "role": "background"
+      },
+      "slots": [
+        {
+          "accepts": [
+            "image"
+          ],
+          "max": 1,
+          "min": 0,
+          "required": false,
+          "slotId": "tag-background"
+        }
+      ],
+      "visibility": "public"
+    },
+    {
+      "bindings": {
+        "title": {
+          "from": "tag.displayName"
+        }
+      },
+      "content": {
+        "paragraphs": [
+          {
+            "runs": [
+              {
+                "text": "Tanzen, bis die Lichter ausgehen."
+              }
+            ]
+          }
+        ]
+      },
+      "displayOrder": 10,
+      "elementId": "cel_hero",
+      "elementType": "hero",
+      "items": {
+        "mode": "none"
+      },
+      "payload": {
+        "variant": "cover"
+      },
+      "placement": {
+        "order": {
+          "desktop": 10,
+          "mobile": 10,
+          "tablet": 10
+        },
+        "span": {
+          "desktop": 12,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "slots": [
+        {
+          "accepts": [
+            "image"
+          ],
+          "max": 1,
+          "min": 0,
+          "presentation": {
+            "fit": "cover"
+          },
+          "required": false,
+          "slotId": "cover"
+        }
+      ],
+      "visibility": "public"
+    },
+    {
+      "content": {
+        "paragraphs": [
+          {
+            "heading": 4,
+            "runs": [
+              {
+                "text": "Dresscode & Zeiten"
+              }
+            ]
+          },
+          {
+            "runs": [
+              {
+                "text": "Ab 20 Uhr wird gefeiert – festlich, aber tanzbar. "
+              },
+              {
+                "marks": [
+                  {
+                    "type": "italic"
+                  }
+                ],
+                "text": "Hohe Absätze im Garten bitte vermeiden."
+              }
+            ]
+          }
+        ]
+      },
+      "displayOrder": 20,
+      "elementId": "cel_dress",
+      "elementType": "callout",
+      "items": {
+        "mode": "none"
+      },
+      "payload": {
+        "tone": "notice"
+      },
+      "placement": {
+        "order": {
+          "desktop": 20,
+          "mobile": 20,
+          "tablet": 20
+        },
+        "span": {
+          "desktop": 6,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "visibility": "public"
+    },
+    {
+      "content": {
+        "paragraphs": [
+          {
+            "heading": 3,
+            "runs": [
+              {
+                "text": "Bar & Getränke"
+              }
+            ]
+          },
+          {
+            "border": {
+              "color": "#4a3b5e",
+              "style": "solid",
+              "width": 1
+            },
+            "columns": [
+              {
+                "align": "start"
+              },
+              {
+                "align": "end"
+              },
+              {
+                "align": "start"
+              }
+            ],
+            "rows": [
+              {
+                "cells": [
+                  {
+                    "background": "#2a2237",
+                    "runs": [
+                      {
+                        "text": "Getränk"
+                      }
+                    ]
+                  },
+                  {
+                    "background": "#2a2237",
+                    "runs": [
+                      {
+                        "text": "Preis"
+                      }
+                    ]
+                  },
+                  {
+                    "background": "#2a2237",
+                    "runs": [
+                      {
+                        "text": "Hinweis"
+                      }
+                    ]
+                  }
+                ],
+                "header": true
+              },
+              {
+                "cells": [
+                  {
+                    "runs": [
+                      {
+                        "text": "Aperol Spritz"
+                      }
+                    ]
+                  },
+                  {
+                    "runs": [
+                      {
+                        "text": "7 €"
+                      }
+                    ]
+                  },
+                  {
+                    "runs": [
+                      {
+                        "text": "mit Orangenscheibe"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "background": "#241d2f",
+                    "runs": [
+                      {
+                        "text": "Gin Tonic"
+                      }
+                    ]
+                  },
+                  {
+                    "background": "#241d2f",
+                    "runs": [
+                      {
+                        "text": "8 €"
+                      }
+                    ]
+                  },
+                  {
+                    "background": "#241d2f",
+                    "runs": [
+                      {
+                        "text": "Basilikum optional"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "runs": [
+                      {
+                        "text": "Hausgemachte Limonade"
+                      }
+                    ]
+                  },
+                  {
+                    "runs": [
+                      {
+                        "text": "4 €"
+                      }
+                    ]
+                  },
+                  {
+                    "runs": [
+                      {
+                        "text": "Holunder oder Zitrone"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "background": "#241d2f",
+                    "runs": [
+                      {
+                        "text": "Bier vom Fass"
+                      }
+                    ]
+                  },
+                  {
+                    "background": "#241d2f",
+                    "runs": [
+                      {
+                        "text": "4,50 €"
+                      }
+                    ]
+                  },
+                  {
+                    "background": "#241d2f",
+                    "runs": [
+                      {
+                        "text": "aus der Region"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "runs": [
+                      {
+                        "text": "Alkoholfrei"
+                      }
+                    ]
+                  },
+                  {
+                    "runs": [
+                      {
+                        "text": "0 €"
+                      }
+                    ]
+                  },
+                  {
+                    "runs": [
+                      {
+                        "text": "Wasser, Saft, Kaffee"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "type": "table"
+          }
+        ]
+      },
+      "displayOrder": 30,
+      "elementId": "cel_bar",
+      "elementType": "text",
+      "items": {
+        "mode": "none"
+      },
+      "payload": {
+        "align": "start",
+        "headingLevel": "h2",
+        "maxParagraphs": 8
+      },
+      "placement": {
+        "order": {
+          "desktop": 30,
+          "mobile": 30,
+          "tablet": 30
+        },
+        "span": {
+          "desktop": 6,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "style": {
+        "background": {
+          "color": "surface",
+          "type": "solid"
+        },
+        "padding": "md"
+      },
+      "visibility": "public"
+    },
+    {
+      "actions": {
+        "download": {
+          "enabled": true,
+          "principals": [
+            "scanner",
+            "guest",
+            "owner"
+          ]
+        },
+        "upload": {
+          "enabled": false
+        }
+      },
+      "content": {
+        "paragraphs": [
+          {
+            "heading": 3,
+            "runs": [
+              {
+                "text": "Partyfotos"
+              }
+            ]
+          }
+        ]
+      },
+      "displayOrder": 50,
+      "elementId": "cel_gallery",
+      "elementType": "gallery",
+      "items": {
+        "mode": "dynamic",
+        "slotIds": [
+          "images"
+        ]
+      },
+      "payload": {
+        "lightbox": true,
+        "maxImages": 48,
+        "name": "Partyfotos",
+        "picker": {
+          "axis": "horizontal",
+          "showCounter": true,
+          "thumbSize": "lg"
+        },
+        "viewer": {
+          "loop": true,
+          "showCaptions": true,
+          "sizeMode": "large",
+          "swipe": true
+        }
+      },
+      "placement": {
+        "order": {
+          "desktop": 50,
+          "mobile": 50,
+          "tablet": 50
+        },
+        "span": {
+          "desktop": 12,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "slots": [
+        {
+          "accepts": [
+            "image"
+          ],
+          "max": 48,
+          "min": 0,
+          "presentation": {
+            "caption": "optional",
+            "downloadable": true,
+            "fit": "cover"
+          },
+          "required": false,
+          "slotId": "images"
+        }
+      ],
+      "visibility": "public"
+    },
+    {
+      "actions": {
+        "download": {
+          "enabled": true,
+          "principals": [
+            "guest",
+            "owner"
+          ]
+        },
+        "upload": {
+          "enabled": false
+        }
+      },
+      "content": {
+        "paragraphs": [
+          {
+            "heading": 3,
+            "runs": [
+              {
+                "text": "Ablaufplan"
+              }
+            ]
+          }
+        ]
+      },
+      "displayOrder": 60,
+      "elementId": "cel_docs",
+      "elementType": "documents",
+      "items": {
+        "mode": "dynamic",
+        "slotIds": [
+          "documents"
+        ]
+      },
+      "payload": {
+        "maxItems": 16,
+        "showMeta": true,
+        "sort": "date-asc",
+        "view": "list"
+      },
+      "placement": {
+        "order": {
+          "desktop": 60,
+          "mobile": 60,
+          "tablet": 60
+        },
+        "span": {
+          "desktop": 8,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "slots": [
+        {
+          "accepts": [
+            "document"
+          ],
+          "max": 16,
+          "min": 0,
+          "required": false,
+          "slotId": "documents"
+        }
+      ],
+      "visibility": "shared"
+    },
+    {
+      "content": {
+        "paragraphs": [
+          {
+            "heading": 4,
+            "runs": [
+              {
+                "text": "Musikwünsche"
+              }
+            ]
+          },
+          {
+            "runs": [
+              {
+                "text": "Tragt eure Wünsche in die Liste ein – wir spielen sie in der Pause."
+              }
+            ]
+          }
+        ]
+      },
+      "copy": {
+        "label": "Playlist öffnen",
+        "url": "https://example.org/playlist"
+      },
+      "displayOrder": 70,
+      "elementId": "cel_link",
+      "elementType": "external-link",
+      "items": {
+        "mode": "none"
+      },
+      "payload": {
+        "display": "button"
+      },
+      "placement": {
+        "order": {
+          "desktop": 70,
+          "mobile": 70,
+          "tablet": 70
+        },
+        "span": {
+          "desktop": 4,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "visibility": "public"
+    },
+    {
+      "displayOrder": 80,
+      "elementId": "cel_divider",
+      "elementType": "divider",
+      "items": {
+        "mode": "none"
+      },
+      "payload": {
+        "style": "line"
+      },
+      "placement": {
+        "order": {
+          "desktop": 80,
+          "mobile": 80,
+          "tablet": 80
+        },
+        "span": {
+          "desktop": 12,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "visibility": "public"
+    },
+    {
+      "actions": {
+        "delete": {
+          "enabled": true,
+          "principals": [
+            "owner"
+          ]
+        },
+        "upload": {
+          "acceptedTypes": [
+            "document"
+          ],
+          "afterUpload": "ready",
+          "enabled": true,
+          "maxFileSizeMb": 25,
+          "maxItemsPerPrincipal": 12,
+          "principals": [
+            "owner"
+          ]
+        }
+      },
+      "displayOrder": 40,
+      "elementId": "cel_document_jlzb8b",
+      "elementType": "document",
+      "items": {
+        "mode": "dynamic",
+        "slotIds": [
+          "document"
+        ]
+      },
+      "payload": {
+        "boxHeight": "md",
+        "display": "pages-paged",
+        "showMeta": true
+      },
+      "placement": {
+        "order": {
+          "desktop": 40,
+          "mobile": 40,
+          "tablet": 40
+        },
+        "span": {
+          "desktop": 12,
+          "mobile": 12,
+          "tablet": 12
+        }
+      },
+      "slots": [
+        {
+          "accepts": [
+            "document"
+          ],
+          "max": 12,
+          "min": 0,
+          "required": false,
+          "slotId": "document"
+        }
+      ],
+      "visibility": "public"
+    }
+  ],
+  "layout": {
+    "columns": 12,
+    "container": {
+      "maxWidth": "narrow",
+      "padding": "normal"
+    },
+    "gap": "md",
+    "mode": "grid-flow",
+    "responsive": {
+      "autoReflow": true,
+      "minColumnWidth": {
+        "desktop": "20rem",
+        "tablet": "16rem"
+      },
+      "preferredColumns": {
+        "desktop": 2,
+        "mobile": 1,
+        "tablet": 2
+      }
+    }
+  },
+  "schema": "myqr24-tag-content-template-v1",
+  "schemaVersion": 4,
+  "shell": {
+    "features": [
+      "vault"
+    ],
+    "navigation": {
+      "items": [],
+      "mode": "single"
+    },
+    "presentation": "wedding",
+    "statusBar": {
+      "showPresentation": false,
+      "showTagId": true
+    },
+    "theme": {
+      "colorMode": "dark",
+      "colors": {
+        "accent": "#e2a33c",
+        "accentText": "#141018",
+        "background": "#141018",
+        "border": "#342a44",
+        "danger": "#ff8a80",
+        "heading": "#ffe9a8",
+        "mutedText": "#b4a8c6",
+        "success": "#7fd6a0",
+        "surface": "#1e1826",
+        "text": "#f3ecff"
+      },
+      "layout": {
+        "contentWidth": "narrow",
+        "cornerStyle": "round",
+        "density": "comfortable"
+      },
+      "typography": {
+        "bodySize": 16,
+        "fontFamily": "system",
+        "headingScale": 1.1,
+        "lineHeight": 1.6
+      }
+    }
+  },
+  "template": {
+    "compatibility": {
+      "presentations": [
+        "wedding"
+      ],
+      "protectionModes": [
+        "public",
+        "pin_required"
+      ]
+    },
+    "description": "Beispiel: dunkles Party-Layout mit Getränkekarte als Tabelle, Partyfotos, Ablaufplan und Playlist.",
+    "locale": "de-DE",
+    "name": "Hochzeit – Abendparty",
+    "status": "draft",
+    "tagType": "event",
+    "templateId": "tct_example_wedding_party",
+    "templateVersion": 1
+  }
+}

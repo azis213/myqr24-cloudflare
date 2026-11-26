@@ -129,6 +129,14 @@ export async function publishTagContent(
     elements: projection.elements.map(({ elementId, elementType, payload }) => ({ elementId, elementType, payload })),
   };
   const elementIds = projection.elements.map((element) => element.elementId);
+  /**
+   * Nur item-fähige Elemente bekommen eine Zeile in `tag_content_elements`.
+   * Statische Elemente (Text, Hinweis, Trenner, …) stehen ausschließlich im
+   * Tag-Dokument und erzeugen keine Zeile und keine Items.
+   */
+  const itemElementIds = projection.elements
+    .filter((element) => element.items.mode === "dynamic")
+    .map((element) => element.elementId);
 
   /**
    * Idempotenz über den Inhalt **ohne** Revision: Die Revision steht im Dokument,
@@ -151,6 +159,8 @@ export async function publishTagContent(
       contentBytes: byteLength(compareCanonical),
       elementCount: elementIds.length,
       elementIds,
+      itemElementCount: itemElementIds.length,
+      itemElementIds,
       unchanged: true,
     });
   }
@@ -175,7 +185,7 @@ export async function publishTagContent(
     for (const row of itemRows.results ?? []) {
       itemCounts.set(row.content_element_id, Number(row.item_count) || 0);
     }
-    const nextIds = new Set(elementIds);
+    const nextIds = new Set(itemElementIds);
     removed = (existingRows.results ?? [])
       .map((row) => row.content_element_id)
       .filter((elementId) => !nextIds.has(elementId));
@@ -206,6 +216,8 @@ export async function publishTagContent(
     contentBytes,
     elementCount: elementIds.length,
     elementIds,
+    itemElementCount: itemElementIds.length,
+    itemElementIds,
     unchanged: false,
   });
 
@@ -237,6 +249,7 @@ export async function publishTagContent(
   }
 
   for (const element of projection.elements) {
+    if (element.items.mode !== "dynamic") continue;
     statements.push(
       env.APP_DB.prepare(
         "INSERT INTO tag_content_elements (tag_numeric_id, content_element_id, content_element_type, display_order, visibility) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(tag_numeric_id, content_element_id) DO UPDATE SET content_element_type = excluded.content_element_type, display_order = excluded.display_order, visibility = excluded.visibility",

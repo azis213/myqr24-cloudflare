@@ -119,7 +119,7 @@ function environment() {
 }
 
 function contentRequest(): Request {
-  return new Request(`https://app.test/api/v1/tags/${TAG_ID}/content`, {
+  return new Request(`https://app.test/api/v1/tags/${TAG_ID}/content?elements=true`, {
     method: "GET",
     headers: { cookie: "myqr24_tag_access=test-token" },
   });

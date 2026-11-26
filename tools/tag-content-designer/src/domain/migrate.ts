@@ -1,5 +1,6 @@
+import { defaultItemsFor } from "./catalog";
 import { DocumentError } from "./errors";
-import { SCHEMA_VERSION } from "./types";
+import { ITEM_MODES, SCHEMA_VERSION } from "./types";
 
 export interface MigrationStep {
   from: number;
@@ -108,6 +109,34 @@ export const MIGRATIONS: MigrationStep[] = [
 
         if (!touched) return entry;
         return { ...element, content: { ...(content as Record<string, unknown>), paragraphs: nextParagraphs } };
+      });
+
+      return { document: { ...document, elements: migrated }, changes };
+    },
+  },
+  {
+    from: 3,
+    to: 4,
+    description: "Item-Fähigkeit je Element ergänzen (element.items)",
+    apply: (document) => {
+      const changes: string[] = [];
+      const elements = document.elements;
+      if (!Array.isArray(elements)) return { document, changes };
+
+      const migrated = elements.map((entry, index) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+        const element = entry as Record<string, unknown>;
+        const elementType = typeof element.elementType === "string" ? element.elementType : "";
+        const defaults = defaultItemsFor(elementType as never);
+        const current = element.items;
+        const validMode =
+          !!current &&
+          typeof current === "object" &&
+          !Array.isArray(current) &&
+          ITEM_MODES.includes((current as Record<string, unknown>).mode as never);
+        if (validMode) return entry;
+        changes.push(`elements[${index}].items → ${defaults.mode}${defaults.slotIds ? ` (${defaults.slotIds.join(", ")})` : ""}`);
+        return { ...element, items: defaults };
       });
 
       return { document: { ...document, elements: migrated }, changes };

@@ -8,6 +8,7 @@ const element = (overrides: Partial<TemplateElement> = {}): TemplateElement => (
   elementType: "text",
   displayOrder: 10,
   visibility: "public",
+  items: { mode: "none" },
   payload: {},
   content: { paragraphs: [{ heading: 3, runs: [{ text: "Vorlage" }] }, { runs: [{ text: "Text" }] }] },
   ...overrides,

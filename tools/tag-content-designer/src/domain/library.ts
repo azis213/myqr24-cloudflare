@@ -1,6 +1,6 @@
 import { ELEMENT_CATALOG } from "./catalog";
 import { error, type ValidationIssue } from "./errors";
-import { LIBRARY_SCHEMA, LIBRARY_SCHEMA_VERSION } from "./types";
+import { LIBRARY_SCHEMA, LIBRARY_SCHEMA_VERSION, ITEM_MODES } from "./types";
 import type { ElementLibrary, ElementTemplate } from "./types";
 
 export type LibraryChangeAction = "added" | "replaced" | "unchanged" | "ignored-older";
@@ -85,6 +85,32 @@ export function validateLibrary(input: unknown): ValidationIssue[] {
     }
     if (!isObject(entry.payload)) {
       issues.push(error("LIBRARY_ELEMENT_PAYLOAD_INVALID", `${path}.payload`, "payload muss ein Objekt sein."));
+    }
+    if (entry.items !== undefined) {
+      if (
+        !isObject(entry.items) ||
+        typeof entry.items.mode !== "string" ||
+        !(ITEM_MODES as readonly string[]).includes(entry.items.mode)
+      ) {
+        issues.push(
+          error(
+            "LIBRARY_ELEMENT_ITEMS_INVALID",
+            `${path}.items`,
+            'items.mode muss "none" oder "dynamic" sein.',
+          ),
+        );
+      } else if (typeof elementType === "string" && elementType in ELEMENT_CATALOG) {
+        const expected = ELEMENT_CATALOG[elementType as keyof typeof ELEMENT_CATALOG].items.mode;
+        if (entry.items.mode !== expected) {
+          issues.push(
+            error(
+              "LIBRARY_ELEMENT_ITEMS_MISMATCH",
+              `${path}.items.mode`,
+              `Der Elementtyp erwartet mode "${expected}".`,
+            ),
+          );
+        }
+      }
     }
     if (entry.slots !== undefined) {
       if (!Array.isArray(entry.slots)) {

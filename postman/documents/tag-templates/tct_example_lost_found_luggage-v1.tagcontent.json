@@ -4,6 +4,7 @@
       "displayOrder": 0,
       "elementId": "cel_theme",
       "elementType": "theme-assets",
+      "items": { "mode": "none" },
       "hidden": true,
       "payload": {
         "role": "background"
@@ -55,6 +56,7 @@
       "displayOrder": 10,
       "elementId": "cel_finder",
       "elementType": "finder-notice",
+      "items": { "mode": "none" },
       "payload": {
         "urgency": "normal"
       },
@@ -95,6 +97,7 @@
       "displayOrder": 20,
       "elementId": "cel_form",
       "elementType": "finder-form",
+      "items": { "mode": "dynamic", "slotIds": ["photos"] },
       "payload": {
         "channel": "server-mediated"
       },
@@ -265,6 +268,7 @@
       "displayOrder": 30,
       "elementId": "cel_facts",
       "elementType": "text",
+      "items": { "mode": "none" },
       "payload": {
         "align": "start",
         "headingLevel": "h2",
@@ -310,6 +314,7 @@
       "displayOrder": 40,
       "elementId": "cel_privacy",
       "elementType": "callout",
+      "items": { "mode": "none" },
       "payload": {
         "tone": "info"
       },
@@ -350,6 +355,7 @@
       "displayOrder": 50,
       "elementId": "cel_contact",
       "elementType": "contact-channel",
+      "items": { "mode": "none" },
       "payload": {
         "method": "form"
       },
@@ -374,6 +380,7 @@
       "displayOrder": 60,
       "elementId": "cel_divider",
       "elementType": "divider",
+      "items": { "mode": "none" },
       "payload": {
         "style": "line"
       },
@@ -414,7 +421,7 @@
     }
   },
   "schema": "myqr24-tag-content-template-v1",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "shell": {
     "features": [
       "vault",

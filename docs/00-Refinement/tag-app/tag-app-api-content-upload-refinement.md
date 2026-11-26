@@ -1,8 +1,8 @@
 # Refinement: TAG-App-API – Upload eines TAG-Content-Templates
 
-**Status:** unverbindliches Refinement (Rev. 6: App-Nachzug und Element-Schema)
-**Revision:** 6
-**Stand:** 2026-11-20
+**Status:** unverbindliches Refinement (Rev. 7: Item-Fähigkeit, Lese-Parameter und Element-Items)
+**Revision:** 7
+**Stand:** 2026-11-26
 **Geltungsbereich:** `apps/tag-app` (Worker `app-api`, D1 `database/0002_tag_content.sql`, R2 `PRIVATE_CONTENT`), Consumer TAG Control Center/TCP und TAG-Content-Designer
 **Verbindlichkeit:** gemäß [`../README.md`](../README.md) ausdrücklich **keine** Anforderung, kein Contract und keine Umsetzungsgrundlage
 
@@ -235,6 +235,8 @@ Content-Type: application/json
   "contentBytes": 7231,
   "elementCount": 9,
   "elementIds": ["cel_hero", "cel_welcome", "cel_gallery", "cel_docs"],
+  "itemElementCount": 2,
+  "itemElementIds": ["cel_gallery", "cel_docs"],
   "unchanged": false
 }
 ```
@@ -301,6 +303,33 @@ Authorization: Bearer <APP_CONTENT_PUBLISH_KEY_S01>
 
 Es wird **nicht** das ursprüngliche Designer-Template zurückgegeben – die Projektion ist nicht verlustfrei umkehrbar. Der Endpunkt liefert genau das, was die Content-Route als Laufzeitstand liest.
 
+### 6.7 Lesezugriff: Parameter, `viewAs` und Element-Items
+
+```text
+GET /api/v1/tags/{tagId}/content[?elements=true][&items=true][&viewAs=scanner|guest|owner]
+GET /api/v1/tags/{tagId}/elements/{elementId}/items[?viewAs=…]
+```
+
+| Aufruf | Antwort |
+| --- | --- |
+| ohne Parameter | `{ schema, tagId, revision, view }` – die View ist nach Sichtbarkeit des Credentials gefiltert |
+| `elements=true` | zusätzlich `elements[]` (item-fähige Elemente mit `id`, `type`, `displayMode`, `visibility`, `payload`) |
+| `items=true` | impliziert `elements=true` und liefert je Element `items[]` (contentId, Dateiname, altText, displayOrder, createdAt, visibility, mediaUrl) |
+| `viewAs=scanner\|guest\|owner` | Sichtprojektion für View, Elemente und Items; muss vom Credential gedeckt sein (`403 view_as_not_allowed`) |
+| `elements=false&items=true` | `400 invalid_request` |
+| unbekannter Parameterwert | `400 invalid_request` |
+
+| Credential | Standard-Sicht | erlaubte `viewAs`-Werte |
+| --- | --- | --- |
+| Session `public` | `scanner` | `scanner` |
+| Session `pin` / `login` | `guest` | `scanner`, `guest` |
+| Owner-Session (Gate) | `owner` | alle |
+| `TAG_CONTENT_API_KEY_S01` | `owner` | alle |
+
+Sichtbarkeitsregel: `public` → alle; `shared` → nicht `scanner`; `private`/`ownerOnly` → nur `owner`. Ein `viewAs`-Wert **verengt** immer nur die Sicht des Credentials; ohne Angabe gilt die Standard-Sicht.
+
+Die Element-Items-Route liefert dieselbe Item-Struktur je Element und ein `itemsEtag`; `304` bei `If-None-Match` erlaubt einen Galerie-Refresh ohne erneuten Content-Abruf.
+
 ---
 
 ## 7. Strukturierte Ablage in D1
@@ -355,8 +384,8 @@ Begründung: Mit `D-14` gibt es kein eigenes Element-Dokument mehr. Die vier zuv
 **Regeln:**
 
 1. `hidden: true` (Theme-Assets/`theme-assets`) erzeugt **keine** Elementzeile – es ist Gestaltung, kein View-Element.
-2. Slot-IDs werden **1:1** aus dem Template übernommen und nie umbenannt – Items werden später über `(elementId, slotId)` adressiert; eine Umbenennung würde Zuordnungen unsichtbar machen.
-3. **Jedes** sichtbare Element erhält eine Zeile – auch Typen, die die App heute nicht rendert (`image`, `document`, `divider`, Finder, Wartung). Gespeichert wird die Struktur, gerendert wird später (`D-11`).
+2. Slot-IDs werden **1:1** aus dem Template übernommen und nie umbenannt – Items werden über `(elementId, slotId)` adressiert; eine Umbenennung würde Zuordnungen unsichtbar machen.
+3. Eine Zeile entsteht **nur** für item-fähige Elemente (`items.mode: "dynamic"`, siehe §6.7): `gallery`, `documents`, `maintenance-history`, `finder-form`, `image`, `document`. Statische Elemente (Text, Hinweis, Trenner, externer Link, Fundhinweis, Kontaktweg, Hero, Theme-Assets) stehen ausschließlich im Tag-Dokument.
 
 ### 7.3 `tag_routing` (im selben Batch)
 
@@ -508,8 +537,8 @@ Regeln:
 - Kein `objectKey`, `object_key`, `r2_key`, `r2Key` irgendwo im Dokument (`containsStorageKey()` in der Route).
 - Jede `contentId` in Items ist ein Dezimalstring ≤ 2^52−1 (Items selbst sind nicht Teil dieses Uploads).
 - `revision` im Dokument = `content_revision` in D1 = `tag_routing.content_revision`.
-- **Mengengleichheit:** `elements[].elementId` = `tag_content_elements.content_element_id` (beide Richtungen, keine Waisen in D1 oder im JSON).
-- **1:1 zu den Blöcken:** `view.vault.blocks.length === elements.length` – jedes sichtbare Element wird als Block abgebildet (`D-11`), `hidden`/`theme-assets` in keinem von beiden.
+- **Mengengleichheit:** `itemElementIds` (Elemente mit `items.mode: "dynamic"`) = `tag_content_elements.content_element_id` (beide Richtungen, keine Waisen in D1 oder im JSON).
+- **1:1 zu den Blöcken:** `view.vault.blocks.length === elements.length` gilt nur noch, wenn beide **dieselbe** Auswahl zeigen – die View enthält alle sichtbaren Elemente, `elements[]` nur die item-fähigen. Verbindlich ist: jeder Block trägt `elementId`, `visibility` und `items.mode`; die View wird beim Lesen nach Sichtbarkeit gefiltert.
 
 ---
 
@@ -873,6 +902,12 @@ Nach jedem Publish ist ein Smoke-Test möglich: `GET /api/v1/tags/{tagId}/conten
 | `D-14` | Element-Dokumente | **entfallen**; Element-Nutzlast liegt im Tag-Dokument (`elements[]`). Ein R2-Put pro Publish, ein Hash, eine Größe. Datei-Spalten aus `tag_content_elements` mit Migration `0003` entfernt | **umgesetzt** |
 | `D-17` | Layoutprojektion | `placement` wird validiert und in jeden View-Block übernommen; App portiert 12-Spalten-Spans/Breakpoints | **umgesetzt** |
 | `D-18` | App-Empty-States | leere Slots werden mit Kapazität und Item-Platzhaltern gerendert; keine Upload-API in diesem Schritt | **umgesetzt** |
+| `D-19` | Elementzeile nur bei Item-Fähigkeit | Jedes Element deklariert `items.mode`; nur `dynamic` erzeugt eine Zeile in `tag_content_elements`. Statische Elemente existieren ausschließlich im Tag-Dokument; bestehende Zeilen statischer Elemente werden beim Re-Publish entfernt (weiterhin `409 elements_in_use` bei hängenden Items) | **umgesetzt** |
+| `D-20` | Lese-Parameter | `GET …/content` liefert ohne Parameter View + Revision; `elements=true` ergänzt die item-fähigen Elemente, `items=true` impliziert Elemente und ergänzt Items je Element. Ungültige Werte und `elements=false&items=true` sind `400` | **umgesetzt** |
+| `D-21` | Einzelanzeige | `image` und `document` sind Galerien mit **einem sichtbaren Item**: mehrere Kandidaten erlaubt (`max: 12`), die PWA zeigt das neueste sichtbare. Ein neuer Upload setzt die bisherigen Kandidaten auf `ownerOnly`; keine Datei wird gelöscht | **umgesetzt (API)**, PWA-Rendering offen |
+| `D-22` | Sichtbarkeitsprojektion | `viewAs=scanner\|guest\|owner` filtert View, Elemente und Items; das Credential bestimmt die erlaubten Werte. Sessions verengen nur, `TAG_CONTENT_API_KEY_S01` deckt alle Rollen (Standard `owner`) | **umgesetzt** |
+| `D-23` | View-Filterung | Blöcke tragen `elementId`, `visibility`, `items.mode`; die Content-Route filtert `view.vault.blocks` bei **jedem** Aufruf nach Sichtbarkeit. Ältere Dokumente ohne `visibility` gelten als `public` | **umgesetzt** |
+| `D-24` | Element-Items-Route | `GET …/elements/{elementId}/items` liefert dieselbe Item-Struktur wie `items=true` inkl. `displayMode` und `itemsEtag` (304 bei `If-None-Match`); 404 neutral bei unbekanntem/unsichtbarem Element | **umgesetzt** |
 
 ---
 

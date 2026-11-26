@@ -1,6 +1,6 @@
 {
   "schema": "myqr24-tag-content-template-v1",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "template": {
     "templateId": "tct_example_wedding_garden",
     "templateVersion": 1,
@@ -52,6 +52,7 @@
     {
       "elementId": "cel_theme",
       "elementType": "theme-assets",
+      "items": { "mode": "none" },
       "displayOrder": 0,
       "visibility": "public",
       "hidden": true,
@@ -63,6 +64,7 @@
     {
       "elementId": "cel_hero",
       "elementType": "hero",
+      "items": { "mode": "none" },
       "displayOrder": 10,
       "visibility": "public",
       "placement": {
@@ -83,6 +85,7 @@
     {
       "elementId": "cel_welcome",
       "elementType": "text",
+      "items": { "mode": "none" },
       "displayOrder": 20,
       "visibility": "public",
       "placement": {
@@ -113,6 +116,7 @@
     {
       "elementId": "cel_photo",
       "elementType": "image",
+      "items": { "mode": "dynamic", "slotIds": ["image"] },
       "displayOrder": 30,
       "visibility": "public",
       "placement": {
@@ -121,12 +125,13 @@
       },
       "payload": { "fit": "contain", "zoom": "tap", "maxHeight": "auto" },
       "slots": [
-        { "slotId": "image", "accepts": ["image"], "min": 0, "max": 1, "required": false, "presentation": { "fit": "contain" } }
+        { "slotId": "image", "accepts": ["image"], "min": 0, "max": 12, "required": false, "presentation": { "fit": "contain" } }
       ]
     },
     {
       "elementId": "cel_schedule",
       "elementType": "text",
+      "items": { "mode": "none" },
       "displayOrder": 40,
       "visibility": "public",
       "placement": {
@@ -194,6 +199,7 @@
     {
       "elementId": "cel_menu",
       "elementType": "text",
+      "items": { "mode": "none" },
       "displayOrder": 50,
       "visibility": "public",
       "placement": {
@@ -253,6 +259,7 @@
     {
       "elementId": "cel_gallery",
       "elementType": "gallery",
+      "items": { "mode": "dynamic", "slotIds": ["images"] },
       "displayOrder": 60,
       "visibility": "public",
       "placement": {
@@ -293,6 +300,7 @@
     {
       "elementId": "cel_docs",
       "elementType": "documents",
+      "items": { "mode": "dynamic", "slotIds": ["documents"] },
       "displayOrder": 70,
       "visibility": "shared",
       "placement": {
@@ -312,6 +320,7 @@
     {
       "elementId": "cel_contact",
       "elementType": "text",
+      "items": { "mode": "none" },
       "displayOrder": 80,
       "visibility": "public",
       "placement": {
@@ -330,6 +339,7 @@
     {
       "elementId": "cel_divider",
       "elementType": "divider",
+      "items": { "mode": "none" },
       "displayOrder": 90,
       "visibility": "public",
       "placement": {

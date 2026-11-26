@@ -1,5 +1,8 @@
 import { SCHEMA_VERSION, TEMPLATE_SCHEMA } from "./types";
 import type {
+  DisplayMode,
+  ElementActions,
+  ElementItems,
   ElementType,
   Feature,
   Presentation,
@@ -46,8 +49,16 @@ export interface CatalogEntry {
   payload: Record<string, unknown>;
   copy?: Record<string, unknown>;
   slots?: TemplateSlot[];
+  /** Standard-Item-Fähigkeit; wird in jedes neue Element übernommen. */
+  items: ElementItems;
+  actions?: ElementActions;
   hidden?: boolean;
 }
+
+/** Statische Elemente (keine Items) – Hilfskonstante für den Katalog. */
+const NO_ITEMS: ElementItems = { mode: "none" };
+
+const dynamicItems = (slotId: string): ElementItems => ({ mode: "dynamic", slotIds: [slotId] });
 
 const imageSlot = (slotId = "images", max = 48, min = 0): TemplateSlot => ({
   slotId,
@@ -66,6 +77,35 @@ const documentSlot = (slotId = "documents", max = 32, min = 0): TemplateSlot => 
   required: min > 0,
 });
 
+/**
+ * Einzelbild: mehrere Kandidaten erlaubt, angezeigt wird genau eines (das
+ * neueste sichtbare Item). Nur der Owner darf hochladen/ersetzen.
+ */
+const singleImageActions: ElementActions = {
+  upload: {
+    enabled: true,
+    principals: ["owner"],
+    acceptedTypes: ["image"],
+    maxItemsPerPrincipal: 12,
+    maxFileSizeMb: 10,
+    afterUpload: "ready",
+  },
+  delete: { enabled: true, principals: ["owner"] },
+};
+
+/** Einzel-Dokument: wie Einzelbild, aber PDF/Dokument. */
+const singleDocumentActions: ElementActions = {
+  upload: {
+    enabled: true,
+    principals: ["owner"],
+    acceptedTypes: ["document"],
+    maxItemsPerPrincipal: 12,
+    maxFileSizeMb: 25,
+    afterUpload: "ready",
+  },
+  delete: { enabled: true, principals: ["owner"] },
+};
+
 export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
   text: {
     type: "text",
@@ -73,6 +113,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: true,
     tagTypes: TAG_TYPES,
     payload: { headingLevel: "h2", align: "start", maxParagraphs: 8 },
+    items: NO_ITEMS,
   },
   image: {
     type: "image",
@@ -80,7 +121,9 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: true,
     tagTypes: TAG_TYPES,
     payload: { fit: "contain", zoom: "tap", maxHeight: "auto" },
-    slots: [{ ...imageSlot("image", 1, 1), presentation: { fit: "contain", caption: "optional" } }],
+    items: dynamicItems("image"),
+    actions: singleImageActions,
+    slots: [{ ...imageSlot("image", 12, 0), presentation: { fit: "contain", caption: "optional" } }],
   },
   document: {
     type: "document",
@@ -88,7 +131,9 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: true,
     tagTypes: TAG_TYPES,
     payload: { display: "link", boxHeight: "md", showMeta: true },
-    slots: [documentSlot("document", 1, 1)],
+    items: dynamicItems("document"),
+    actions: singleDocumentActions,
+    slots: [documentSlot("document", 12, 0)],
   },
   gallery: {
     type: "gallery",
@@ -102,6 +147,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
       lightbox: true,
       maxImages: 48,
     },
+    items: dynamicItems("images"),
     slots: [imageSlot()],
   },
   documents: {
@@ -110,6 +156,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: true,
     tagTypes: ["vault", "event", "exhibit", "maintenance"],
     payload: { view: "list", showMeta: true, sort: "date-desc", maxItems: 32 },
+    items: dynamicItems("documents"),
     slots: [documentSlot()],
   },
   hero: {
@@ -118,6 +165,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: false,
     tagTypes: TAG_TYPES,
     payload: { variant: "cover" },
+    items: NO_ITEMS,
     slots: [imageSlot("cover", 1)],
   },
   callout: {
@@ -126,6 +174,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: false,
     tagTypes: TAG_TYPES,
     payload: { tone: "info" },
+    items: NO_ITEMS,
     copy: { heading: "Hinweis", paragraphs: ["Bitte beachten Sie die folgenden Informationen."] },
   },
   "external-link": {
@@ -134,6 +183,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: false,
     tagTypes: ["vault", "event", "exhibit", "maintenance"],
     payload: { display: "button" },
+    items: NO_ITEMS,
     copy: { label: "Weitere Informationen", url: "" },
   },
   divider: {
@@ -142,6 +192,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: false,
     tagTypes: TAG_TYPES,
     payload: { style: "line" },
+    items: NO_ITEMS,
   },
   "finder-notice": {
     type: "finder-notice",
@@ -149,6 +200,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: false,
     tagTypes: ["lost-found"],
     payload: { urgency: "normal" },
+    items: NO_ITEMS,
     copy: {
       heading: "Sie haben diesen Gegenstand gefunden?",
       paragraphs: ["Bitte nutzen Sie die Funktion „Fund melden“, damit der Eigentümer informiert wird."],
@@ -160,6 +212,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: false,
     tagTypes: ["lost-found"],
     payload: { channel: "server-mediated" },
+    items: dynamicItems("photos"),
     copy: {
       heading: "Fund melden",
       paragraphs: ["Ihre Angaben werden ausschließlich zur Kontaktaufnahme verwendet."],
@@ -172,6 +225,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: false,
     tagTypes: ["vault", "lost-found"],
     payload: { method: "form" },
+    items: NO_ITEMS,
   },
   "maintenance-history": {
     type: "maintenance-history",
@@ -179,6 +233,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: false,
     tagTypes: ["maintenance"],
     payload: { groupBy: "year", showTotals: false, dateFormat: "de-DE" },
+    items: dynamicItems("entries"),
     slots: [{ slotId: "entries", accepts: ["document", "image"], min: 0, max: 64, required: false }],
   },
   "theme-assets": {
@@ -187,6 +242,7 @@ export const ELEMENT_CATALOG: Record<ElementType, CatalogEntry> = {
     requiredV1: false,
     tagTypes: TAG_TYPES,
     payload: { role: "background" },
+    items: NO_ITEMS,
     hidden: true,
     slots: [{ slotId: "tag-background", accepts: ["image"], min: 0, max: 1, required: false }],
   },
@@ -196,6 +252,25 @@ export function allowedTypesFor(tagType: TagType): CatalogEntry[] {
   return Object.values(ELEMENT_CATALOG).filter(
     (entry) => !entry.hidden && entry.tagTypes.includes(tagType),
   );
+}
+
+/** Kann dieser Elementtyp in der operativen Nutzung eigene Items aufnehmen? */
+export function supportsDynamicItems(type: ElementType): boolean {
+  return ELEMENT_CATALOG[type]?.items.mode === "dynamic";
+}
+
+/**
+ * Anzeigeform: `image` und `document` zeigen genau ein Item (das neueste
+ * sichtbare), alle anderen item-fähigen Elemente zeigen die vollständige Liste.
+ */
+export function displayModeFor(type: ElementType): DisplayMode {
+  return type === "image" || type === "document" ? "single" : "all";
+}
+
+/** Katalog-Definition der Item-Fähigkeit eines Elementtyps. */
+export function defaultItemsFor(type: ElementType): ElementItems {
+  const entry = ELEMENT_CATALOG[type];
+  return entry ? structuredClone(entry.items) : { mode: "none" };
 }
 
 export function newElementId(type: ElementType): string {
@@ -225,6 +300,7 @@ export function createElement(
     elementType: type,
     displayOrder,
     visibility: "public",
+    items: structuredClone(entry.items),
     payload: structuredClone(entry.payload),
     placement: {
       span: { mobile: 12, tablet: 12, desktop: 12 },
@@ -232,6 +308,7 @@ export function createElement(
     },
   };
   if (entry.slots) element.slots = structuredClone(entry.slots);
+  if (entry.actions) element.actions = structuredClone(entry.actions);
   if (entry.copy) {
     element.copy = structuredClone(entry.copy);
     element.content = copyToContent(element.copy);

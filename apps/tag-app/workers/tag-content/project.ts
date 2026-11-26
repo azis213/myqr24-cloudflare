@@ -54,7 +54,14 @@ export function contentTexts(content: JsonObject | undefined): { title?: string;
 
 /** Gemeinsamer Rahmen jedes Blocks: strukturierte Nutzlast zusätzlich zu den Pflichtfeldern. */
 function baseBlock(type: string, element: VElement, extra: JsonObject): JsonObject {
-  const block: JsonObject = { type, ...extra };
+  const block: JsonObject = {
+    type,
+    // Adressierung für die Element-Items-API und die Sichtbarkeitsprojektion.
+    elementId: element.elementId,
+    visibility: element.visibility,
+    items: element.items,
+    ...extra,
+  };
   if (element.placement) block.placement = element.placement;
   if (element.content) block.content = element.content;
   if (Object.keys(element.payload).length > 0) block.options = element.payload;
@@ -139,6 +146,8 @@ export interface ProjectionElement {
   elementType: string;
   displayOrder: number;
   visibility: string;
+  /** Item-Fähigkeit; nur `dynamic` erzeugt eine D1-Elementzeile. */
+  items: { mode: "none" | "dynamic"; slotIds?: string[] };
   payload: JsonObject;
 }
 
@@ -148,7 +157,7 @@ export interface Projection {
 }
 
 function elementPayload(element: VElement): JsonObject {
-  const payload: JsonObject = { options: element.payload };
+  const payload: JsonObject = { options: element.payload, items: element.items };
   if (element.style) payload.style = element.style;
   if (element.content) payload.content = element.content;
   if (element.slots.length > 0) payload.slots = element.slots;
@@ -197,6 +206,7 @@ export function buildProjection(input: {
       displayOrder: element.displayOrder,
       ...(element.placement ? { placement: element.placement } : {}),
       visibility: element.visibility,
+      items: element.items,
       payload: elementPayload(element),
     })),
   };

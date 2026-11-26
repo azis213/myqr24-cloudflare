@@ -2,7 +2,17 @@ import { argon2Verify } from "hash-wasm";
 import { Hono } from "hono";
 import { parseContentId } from "./content-id";
 import { globalItemVariantKey, tagContentFileKey, tagItemVariantKey } from "./content-paths";
-import { deleteContentItem, readContentItem, uploadContentItem } from "./tag-content/items";
+import { deleteContentItem, loadItemsByElement, readContentItem, readElementItems, uploadContentItem } from "./tag-content/items";
+import { ELEMENT_DISPLAY_MODE, PRINCIPALS, type Principal } from "./tag-content/limits";
+import {
+  API_KEY_PRINCIPALS,
+  IS_VISIBILITY,
+  allowedPrincipalsForScope,
+  isPrincipalAllowed,
+  isVisibleToPrincipal,
+  principalFromScope,
+  type Visibility,
+} from "./tag-content/principal";
 import { publishTagContent } from "./tag-content/publish";
 import { getTagContentDocument } from "./tag-content/read";
 import { handleTagTestAdminRequest } from "./tag-test-admin";
@@ -82,43 +92,23 @@ interface ContentDocument {
   elements: unknown;
 }
 
-interface ContentItemRow {
-  content_element_id: string;
-  content_id: number;
-  content_item_type: string;
-  title: string | null;
-  alt_text: string | null;
-  original_filename: string | null;
-  display_order: number;
-  visibility: ElementVisibility;
-  scope: "tag" | "global";
-}
-
-type ElementVisibility = "public" | "shared" | "private" | "ownerOnly";
-
-interface LoadedItem {
-  contentId: string;
-  type: string;
-  title: string | null;
-  altText: string | null;
-  filename: string | null;
-  displayOrder: number;
-  visibility: ElementVisibility;
-  scope: "tag" | "global";
-}
+type ElementVisibility = Visibility;
 
 interface LoadedElement {
   id: string;
   type: string;
   displayOrder: number;
   visibility: ElementVisibility;
+  /** `single`: Die PWA zeigt genau ein Item (das neueste sichtbare). */
+  displayMode: "single" | "all";
   payload: Record<string, unknown>;
-  items: LoadedItem[];
 }
 
 interface LoadedContent {
   document: ContentDocument;
   elements: LoadedElement[];
+  tagNumericId: number;
+  contentSha256: string;
 }
 
 interface MediaVisibilityRow {
@@ -187,9 +177,7 @@ function timingSafeEqual(left: string, right: string): boolean {
 }
 
 function isVisibleToScope(visibility: ElementVisibility, scope: AccessSession["scope"]): boolean {
-  if (visibility === "public") return true;
-  if (visibility === "shared") return scope !== "public";
-  return false;
+  return isVisibleToPrincipal(visibility, principalFromScope(scope));
 }
 
 const FORBIDDEN_STORAGE_KEYS = new Set(["object_key", "objectKey", "r2_key", "r2Key"]);
@@ -249,7 +237,7 @@ async function issueSession(env: AppApiEnv, record: RoutingRecord, scope: Access
 async function content(
   env: AppApiEnv,
   record: RoutingRecord,
-  scope: AccessSession["scope"],
+  principal: Principal,
 ): Promise<LoadedContent | null> {
   try {
     const row = await env.APP_DB.prepare(
@@ -291,46 +279,119 @@ async function content(
       "SELECT content_element_id, content_element_type, display_order, visibility FROM tag_content_elements WHERE tag_numeric_id = ?1 ORDER BY display_order, content_element_id",
     ).bind(row.tag_numeric_id).all<ContentElementRow>();
 
-    const itemRows = await env.APP_DB.prepare(
-      "SELECT assignment.content_element_id, item.content_id, item.content_item_type, item.title, item.alt_text, item.original_filename, assignment.display_order, assignment.visibility, item.scope FROM tag_content_element_items AS assignment JOIN tag_content_items AS item ON item.content_id = assignment.content_id WHERE assignment.tag_numeric_id = ?1 AND item.status = 'ready' AND item.revoked_at IS NULL ORDER BY assignment.content_element_id, assignment.display_order, assignment.content_id",
-    ).bind(row.tag_numeric_id).all<ContentItemRow>();
-
-    const itemsByElement = new Map<string, LoadedItem[]>();
-    for (const item of itemRows.results ?? []) {
-      if (!Number.isSafeInteger(item.content_id) || !isVisibleToScope(item.visibility, scope)) continue;
-      const items = itemsByElement.get(item.content_element_id) ?? [];
-      items.push({
-        contentId: String(item.content_id),
-        type: item.content_item_type,
-        title: item.title,
-        altText: item.alt_text,
-        filename: item.original_filename,
-        displayOrder: item.display_order,
-        visibility: item.visibility,
-        scope: item.scope,
-      });
-      itemsByElement.set(item.content_element_id, items);
-    }
-
     const elements: LoadedElement[] = [];
     for (const element of elementRows.results ?? []) {
-      if (!isVisibleToScope(element.visibility, scope)) continue;
+      if (!isVisibleToPrincipal(element.visibility, principal)) continue;
       const inline = inlineElements.get(element.content_element_id);
       if (!inline || inline.elementType !== element.content_element_type) return null;
+      const elementType = element.content_element_type as keyof typeof ELEMENT_DISPLAY_MODE;
       elements.push({
         id: element.content_element_id,
         type: element.content_element_type,
         displayOrder: element.display_order,
         visibility: element.visibility,
+        displayMode: elementType in ELEMENT_DISPLAY_MODE ? ELEMENT_DISPLAY_MODE[elementType] : "all",
         payload: inline.payload,
-        items: itemsByElement.get(element.content_element_id) ?? [],
       });
     }
 
-    return { document, elements };
+    return {
+      document,
+      elements,
+      tagNumericId: row.tag_numeric_id,
+      contentSha256: row.content_sha256,
+    };
   } catch {
     return null;
   }
+}
+
+interface ReadCredential {
+  principal: Principal;
+  allowed: Principal[];
+}
+
+const ELEMENT_ID = /^cel_[A-Za-z0-9_-]{1,120}$/;
+
+function failJson(status: number, code: string, message: string): Response {
+  return Response.json(
+    { error: { code, message } },
+    { status, headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } },
+  );
+}
+
+/**
+ * Löst das Lese-Credential auf: API-Key (Server-zu-Server, darf jede Sicht
+ * anfordern) oder TAG-Session (darf nur verengen).
+ */
+async function readCredential(request: Request, env: AppApiEnv, tagId: string): Promise<ReadCredential | null> {
+  const authorization = request.headers.get("authorization");
+  if (authorization) {
+    const key = env.TAG_CONTENT_API_KEY_S01;
+    if (!key) return null;
+    const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
+    if (!match || !timingSafeEqual(match[1].trim(), key)) return null;
+    return { principal: "owner", allowed: API_KEY_PRINCIPALS };
+  }
+  const session = await sessionFromRequest(request, env, tagId);
+  if (!session) return null;
+  return {
+    principal: principalFromScope(session.scope),
+    allowed: allowedPrincipalsForScope(session.scope),
+  };
+}
+
+interface ContentFlags {
+  elements: boolean;
+  items: boolean;
+  viewAs?: string;
+}
+
+/** `elements`/`items` sind strikt true/false; `items=true` impliziert elements. */
+function parseContentFlags(url: URL): ContentFlags | null {
+  const parse = (value: string | null): { present: boolean; value: boolean } | null => {
+    if (value === null) return { present: false, value: false };
+    if (value === "true") return { present: true, value: true };
+    if (value === "false") return { present: true, value: false };
+    return null;
+  };
+  const elements = parse(url.searchParams.get("elements"));
+  const items = parse(url.searchParams.get("items"));
+  if (!elements || !items) return null;
+  // `elements=false&items=true` ist widersprüchlich; `items=true` allein ist erlaubt.
+  if (elements.present && !elements.value && items.value) return null;
+  const viewAs = url.searchParams.get("viewAs") ?? undefined;
+  return { elements: elements.value || items.value, items: items.value, ...(viewAs ? { viewAs } : {}) };
+}
+
+/** `viewAs` darf nur Sichten anfordern, die das Credential erlaubt. */
+function resolveViewAs(requested: string | undefined, credential: ReadCredential): Principal | Response {
+  if (!requested) return credential.principal;
+  if (!(PRINCIPALS as readonly string[]).includes(requested)) {
+    return failJson(400, "invalid_request", "viewAs muss scanner, guest oder owner sein.");
+  }
+  const principal = requested as Principal;
+  if (!isPrincipalAllowed(principal, credential.allowed)) {
+    return failJson(403, "view_as_not_allowed", "Diese Sicht ist für dieses Credential nicht erlaubt.");
+  }
+  return principal;
+}
+
+/**
+ * Filtert die Blöcke der View nach Sichtbarkeit. Ältere Dokumente ohne
+ * `visibility` am Block gelten als `public`.
+ */
+function filterViewByPrincipal(view: Record<string, unknown>, principal: Principal): Record<string, unknown> {
+  const vault = view.vault;
+  if (!vault || typeof vault !== "object" || Array.isArray(vault)) return view;
+  const blocks = (vault as { blocks?: unknown }).blocks;
+  if (!Array.isArray(blocks)) return view;
+  const visible = blocks.filter((block) => {
+    if (!block || typeof block !== "object" || Array.isArray(block)) return false;
+    const visibility = (block as { visibility?: unknown }).visibility;
+    return IS_VISIBILITY(visibility) ? isVisibleToPrincipal(visibility, principal) : true;
+  });
+  return { ...view, vault: { ...(vault as Record<string, unknown>), blocks: visible } };
 }
 
 function clientKey(request: Request): string {
@@ -420,19 +481,78 @@ app.get("/api/v1/tags/:tagId/content", async (c) => {
   const tagId = c.req.param("tagId");
   if (!TAG_ID.test(tagId)) return neutral();
 
-  const session = await sessionFromRequest(c.req.raw, c.env, tagId);
-  if (!session) return neutral();
+  const flags = parseContentFlags(new URL(c.req.url));
+  if (!flags) {
+    return failJson(400, "invalid_request", "elements/items erlauben nur true oder false; items=true impliziert elements=true.");
+  }
+
+  const credential = await readCredential(c.req.raw, c.env, tagId);
+  if (!credential) return neutral();
+  const resolved = resolveViewAs(flags.viewAs, credential);
+  if (resolved instanceof Response) return resolved;
+  const principal = resolved;
+
   const record = await routing(c.env, tagId);
   if (!record) return neutral();
-  const loaded = await content(c.env, record, session.scope);
+  const loaded = await content(c.env, record, principal);
   if (!loaded) return neutral();
-  return json({
+
+  const body: Record<string, unknown> = {
     schema: loaded.document.schema,
     tagId: loaded.document.tagId,
     revision: loaded.document.revision,
-    view: loaded.document.view,
-    elements: loaded.elements,
-  });
+    view: filterViewByPrincipal(loaded.document.view, principal),
+  };
+
+  let itemSignature = "";
+  if (flags.elements) {
+    if (flags.items) {
+      const byElement = await loadItemsByElement(c.env, tagId, loaded.tagNumericId, principal);
+      body.elements = loaded.elements.map((element) => ({
+        ...element,
+        items: byElement.get(element.id) ?? [],
+      }));
+      itemSignature = loaded.elements
+        .map((element) => `${element.id}:${(byElement.get(element.id) ?? [])
+          .map((item) => `${item.contentId}.${item.visibility}.${item.displayOrder}.${item.createdAt}`)
+          .join(",")}`)
+        .join("|");
+    } else {
+      body.elements = loaded.elements;
+    }
+  }
+
+  const etag = `"${await sha256(`${loaded.contentSha256}|${principal}|${flags.elements ? "e" : "-"}|${flags.items ? "i" : "-"}|${itemSignature}`)}"`;
+  if (c.req.raw.headers.get("if-none-match") === etag) {
+    return new Response(null, { status: 304, headers: { "cache-control": "no-store", etag } });
+  }
+  return json(body, 200, { etag });
+});
+
+app.get("/api/v1/tags/:tagId/elements/:elementId/items", async (c) => {
+  const tagId = c.req.param("tagId");
+  const elementId = c.req.param("elementId");
+  if (!TAG_ID.test(tagId) || !ELEMENT_ID.test(elementId)) return neutral();
+
+  const credential = await readCredential(c.req.raw, c.env, tagId);
+  if (!credential) return neutral();
+  const resolved = resolveViewAs(new URL(c.req.url).searchParams.get("viewAs") ?? undefined, credential);
+  if (resolved instanceof Response) return resolved;
+
+  const record = await routing(c.env, tagId);
+  if (!record || record.status !== "active") return neutral();
+
+  const result = await readElementItems(c.env, tagId, elementId, resolved);
+  if (!result) return neutral();
+
+  const signature = result.items
+    .map((item) => `${item.contentId}.${item.visibility}.${item.displayOrder}.${item.createdAt}`)
+    .join("|");
+  const etag = `"${await sha256(`${result.elementId}|${resolved}|${signature}`)}"`;
+  if (c.req.raw.headers.get("if-none-match") === etag) {
+    return new Response(null, { status: 304, headers: { "cache-control": "no-store", etag } });
+  }
+  return json({ ...result, itemsEtag: etag }, 200, { etag });
 });
 
 app.get("/api/v1/tags/:tagId/items/:contentId/media", async (c) => {

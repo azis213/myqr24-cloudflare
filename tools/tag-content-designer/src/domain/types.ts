@@ -7,8 +7,9 @@ export const LIBRARY_SCHEMA = "myqr24-tag-element-library-v1" as const;
  */
 export const LIBRARY_SCHEMA_VERSION = 1;
 /** 2: Überschriften liegen als Absatz-Attribut (`paragraph.heading`) im Absatzfluss.
- *  3: Tabellenzellen tragen Runs (Farbe/Markierung/Marks/Links) statt reinem Text. */
-export const SCHEMA_VERSION = 3;
+ *  3: Tabellenzellen tragen Runs (Farbe/Markierung/Marks/Links) statt reinem Text.
+ *  4: Jedes Element deklariert seine Item-Fähigkeit (`element.items`). */
+export const SCHEMA_VERSION = 4;
 /** Gesamtbudget der kanonischen Datei: Platz für Text und Tabellen mit Rahmen/Hintergründen. */
 export const MAX_DOCUMENT_BYTES = 128 * 1024;
 export const MAX_ELEMENTS = 24;
@@ -67,6 +68,28 @@ export type ElementType =
 export type Breakpoint = "mobile" | "tablet" | "desktop";
 export type Principal = "scanner" | "guest" | "owner";
 export type SlotAccept = "image" | "document" | "audio";
+
+/**
+ * Item-Fähigkeit eines Elements. `dynamic` bedeutet: Das Element bekommt beim
+ * Publish eine Zeile in `tag_content_elements` und kann in der operativen
+ * Nutzung eigene `tag_content_element_items` aufnehmen (Galerie, Dokumentenliste,
+ * Wartungshistorie, Einzelbild, Einzel-Dokument, Chat). `none` bedeutet: Der
+ * Inhalt steht ausschließlich im Tag-Dokument, es entsteht keine Elementzeile.
+ */
+export const ITEM_MODES = ["none", "dynamic"] as const;
+export type ItemMode = (typeof ITEM_MODES)[number];
+
+export interface ElementItems {
+  mode: ItemMode;
+  /**
+   * Slots, die Items aufnehmen. Leer/fehlend ist zulässig, wenn die Items aus
+   * einem Subsystem stammen (z. B. Chat) statt aus einem Upload.
+   */
+  slotIds?: string[];
+}
+
+/** Anzeigeform eines item-fähigen Elements: genau ein Item oder alle Items. */
+export type DisplayMode = "single" | "all";
 export type MarkName = "bold" | "italic" | "underline";
 
 /** Geschlossene Skalen für Zeichen- und Absatzformatierung (kein freies CSS). */
@@ -213,6 +236,8 @@ export interface TemplateElement {
   visibility: Visibility;
   hidden?: boolean;
   locked?: boolean;
+  /** Item-Fähigkeit; wird beim Publish ausgewertet (Elementzeile ja/nein). */
+  items: ElementItems;
   placement?: Placement;
   style?: ElementStyle;
   payload: Record<string, unknown>;
@@ -298,6 +323,8 @@ export interface ElementTemplate {
   elementTemplateVersion: number;
   elementType: ElementType;
   label: string;
+  /** Optional: Item-Fähigkeit bleibt beim Import aus älteren Bibliotheken leer. */
+  items?: ElementItems;
   style?: ElementStyle;
   payload: Record<string, unknown>;
   slots?: TemplateSlot[];

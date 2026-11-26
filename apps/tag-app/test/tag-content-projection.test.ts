@@ -14,12 +14,35 @@ const COLORS = {
   border: "#dddddd",
 };
 
+/** Katalog-Defaults der Item-Fähigkeit (Spiegel des Designer-Katalogs). */
+const ITEM_DEFAULTS: Record<string, Record<string, unknown>> = {
+  image: { mode: "dynamic", slotIds: ["image"] },
+  document: { mode: "dynamic", slotIds: ["document"] },
+  gallery: { mode: "dynamic", slotIds: ["images"] },
+  documents: { mode: "dynamic", slotIds: ["documents"] },
+  "maintenance-history": { mode: "dynamic", slotIds: ["entries"] },
+  "finder-form": { mode: "dynamic", slotIds: ["photos"] },
+};
+
+/** Zugehörige Slots; Tests dürfen sie über `overrides.slots` ersetzen. */
+const SLOT_DEFAULTS: Record<string, Array<Record<string, unknown>>> = {
+  image: [{ slotId: "image", accepts: ["image"], min: 0, max: 12, required: false }],
+  document: [{ slotId: "document", accepts: ["document"], min: 0, max: 12, required: false }],
+  gallery: [{ slotId: "images", accepts: ["image"], min: 0, max: 48, required: false }],
+  documents: [{ slotId: "documents", accepts: ["document"], min: 0, max: 32, required: false }],
+  "maintenance-history": [{ slotId: "entries", accepts: ["document", "image"], min: 0, max: 64, required: false }],
+  "finder-form": [{ slotId: "photos", accepts: ["image"], min: 0, max: 3, required: false }],
+};
+
 function element(
   overrides: Record<string, unknown> & { elementId: string; elementType: string },
 ): Record<string, unknown> {
+  const defaults = SLOT_DEFAULTS[overrides.elementType];
   return {
     displayOrder: 10,
     visibility: "public",
+    items: ITEM_DEFAULTS[overrides.elementType] ?? { mode: "none" },
+    ...(defaults ? { slots: defaults } : {}),
     payload: {},
     ...overrides,
   };
@@ -31,7 +54,7 @@ function template(
 ): Record<string, unknown> {
   return {
     schema: "myqr24-tag-content-template-v1",
-    schemaVersion: 3,
+    schemaVersion: 4,
     template: {
       templateId: "tct_projection_test",
       templateVersion: 1,
@@ -191,8 +214,10 @@ describe("buildProjection", () => {
     expect(blocks[1]).toMatchObject({ type: "text", title: "Über uns", paragraphs: ["Ein Text mit Fett", "A · B"] });
     expect((blocks[1].content as { paragraphs: unknown[] }).paragraphs).toHaveLength(3);
     expect(blocks[2]).toMatchObject({ type: "gallery", title: "Gästefotos", images: [] });
+    expect(blocks[2]).toMatchObject({ elementId: "cel_gallery", visibility: "public", items: { mode: "dynamic" } });
     expect(blocks[2].placement).toMatchObject({ span: { desktop: 4 }, minWidth: "18rem" });
     expect(blocks[3]).toMatchObject({ type: "documents", documents: [] });
+    expect(blocks[3]).toMatchObject({ elementId: "cel_docs", visibility: "shared" });
     expect(projection.elements.map((entry) => entry.elementId)).toEqual([
       "cel_hero",
       "cel_text",

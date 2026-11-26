@@ -5,6 +5,7 @@ import {
   CSS_URL,
   DATA_URL,
   ELEMENT_ID,
+  ELEMENT_ITEMS,
   ELEMENT_TYPE_TAG_TYPES,
   ELEMENT_TYPES,
   EVENT_HANDLER,
@@ -15,6 +16,7 @@ import {
   HEX_COLOR,
   HIDDEN_ELEMENT_TYPES,
   HTML_MARKUP,
+  ITEM_MODES,
   LINE_HEIGHTS,
   LINK_TARGET,
   LIST_KINDS,
@@ -49,7 +51,9 @@ import {
   TEMPLATE_STATUS,
   VISIBILITIES,
   type ElementType,
+  type ElementItems,
   type Feature,
+  type ItemMode,
   type Presentation,
   type TagType,
   type Visibility,
@@ -85,6 +89,8 @@ export interface VElement {
   placement?: VPlacement;
   visibility: Visibility;
   hidden: boolean;
+  /** Item-Fähigkeit; `dynamic` erzeugt beim Publish eine Elementzeile. */
+  items: ElementItems;
   payload: Record<string, unknown>;
   style?: Record<string, unknown>;
   content?: Record<string, unknown>;
@@ -516,6 +522,65 @@ function validateBindings(bindings: unknown, path: string, issues: Issues): Reco
   return bindings;
 }
 
+/**
+ * Prüft `element.items` gegen den Katalog. Fehlt der Block, wird der
+ * Katalog-Standard übernommen – so bleiben Templates ohne Angabe gültig, das
+ * Ergebnis ist aber deterministisch (Quelle: `ELEMENT_ITEMS`).
+ */
+function validateItems(
+  input: unknown,
+  path: string,
+  elementType: ElementType,
+  slots: VSlot[],
+  issues: Issues,
+): ElementItems {
+  const fallback: ElementItems = structuredClone(ELEMENT_ITEMS[elementType]);
+  if (input === undefined) return fallback;
+  if (!isObject(input)) {
+    issues.add("ELEMENT_ITEMS_INVALID", path, "items muss ein Objekt sein.");
+    return fallback;
+  }
+  const mode = input.mode;
+  if (typeof mode !== "string" || !(ITEM_MODES as readonly string[]).includes(mode)) {
+    issues.add("ELEMENT_ITEMS_MODE_INVALID", `${path}.mode`, 'mode muss "none" oder "dynamic" sein.');
+    return fallback;
+  }
+  if (mode !== ELEMENT_ITEMS[elementType].mode) {
+    issues.add(
+      "ELEMENT_ITEMS_MODE_MISMATCH",
+      `${path}.mode`,
+      `Der Elementtyp erwartet mode "${ELEMENT_ITEMS[elementType].mode}".`,
+    );
+  }
+
+  const declared = slots.map((slot) => slot.slotId);
+  const seen = new Set<string>();
+  const slotIds: string[] = [];
+  if (input.slotIds !== undefined) {
+    if (!Array.isArray(input.slotIds)) {
+      issues.add("ELEMENT_ITEMS_SLOT_INVALID", `${path}.slotIds`, "slotIds muss ein Array sein.");
+    } else {
+      for (const slotId of input.slotIds) {
+        if (typeof slotId !== "string" || !declared.includes(slotId)) {
+          issues.add("ELEMENT_ITEMS_SLOT_UNKNOWN", `${path}.slotIds`, `Unbekannter Slot: ${String(slotId)}`);
+        } else if (seen.has(slotId)) {
+          issues.add("ELEMENT_ITEMS_SLOT_DUPLICATE", `${path}.slotIds`, `slotId ${slotId} ist doppelt.`);
+        } else {
+          seen.add(slotId);
+          slotIds.push(slotId);
+        }
+      }
+    }
+  } else if (mode === "dynamic") {
+    slotIds.push(...(ELEMENT_ITEMS[elementType].slotIds ?? []));
+  }
+
+  return {
+    mode: mode as ItemMode,
+    ...(slotIds.length > 0 ? { slotIds } : {}),
+  };
+}
+
 function validateElement(
   element: unknown,
   index: number,
@@ -623,6 +688,7 @@ function validateElement(
   validateStyle(element.style, `${path}.style`, issues);
   validateRichText(element.content, `${path}.content`, issues);
   const slots = validateSlots(element.slots, `${path}.slots`, issues);
+  const items = validateItems(element.items, `${path}.items`, type, slots, issues);
   const actions = validateActions(element.actions, `${path}.actions`, issues);
   const bindings = validateBindings(element.bindings, `${path}.bindings`, issues);
 
@@ -633,6 +699,7 @@ function validateElement(
     ...(placement ? { placement } : {}),
     visibility: (inList(visibility, VISIBILITIES) ? visibility : "public") as Visibility,
     hidden: element.hidden === true || HIDDEN_ELEMENT_TYPES.includes(type),
+    items,
     payload: isObject(payload) ? payload : {},
     ...(isObject(element.style) ? { style: element.style } : {}),
     ...(isObject(element.content) ? { content: element.content } : {}),

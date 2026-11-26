@@ -5,6 +5,7 @@ import { isFontFamily, isFontSize, isHeadingLevel, isHexColor, isLineHeight, isL
 import { canonicalByteLength } from "./serialize";
 import {
   INSTANCE_SCHEMA,
+  ITEM_MODES,
   MAX_DOCUMENT_BYTES,
   MAX_CUSTOM_COLORS,
   MAX_ELEMENTS,
@@ -22,7 +23,7 @@ import {
   SCHEMA_VERSION,
   TEMPLATE_SCHEMA,
 } from "./types";
-import type { ContentBlock, TagType } from "./types";
+import type { ContentBlock, ElementType, TagType } from "./types";
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -808,6 +809,111 @@ function validateEditability(input: unknown, path: string, issues: ValidationIss
 }
 
 
+function validateItems(
+  input: unknown,
+  path: string,
+  elementType: ElementType | undefined,
+  slots: unknown,
+  issues: ValidationIssue[],
+): void {
+  if (input === undefined) {
+    issues.push(
+      error(
+        "ELEMENT_ITEMS_MISSING",
+        path,
+        "Jedes Element braucht eine Item-Fähigkeit (items.mode).",
+        "Ältere Dateien ergänzen den Katalog-Standard beim Laden automatisch.",
+      ),
+    );
+    return;
+  }
+  if (!isObject(input)) {
+    issues.push(error("ELEMENT_ITEMS_INVALID", path, "items muss ein Objekt sein."));
+    return;
+  }
+  const mode = input.mode;
+  if (typeof mode !== "string" || !(ITEM_MODES as readonly string[]).includes(mode)) {
+    issues.push(
+      error("ELEMENT_ITEMS_MODE_INVALID", `${path}.mode`, 'mode muss "none" oder "dynamic" sein.'),
+    );
+    return;
+  }
+  const declaredSlots = Array.isArray(slots)
+    ? slots.filter(isObject).map((slot) => slot.slotId).filter((slotId): slotId is string => typeof slotId === "string")
+    : [];
+  const catalogEntry = elementType ? ELEMENT_CATALOG[elementType] : undefined;
+
+  if (catalogEntry) {
+    if (mode === "dynamic" && catalogEntry.items.mode !== "dynamic") {
+      issues.push(
+        error(
+          "ELEMENT_ITEMS_NOT_SUPPORTED",
+          path,
+          `${catalogEntry.label} kann keine eigenen Items besitzen.`,
+          'mode auf "none" setzen.',
+        ),
+      );
+    } else if (mode === "none" && catalogEntry.items.mode === "dynamic") {
+      issues.push(
+        error(
+          "ELEMENT_ITEMS_MODE_MISMATCH",
+          `${path}.mode`,
+          `${catalogEntry.label} benötigt eigene Items.`,
+          'mode muss "dynamic" sein – sonst entsteht beim Publish keine Elementzeile.',
+        ),
+      );
+    }
+  }
+
+  if (input.slotIds !== undefined) {
+    if (mode !== "dynamic") {
+      issues.push(error("ELEMENT_ITEMS_SLOT_INVALID", `${path}.slotIds`, 'slotIds ist nur bei mode "dynamic" zulässig.'));
+      return;
+    }
+    if (!Array.isArray(input.slotIds)) {
+      issues.push(error("ELEMENT_ITEMS_SLOT_INVALID", `${path}.slotIds`, "slotIds muss ein Array sein."));
+      return;
+    }
+    const seen = new Set<string>();
+    for (const slotId of input.slotIds) {
+      if (typeof slotId !== "string" || !declaredSlots.includes(slotId)) {
+        issues.push(
+          error(
+            "ELEMENT_ITEMS_SLOT_UNKNOWN",
+            `${path}.slotIds`,
+            `Unbekannter Slot: ${String(slotId)}`,
+            "Nur Slots aus slots[] dürfen gebunden werden.",
+          ),
+        );
+      } else if (seen.has(slotId)) {
+        issues.push(error("ELEMENT_ITEMS_SLOT_DUPLICATE", `${path}.slotIds`, `slotId ${slotId} ist doppelt.`));
+      } else {
+        seen.add(slotId);
+      }
+    }
+    if (input.slotIds.length === 0 && declaredSlots.length > 0) {
+      issues.push(
+        warning(
+          "ELEMENT_ITEMS_SLOT_UNBOUND",
+          `${path}.slotIds`,
+          "Dynamisches Element ohne Slot-Bindung: Uploads können keinem Slot zugeordnet werden.",
+          "Mindestens einen Slot auswählen oder die Slots entfernen (z. B. Chat).",
+        ),
+      );
+    }
+  } else if (mode === "dynamic" && declaredSlots.length > 0) {
+    issues.push(
+      warning(
+        "ELEMENT_ITEMS_SLOT_UNBOUND",
+        `${path}.slotIds`,
+        "Dynamisches Element ohne Slot-Bindung: Uploads können keinem Slot zugeordnet werden.",
+        "Mindestens einen Slot auswählen oder die Slots entfernen (z. B. Chat).",
+      ),
+    );
+  }
+}
+
+
 function validateElements(elements: unknown[], tagType: TagType | undefined, issues: ValidationIssue[]): void {
   if (elements.length > MAX_ELEMENTS) {
     issues.push(error("LIMIT_ELEMENTS", "elements", `Höchstens ${MAX_ELEMENTS} Elemente pro Template.`));
@@ -918,6 +1024,14 @@ function validateElements(elements: unknown[], tagType: TagType | undefined, iss
         });
       }
     }
+
+    validateItems(
+      element.items,
+      `${path}.items`,
+      typeof elementType === "string" ? (elementType as ElementType) : undefined,
+      element.slots,
+      issues,
+    );
 
     if (element.payload === undefined || !isObject(element.payload)) {
       issues.push(error("PAYLOAD_INVALID", `${path}.payload`, "payload muss ein Objekt sein."));

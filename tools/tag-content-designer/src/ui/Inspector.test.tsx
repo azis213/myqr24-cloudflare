@@ -57,3 +57,22 @@ describe("Inspector – Textkontrolle als JSON", () => {
     expect(container.querySelector(".error-hint")?.textContent).toContain("color");
   });
 });
+describe("Inspector – Item-Fähigkeit", () => {
+  it("zeigt Modus und Anzeigeform eines dynamischen Elements", () => {
+    const doc = clone();
+    const gallery = doc.elements.find((element) => element.elementType === "gallery")!;
+    const { container } = render(<Inspector doc={doc} selectedId={gallery.elementId} breakpoint="desktop" onChange={() => {}} />);
+    expect(container.textContent).toContain("dynamisch – eigene Items");
+    expect(container.textContent).toContain("Alle sichtbaren Items werden angezeigt");
+    expect(container.textContent).toContain("Slots: images");
+  });
+
+  it("kennzeichnet statische Elemente ohne Elementzeile", () => {
+    const doc = clone();
+    const text = textElement(doc);
+    const { container } = render(<Inspector doc={doc} selectedId={text.elementId} breakpoint="desktop" onChange={() => {}} />);
+    expect(container.textContent).toContain("statisch – keine Items");
+    expect(container.textContent).toContain("keine Elementzeile und kein Item");
+  });
+});
+

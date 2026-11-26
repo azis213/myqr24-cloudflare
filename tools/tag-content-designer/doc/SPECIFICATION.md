@@ -61,7 +61,7 @@ Regeln:
 | `layout` | `mode: grid-flow`, `columns: 12`, `gap`, `container`, `responsive` (`autoReflow`, `minColumnWidth`, `preferredColumns`) |
 | `editability` | Whitelist der später im User-Designer änderbaren Pfade + `limits` |
 | `palette` | eigene Farben der Formatierleiste (`custom`, max. 24 × `#rrggbb`) – Teil der Konfiguration |
-| `elements` | geordnete Elemente mit `elementId`, `elementType`, `displayOrder`, `visibility`, `placement`, `style`, `payload`, `content`, `actions`, `slots` |
+| `elements` | geordnete Elemente mit `elementId`, `elementType`, `items`, `displayOrder`, `visibility`, `placement`, `style`, `payload`, `content`, `actions`, `slots` |
 
 ### 3.1 Elemente
 
@@ -70,9 +70,25 @@ Zusätzlich verfügbar: `hero`, `callout`, `external-link`, `divider`, `finder-n
 
 `elementId` folgt `^cel_[A-Za-z0-9_-]{1,120}$`, `slotId` `^[a-z][a-z0-9-]{0,31}$`.
 
+**Item-Fähigkeit (`items`)** – Pflichtfeld jedes Elements seit `schemaVersion 4`:
+
+```json
+{ "items": { "mode": "dynamic", "slotIds": ["images"] } }
+```
+
+| `items.mode` | Bedeutung beim Publish |
+| --- | --- |
+| `dynamic` | Element erhält eine Zeile in `tag_content_elements` und kann `tag_content_element_items` aufnehmen (Galerie, Dokumentenliste, Wartungshistorie, Fund-Formular, Einzelbild, Einzel-Dokument, später Chat). |
+| `none` | Kein Item, keine Elementzeile: Der Inhalt steht ausschließlich im Tag-Dokument (Text, Hinweis, Trenner, externer Link, Kontaktweg, Hero, Theme-Assets). |
+
+Der Wert ist eine **Katalog-Eigenschaft** und wird je Elementtyp fest vorgegeben (`text`/`callout`/… = `none`; `gallery`/`documents`/`maintenance-history`/`finder-form`/`image`/`document` = `dynamic`). `slotIds` bindet die Slots, die Items aufnehmen; leer ist zulässig, wenn die Items aus einem Subsystem stammen (Chat).
+
+**Anzeigeform** (abgeleitet, kein eigenes Feld): `image` und `document` zeigen genau **ein** Item – das neueste sichtbare. Der Owner lädt mehrere Kandidaten hoch und steuert über die Sichtbarkeit (`public`/`ownerOnly`), welches Bild beziehungsweise Dokument erscheint. `gallery`, `documents`, `maintenance-history` und `finder-form` zeigen alle sichtbaren Items.
+
 ### 3.2 Slots und Aktionen
 
-- **Slots** beschreiben Medienplätze (`slotId`, `accepts`, `min`, `max`, `required`, `presentation`) – nie konkrete Dateien.
+- **Slots** beschreiben Medienplätze (`slotId`, `accepts`, `min`, `max`, `required`, `presentation`) – nie konkrete Dateien. Bei `items.mode: "dynamic"` sind sie die Aufnahmeplätze der Items; `items.slotIds` verweist auf sie.
+- **Einzelbild/Einzel-Dokument** erlauben mehrere Kandidaten (`max: 12`), angezeigt wird genau eines.
 - **Aktionen** (`upload`, `download`, `delete`) sind Anträge: `principals` (`scanner`, `guest`, `owner`), `maxItemsPerPrincipal`, `maxFileSizeMb`, `afterUpload: quarantine`, `guestScope: ownOnly`.
 - Ein Template kann Rechte **einschränken**, nie erweitern.
 
@@ -241,6 +257,7 @@ Migrationsstufen liegen in `src/domain/migrate.ts`:
 | --- | --- |
 | `1 → 2` | `content.heading` (eine Überschrift am Feldanfang) wird zum ersten Absatz mit `heading: 3`; Feld wird entfernt. Danach sind Überschriften Absatz-Attribute und damit beliebig positionierbar (H1–H5). |
 | `2 → 3` | Tabellenzellen werden von `cell.text` auf `cell.runs` umgestellt (`{ text }` → `runs: [{ text }]`, leerer Text → `runs: []`). Damit sind Textfarbe/Text-Hintergrund/Marks/Links in Zellen möglich; `cell.background` bleibt unverändert. |
+| `3 → 4` | Jedes Element erhält `items` mit dem Katalog-Standard (`dynamic` für Galerie/Dokumentenliste/Wartungshistorie/Fund-Formular/Einzelbild/Einzel-Dokument, sonst `none`). Rein additiv, keine Inhalte werden verändert. |
 
 ---
 
@@ -254,7 +271,7 @@ Migrationsstufen liegen in `src/domain/migrate.ts`:
 
 Fehler blockieren `Save`/`Save as`; Warnungen nicht. Jeder Befund hat `code`, `path`, `message` und optional `hint`.
 
-Wichtige Codes (Auszug): `SCHEMA_UNKNOWN`, `SCHEMA_TOO_NEW`, `MIGRATION_STEP_MISSING`, `ELEMENT_ID_DUPLICATE`, `ELEMENT_ORDER_DUPLICATE`, `ELEMENT_TYPE_NOT_ALLOWED`, `SLOT_RANGE_INVALID`, `BINDING_SOURCE_UNKNOWN`, `POLICY_HTML_MARKUP` (Warnung), `POLICY_SCRIPT_URL`, `THEME_COLOR_INVALID`, `CONTENT_RUN_COLOR_INVALID`, `CONTENT_RUN_FONT_SIZE_INVALID`, `CONTENT_RUN_FONT_FAMILY_INVALID`, `CONTENT_RUN_LINK_INVALID`, `CONTENT_PARAGRAPH_ALIGN_INVALID`, `CONTENT_PARAGRAPH_LINE_HEIGHT_INVALID`, `CONTENT_PARAGRAPH_INDENT_INVALID`, `CONTENT_LIST_INVALID`, `LIMIT_DOCUMENT_BYTES`, `ACTIONS_OWNERSHIP_UNPROVEN` (Warnung).
+Wichtige Codes (Auszug): `SCHEMA_UNKNOWN`, `SCHEMA_TOO_NEW`, `MIGRATION_STEP_MISSING`, `ELEMENT_ID_DUPLICATE`, `ELEMENT_ORDER_DUPLICATE`, `ELEMENT_TYPE_NOT_ALLOWED`, `ELEMENT_ITEMS_MISSING`, `ELEMENT_ITEMS_INVALID`, `ELEMENT_ITEMS_MODE_INVALID`, `ELEMENT_ITEMS_NOT_SUPPORTED`, `ELEMENT_ITEMS_MODE_MISMATCH`, `ELEMENT_ITEMS_SLOT_UNKNOWN`, `ELEMENT_ITEMS_SLOT_DUPLICATE`, `ELEMENT_ITEMS_SLOT_UNBOUND` (Warnung), `SLOT_RANGE_INVALID`, `BINDING_SOURCE_UNKNOWN`, `POLICY_HTML_MARKUP` (Warnung), `POLICY_SCRIPT_URL`, `THEME_COLOR_INVALID`, `CONTENT_RUN_COLOR_INVALID`, `CONTENT_RUN_FONT_SIZE_INVALID`, `CONTENT_RUN_FONT_FAMILY_INVALID`, `CONTENT_RUN_LINK_INVALID`, `CONTENT_PARAGRAPH_ALIGN_INVALID`, `CONTENT_PARAGRAPH_LINE_HEIGHT_INVALID`, `CONTENT_PARAGRAPH_INDENT_INVALID`, `CONTENT_LIST_INVALID`, `LIMIT_DOCUMENT_BYTES`, `ACTIONS_OWNERSHIP_UNPROVEN` (Warnung).
 
 Bekannte, dokumentierte Abweichung: `guestScope: ownOnly` ist derzeit eine **Warnung**, kein Blocker, weil die tag-api noch keine Eigentumsbindung besitzt (Refinement `D-23`).
 

@@ -62,6 +62,18 @@ describe("Elementliste bearbeiten", () => {
     expect(added).toBeDefined();
     expect(added?.displayOrder).toBe(50);
   });
+
+  it("übernimmt die Item-Fähigkeit aus dem Katalog", () => {
+    const image = addElementToDoc(createDoc(), "image");
+    const addedImage = image.doc.elements.find((entry) => entry.elementId === image.elementId);
+    expect(addedImage?.items).toEqual({ mode: "dynamic", slotIds: ["image"] });
+    expect(addedImage?.actions?.upload?.principals).toEqual(["owner"]);
+
+    const divider = addElementToDoc(createDoc(), "divider");
+    const addedDivider = divider.doc.elements.find((entry) => entry.elementId === divider.elementId);
+    expect(addedDivider?.items).toEqual({ mode: "none" });
+    expect(addedDivider?.slots).toBeUndefined();
+  });
 });
 
 describe("editorReducer", () => {

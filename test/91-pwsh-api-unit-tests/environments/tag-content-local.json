@@ -14,7 +14,7 @@
   "uploadFile": "../collections/tag-content-local/assets/upload-test.png",
   "publishTemplate": {
     "schema": "myqr24-tag-content-template-v1",
-    "schemaVersion": 3,
+    "schemaVersion": 4,
     "template": {
       "templateId": "tct_postman_local",
       "templateVersion": 1,
@@ -53,6 +53,7 @@
       {
         "elementId": "cel_gallery",
         "elementType": "gallery",
+        "items": { "mode": "dynamic", "slotIds": ["images"] },
         "displayOrder": 20,
         "visibility": "public",
         "payload": { "name": "Postman-Testgalerie" },

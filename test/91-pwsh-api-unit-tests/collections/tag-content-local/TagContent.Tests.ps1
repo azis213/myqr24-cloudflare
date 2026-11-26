@@ -110,7 +110,7 @@ Describe 'TAG Content – Get runtime content' {
     It 'lädt Runtime-Content mit Session-Cookie und enthält die Galerie' {
         Invoke-LocalSeed | Out-Null
         $cookie = New-AuthorizedSession
-        $response = Invoke-ApiRequest -Method GET -Uri (Get-ApiBaseUri $baseUri "$tagPath/content") -Headers @{ Cookie = $cookie } -Transport $transport
+        $response = Invoke-ApiRequest -Method GET -Uri (Get-ApiBaseUri $baseUri "$tagPath/content?items=true") -Headers @{ Cookie = $cookie } -Transport $transport
         Assert-ApiEqual $response.StatusCode 200 'Runtime-Content muss HTTP 200 liefern.'
         $gallery = @($response.Body.elements | Where-Object { $_.id -eq 'cel_gallery' })
         Assert-ApiEqual $gallery.Count 1 'Runtime muss die Galerie enthalten.'

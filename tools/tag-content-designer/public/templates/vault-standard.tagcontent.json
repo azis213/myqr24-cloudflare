@@ -1,6 +1,6 @@
 {
   "schema": "myqr24-tag-content-template-v1",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "template": {
     "templateId": "tct_vault_standard",
     "templateVersion": 1,
@@ -73,6 +73,7 @@
     {
       "elementId": "cel_theme",
       "elementType": "theme-assets",
+      "items": { "mode": "none" },
       "displayOrder": 0,
       "visibility": "public",
       "hidden": true,
@@ -84,6 +85,7 @@
     {
       "elementId": "cel_intro",
       "elementType": "text",
+      "items": { "mode": "none" },
       "displayOrder": 10,
       "visibility": "public",
       "placement": {
@@ -107,6 +109,7 @@
     {
       "elementId": "cel_notice",
       "elementType": "callout",
+      "items": { "mode": "none" },
       "displayOrder": 20,
       "visibility": "public",
       "placement": {
@@ -124,6 +127,7 @@
     {
       "elementId": "cel_gallery",
       "elementType": "gallery",
+      "items": { "mode": "dynamic", "slotIds": ["images"] },
       "displayOrder": 30,
       "visibility": "public",
       "placement": {
@@ -167,6 +171,7 @@
     {
       "elementId": "cel_docs",
       "elementType": "documents",
+      "items": { "mode": "dynamic", "slotIds": ["documents"] },
       "displayOrder": 40,
       "visibility": "shared",
       "placement": {

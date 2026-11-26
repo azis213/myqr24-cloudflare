@@ -1,5 +1,12 @@
 import { generateContentId, parseContentId } from "../content-id";
-import { tagItemFileKey, tagItemOriginalKey, tagItemVariantKey } from "../content-paths";
+import {
+  tagContentFileKey,
+  tagItemFileKey,
+  tagItemOriginalKey,
+  tagItemVariantKey,
+} from "../content-paths";
+import { ELEMENT_DISPLAY_MODE, type ElementType, type Principal } from "./limits";
+import { isVisibleToPrincipal, type Visibility } from "./principal";
 
 const TAG_ID = /^(?:[0-9a-z]{6}|[0-9a-z]{8}|[0-9a-z]{10})$/;
 const ELEMENT_ID = /^cel_[A-Za-z0-9_-]{1,120}$/;
@@ -33,6 +40,7 @@ interface ElementRow {
   content_element_type: string;
   visibility: "public" | "shared" | "private" | "ownerOnly";
   max_display_order: number;
+  item_count: number;
 }
 
 interface ItemRow {
@@ -237,10 +245,83 @@ async function uploadFiles(request: Request): Promise<UploadFile[] | Response> {
   return files;
 }
 
+const IMAGE_ELEMENT_TYPES = new Set(["image", "gallery", "maintenance-history", "finder-form"]);
+const DOCUMENT_ELEMENT_TYPES = new Set(["document", "documents", "maintenance-history"]);
+
+/**
+ * Welche Elementtypen nehmen welchen Medientyp auf? Einzelbild und Galerie
+ * teilen sich denselben Upload-Pfad; Einzel-Dokument und Dokumentenliste ebenso.
+ */
 function allowedElement(itemType: "image" | "document", elementType: string): boolean {
   return itemType === "image"
-    ? elementType === "image" || elementType === "gallery"
-    : elementType === "document" || elementType === "documents";
+    ? IMAGE_ELEMENT_TYPES.has(elementType)
+    : DOCUMENT_ELEMENT_TYPES.has(elementType);
+}
+
+interface ElementDefinition {
+  elementType: ElementType;
+  itemsMode: "none" | "dynamic";
+  slotIds: string[];
+  maxItems: number;
+}
+
+/**
+ * Liest die Element-Definition aus dem veröffentlichten Tag-Dokument. Sie
+ * entscheidet, ob ein Element Items aufnehmen darf, wie viele Kandidaten erlaubt
+ * sind und ob genau ein Item angezeigt wird.
+ */
+async function loadElementDefinition(
+  env: ContentItemsEnv,
+  tagId: string,
+  tagNumericId: number,
+  elementId: string,
+): Promise<ElementDefinition | null> {
+  const row = await env.APP_DB.prepare(
+    "SELECT content_file FROM tag_content WHERE tag_base36_id = ?1 AND tag_numeric_id = ?2 LIMIT 1",
+  ).bind(tagId, tagNumericId).first<{ content_file: string }>();
+  if (!row) return null;
+
+  let document: unknown;
+  try {
+    const object = await env.PRIVATE_CONTENT.get(tagContentFileKey(tagNumericId, row.content_file));
+    if (!object) return null;
+    document = await object.json();
+  } catch {
+    return null;
+  }
+  if (!document || typeof document !== "object") return null;
+
+  const elements = (document as { elements?: unknown }).elements;
+  if (!Array.isArray(elements)) return null;
+  const entry = elements.find(
+    (candidate) => !!candidate && typeof candidate === "object" && (candidate as { elementId?: unknown }).elementId === elementId,
+  ) as { elementType?: unknown; payload?: unknown } | undefined;
+  if (!entry || typeof entry.elementType !== "string" || !(entry.elementType in ELEMENT_DISPLAY_MODE)) return null;
+
+  const payload = entry.payload && typeof entry.payload === "object" && !Array.isArray(entry.payload)
+    ? entry.payload as Record<string, unknown>
+    : {};
+  const items = payload.items && typeof payload.items === "object" && !Array.isArray(payload.items)
+    ? payload.items as Record<string, unknown>
+    : {};
+  const slotIds = Array.isArray(items.slotIds)
+    ? items.slotIds.filter((slotId): slotId is string => typeof slotId === "string")
+    : [];
+  const slots = Array.isArray(payload.slots)
+    ? payload.slots.filter((slot): slot is Record<string, unknown> => !!slot && typeof slot === "object" && !Array.isArray(slot))
+    : [];
+  const relevant = slotIds.length > 0 ? slots.filter((slot) => slotIds.includes(String(slot.slotId))) : slots;
+  const maxItems = relevant.reduce((max, slot) => {
+    const value = slot.max;
+    return typeof value === "number" && Number.isSafeInteger(value) && value > max ? value : max;
+  }, 0);
+
+  return {
+    elementType: entry.elementType as ElementType,
+    itemsMode: items.mode === "dynamic" ? "dynamic" : "none",
+    slotIds,
+    maxItems,
+  };
 }
 
 async function tagForUpload(env: ContentItemsEnv, tagId: string): Promise<TagRow | null> {
@@ -283,7 +364,7 @@ export async function uploadContentItem(
   }
 
   const element = await env.APP_DB.prepare(
-    "SELECT element.content_element_type, COALESCE(MAX(assignment.display_order), -1) AS max_display_order FROM tag_content_elements AS element LEFT JOIN tag_content_element_items AS assignment ON assignment.tag_numeric_id = element.tag_numeric_id AND assignment.content_element_id = element.content_element_id WHERE element.tag_numeric_id = ?1 AND element.content_element_id = ?2 GROUP BY element.tag_numeric_id, element.content_element_id LIMIT 1",
+    "SELECT element.content_element_type, element.visibility, COALESCE(MAX(assignment.display_order), -1) AS max_display_order, COUNT(assignment.content_id) AS item_count FROM tag_content_elements AS element LEFT JOIN tag_content_element_items AS assignment ON assignment.tag_numeric_id = element.tag_numeric_id AND assignment.content_element_id = element.content_element_id WHERE element.tag_numeric_id = ?1 AND element.content_element_id = ?2 GROUP BY element.tag_numeric_id, element.content_element_id, element.content_element_type, element.visibility LIMIT 1",
   ).bind(tag.tag_numeric_id, elementId).first<ElementRow>();
   if (!element || !allowedElement(mediaType.itemType, element.content_element_type)) {
     return failure(404, "element_not_found", "Element ist nicht verfügbar oder akzeptiert diesen Medientyp nicht.");
@@ -292,6 +373,23 @@ export async function uploadContentItem(
     "SELECT visibility FROM tag_content_elements WHERE tag_numeric_id = ?1 AND content_element_id = ?2 LIMIT 1",
   ).bind(tag.tag_numeric_id, elementId).first<{ visibility: ElementRow["visibility"] }>();
   if (!elementVisibility) return failure(404, "element_not_found", "Element ist nicht verfügbar.");
+
+  const definition = await loadElementDefinition(env, tagId, tag.tag_numeric_id, elementId);
+  if (!definition || definition.itemsMode !== "dynamic") {
+    return failure(404, "element_not_found", "Element nimmt keine Items auf.");
+  }
+  const itemCount = Number(element.item_count) || 0;
+  if (definition.maxItems > 0 && itemCount >= definition.maxItems) {
+    return failure(409, "slot_full", `Element nimmt höchstens ${definition.maxItems} Items auf.`);
+  }
+  const displayMode = ELEMENT_DISPLAY_MODE[definition.elementType] ?? "all";
+  /**
+   * Einzelanzeige: Das neue Item wird sichtbar (Element-Sichtbarkeit), die
+   * bisherigen Kandidaten werden im selben Batch auf `ownerOnly` gesetzt. So
+   * wirkt ein Upload wie „ersetzen", ohne Daten zu löschen; der Owner kann die
+   * Sichtbarkeit später umschalten.
+   */
+  const assignmentVisibility = elementVisibility.visibility;
 
   const now = new Date().toISOString();
   let contentId = 0;
@@ -331,8 +429,14 @@ export async function uploadContentItem(
     const statements = [
       env.APP_DB.prepare("UPDATE tag_content_items SET status = 'ready', updated_at = ?1 WHERE content_id = ?2 AND status = 'pending'").bind(new Date().toISOString(), contentId),
       env.APP_DB.prepare("INSERT INTO tag_content_element_items (tag_numeric_id, content_element_id, content_id, item_scope, filename_key, display_order, visibility) VALUES (?1, ?2, ?3, 'tag', ?4, ?5, ?6)")
-        .bind(tag.tag_numeric_id, elementId, contentId, original.file!.filenameKey, Math.max(0, element.max_display_order + 1), elementVisibility.visibility),
+        .bind(tag.tag_numeric_id, elementId, contentId, original.file!.filenameKey, Math.max(0, element.max_display_order + 1), assignmentVisibility),
     ];
+    if (displayMode === "single" && itemCount > 0) {
+      statements.push(
+        env.APP_DB.prepare("UPDATE tag_content_element_items SET visibility = 'ownerOnly' WHERE tag_numeric_id = ?1 AND content_element_id = ?2 AND content_id <> ?3")
+          .bind(tag.tag_numeric_id, elementId, contentId),
+      );
+    }
     for (const variant of variants) {
       const shaInput = Uint8Array.from(variant.bytes).buffer;
       const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", shaInput)), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -363,6 +467,7 @@ export async function uploadContentItem(
     filename: original.filename,
     contentType: original.contentType,
     contentBytes: original.bytes.byteLength,
+    visibility: assignmentVisibility,
     variants: variants.map((variant) => ({ variant: variant.field, filename: variant.filename, contentType: variant.contentType, contentBytes: variant.bytes.byteLength })),
   }, 201);
 }
@@ -479,4 +584,108 @@ export async function deleteContentItem(
     return failure(500, "delete_pending", "Datei ist gelöscht; D1-Bereinigung kann sicher wiederholt werden.");
   }
   return response({ status: "deleted", tagId, contentId: String(contentId) });
+}
+/** Anzeige-Link auf die Originaldatei eines Items (gleiche Origin wie die PWA). */
+export function mediaUrlFor(tagId: string, contentId: number | string): string {
+  return `/api/v1/tags/${encodeURIComponent(tagId)}/items/${encodeURIComponent(String(contentId))}/media`;
+}
+
+export interface ContentItemLink {
+  contentId: string;
+  type: "image" | "document";
+  title: string | null;
+  altText: string | null;
+  filename: string | null;
+  displayOrder: number;
+  createdAt: string;
+  visibility: Visibility;
+  mediaUrl: string;
+}
+
+interface ItemListRow {
+  content_element_id: string;
+  content_id: number;
+  content_item_type: "image" | "document";
+  title: string | null;
+  alt_text: string | null;
+  original_filename: string | null;
+  display_order: number;
+  visibility: Visibility;
+  created_at: string;
+}
+
+/**
+ * Lädt alle sichtbaren Items eines TAGs in **einer** Query und gruppiert sie je
+ * Element. Die Sichtbarkeit (`public`/`shared`/`private`/`ownerOnly`) wird gegen
+ * den effektiven Prinzipal geprüft.
+ */
+export async function loadItemsByElement(
+  env: ContentItemsEnv,
+  tagId: string,
+  tagNumericId: number,
+  principal: Principal,
+): Promise<Map<string, ContentItemLink[]>> {
+  const rows = await env.APP_DB.prepare(
+    "SELECT assignment.content_element_id, item.content_id, item.content_item_type, item.title, item.alt_text, item.original_filename, assignment.display_order, assignment.visibility, item.created_at FROM tag_content_element_items AS assignment JOIN tag_content_items AS item ON item.content_id = assignment.content_id WHERE assignment.tag_numeric_id = ?1 AND item.status = 'ready' AND item.revoked_at IS NULL ORDER BY assignment.content_element_id, assignment.display_order, item.created_at, item.content_id",
+  ).bind(tagNumericId).all<ItemListRow>();
+
+  const byElement = new Map<string, ContentItemLink[]>();
+  for (const row of rows.results ?? []) {
+    if (!Number.isSafeInteger(row.content_id)) continue;
+    if (!isVisibleToPrincipal(row.visibility, principal)) continue;
+    const list = byElement.get(row.content_element_id) ?? [];
+    list.push({
+      contentId: String(row.content_id),
+      type: row.content_item_type,
+      title: row.title,
+      altText: row.alt_text,
+      filename: row.original_filename,
+      displayOrder: row.display_order,
+      createdAt: row.created_at,
+      visibility: row.visibility,
+      mediaUrl: mediaUrlFor(tagId, row.content_id),
+    });
+    byElement.set(row.content_element_id, list);
+  }
+  return byElement;
+}
+
+export interface ElementItemsResult {
+  elementId: string;
+  elementType: ElementType;
+  /** `single`: Die PWA zeigt genau ein Item (das neueste sichtbare). */
+  displayMode: "single" | "all";
+  items: ContentItemLink[];
+}
+
+/**
+ * Lädt die Items eines einzelnen Elements (Refresh-Pfad). Liefert `null`, wenn
+ * das Element nicht existiert, nicht sichtbar ist oder keine Items aufnimmt –
+ * der Aufrufer antwortet neutral mit `404`.
+ */
+export async function readElementItems(
+  env: ContentItemsEnv,
+  tagId: string,
+  elementId: string,
+  principal: Principal,
+): Promise<ElementItemsResult | null> {
+  const content = await env.APP_DB.prepare(
+    "SELECT tag_numeric_id FROM tag_content WHERE tag_base36_id = ?1 LIMIT 1",
+  ).bind(tagId).first<{ tag_numeric_id: number }>();
+  if (!content || !Number.isSafeInteger(content.tag_numeric_id)) return null;
+
+  const element = await env.APP_DB.prepare(
+    "SELECT content_element_type, visibility FROM tag_content_elements WHERE tag_numeric_id = ?1 AND content_element_id = ?2 LIMIT 1",
+  ).bind(content.tag_numeric_id, elementId).first<{ content_element_type: string; visibility: Visibility }>();
+  if (!element || !(element.content_element_type in ELEMENT_DISPLAY_MODE)) return null;
+  if (!isVisibleToPrincipal(element.visibility, principal)) return null;
+
+  const byElement = await loadItemsByElement(env, tagId, content.tag_numeric_id, principal);
+  const elementType = element.content_element_type as ElementType;
+  return {
+    elementId,
+    elementType,
+    displayMode: ELEMENT_DISPLAY_MODE[elementType] ?? "all",
+    items: byElement.get(elementId) ?? [],
+  };
 }

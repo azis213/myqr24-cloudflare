@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Breakpoint, Presentation, RichTextContent, TagContentDocument, TemplateElement } from "../domain/types";
-import { PRESENTATIONS, TAG_TYPE_LABELS } from "../domain/catalog";
+import { PRESENTATIONS, TAG_TYPE_LABELS, displayModeFor } from "../domain/catalog";
 import { validateRichText } from "../domain/validate";
 import { updateElementInDoc, updatePlacementInDoc, updateShellInDoc, updateThemeColorsInDoc } from "../state/store";
 
@@ -134,6 +134,9 @@ function ElementInspector({
   const span = element.placement?.span?.[breakpoint] ?? 12;
   const order = element.placement?.order?.[breakpoint] ?? element.displayOrder;
   const style = element.style ?? {};
+  const itemsMode = element.items?.mode ?? "none";
+  const displayMode = displayModeFor(element.elementType);
+  const boundSlots = element.items?.slotIds?.join(", ");
 
   return (
     <div className="inspector">
@@ -142,6 +145,24 @@ function ElementInspector({
         <span>Typ</span>
         <strong>{element.elementType}</strong>
       </div>
+
+      <div className="field">
+        <span>Items</span>
+        <strong>{itemsMode === "dynamic" ? "dynamisch – eigene Items" : "statisch – keine Items"}</strong>
+      </div>
+      {itemsMode === "dynamic" ? (
+        <p className="hint">
+          Beim Publish entsteht eine Elementzeile; Items werden in der operativen Nutzung hochgeladen
+          {boundSlots ? ` (Slots: ${boundSlots})` : " (ohne Slot-Bindung, z. B. Subsystem)"}.
+          {displayMode === "single"
+            ? " Angezeigt wird genau ein Item – das neueste sichtbare; der Owner kann die Sichtbarkeit der übrigen steuern."
+            : " Alle sichtbaren Items werden angezeigt."}
+        </p>
+      ) : (
+        <p className="hint">
+          Inhalt und Gestaltung stehen ausschließlich im Tag-Dokument; es entsteht keine Elementzeile und kein Item.
+        </p>
+      )}
 
       <label className="field">
         <span>Sichtbarkeit</span>

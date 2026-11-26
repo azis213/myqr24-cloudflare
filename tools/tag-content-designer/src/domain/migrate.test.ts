@@ -8,8 +8,8 @@ describe("migrateDocument", () => {
     const result = migrateDocument(vaultTemplate);
     expect(result.migrated).toBe(false);
     expect(result.changes).toHaveLength(0);
-    expect(result.from).toBe(3);
-    expect(result.to).toBe(3);
+    expect(result.from).toBe(4);
+    expect(result.to).toBe(4);
   });
 
   it("stellt Tabellenzellen von schemaVersion 2 auf Runs um", () => {
@@ -32,7 +32,7 @@ describe("migrateDocument", () => {
     const result = migrateDocument(legacy);
     expect(result.migrated).toBe(true);
     expect(result.from).toBe(2);
-    expect(result.to).toBe(3);
+    expect(result.to).toBe(4);
     expect(result.changes.join(" ")).toContain("cells[0].text → runs");
 
     const content = (result.document.elements as Array<Record<string, unknown>>)[0].content as {
@@ -55,7 +55,7 @@ describe("migrateDocument", () => {
     const result = migrateDocument(legacy);
     expect(result.migrated).toBe(true);
     expect(result.from).toBe(1);
-    expect(result.to).toBe(3);
+    expect(result.to).toBe(4);
     expect(result.changes.length).toBeGreaterThan(0);
 
     const content = (result.document.elements as Array<Record<string, unknown>>)[0].content as {
@@ -68,8 +68,27 @@ describe("migrateDocument", () => {
     expect(content.paragraphs[1].runs[0].text).toBe("Text");
   });
 
+  it("ergänzt fehlende Item-Fähigkeit aus dem Katalog (schemaVersion 3 → 4)", () => {
+    const legacy = structuredClone(vaultTemplate) as unknown as Record<string, unknown>;
+    legacy.schemaVersion = 3;
+    const elements = legacy.elements as Array<Record<string, unknown>>;
+    elements.forEach((element) => delete element.items);
+
+    const result = migrateDocument(legacy);
+    expect(result.migrated).toBe(true);
+    expect(result.from).toBe(3);
+    expect(result.to).toBe(4);
+    expect(result.changes.some((change) => change.includes("items → dynamic"))).toBe(true);
+
+    const migrated = result.document.elements as Array<Record<string, unknown>>;
+    const gallery = migrated.find((element) => element.elementType === "gallery");
+    expect(gallery?.items).toEqual({ mode: "dynamic", slotIds: ["images"] });
+    const text = migrated.find((element) => element.elementType === "text");
+    expect(text?.items).toEqual({ mode: "none" });
+  });
+
   it("lehnt neuere Versionen erklärend ab", () => {
-    const doc = { ...structuredClone(vaultTemplate), schemaVersion: 4 };
+    const doc = { ...structuredClone(vaultTemplate), schemaVersion: 5 };
     expect(() => migrateDocument(doc)).toThrowError(DocumentError);
     try {
       migrateDocument(doc);
@@ -81,7 +100,7 @@ describe("migrateDocument", () => {
   it("bricht ab, wenn eine Migrationsstufe fehlt", () => {
     const doc = { ...structuredClone(vaultTemplate), schemaVersion: 1 };
     try {
-      migrateDocument(doc, [], 4);
+      migrateDocument(doc, [], 5);
       throw new Error("Migration hätte fehlschlagen müssen");
     } catch (error) {
       expect((error as DocumentError).code).toBe("MIGRATION_STEP_MISSING");
@@ -91,8 +110,8 @@ describe("migrateDocument", () => {
   it("führt kumulative Stufen aus und protokolliert Änderungen", () => {
     const steps: MigrationStep[] = [
       {
-        from: 3,
-        to: 4,
+        from: 4,
+        to: 5,
         description: "Beispielstufe",
         apply: (document) => ({
           document: { ...document, migratedFlag: true },
@@ -100,9 +119,9 @@ describe("migrateDocument", () => {
         }),
       },
     ];
-    const result = migrateDocument(vaultTemplate, steps, 4);
+    const result = migrateDocument(vaultTemplate, steps, 5);
     expect(result.migrated).toBe(true);
-    expect(result.to).toBe(4);
+    expect(result.to).toBe(5);
     expect(result.changes).toEqual(["migratedFlag ergänzt"]);
     expect((result.document as { migratedFlag?: boolean }).migratedFlag).toBe(true);
   });

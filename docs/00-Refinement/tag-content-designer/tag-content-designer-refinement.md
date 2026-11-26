@@ -1,8 +1,8 @@
 # Refinement: TAG-Content-Designer – Templates für TAG-Content
 
 **Status:** unverbindliches Refinement
-**Revision:** 14
-**Stand:** 2026-11-18
+**Revision:** 15
+**Stand:** 2026-11-26
 **Geltungsbereich:** `tools/tag-content-designer` (Master), späterer TAG-Content-User-Designer, TAG-App-Rendering, tag-api-Contentprojektion, TCP-/TCC-Integration
 **Verbindlichkeit:** gemäß [`../README.md`](../README.md) ausdrücklich **keine** Anforderung, kein Contract und keine Umsetzungsgrundlage
 
@@ -13,6 +13,8 @@
 **Revision 6 (RTF-Feinschliff):** Weiche Zeilenumbrüche im selben Absatz (`Shift+Enter`), Word-nahe Symbolknöpfe mit Farbmenü (Theme-Palette, Standard-Palette, **eigene Farben**, RGB-Wähler) und eine lokal gehaltene **„letzte Konfiguration"** (`D-37`, `D-38`). Die rechte Textkontrolle zeigt das Runs-Modell als bearbeitbares, scrollbares JSON; die rechte Spalte ist per Ziehgriff verstellbar.
 
 **Revision 7 (Überschriften & Markdown):** Überschriften werden Absatz-Attribut (`paragraph.heading`, Ebene 1–5, `D-39`) – jede Zeile kann Überschrift sein, das bisherige Feld `content.heading` wird per Migration überführt (`D-41`, `schemaVersion 2`). Dazu ein Absatzstil-Feld, das Größen-Zahlenfeld mit Pfeilen (wirkt nur auf die Auswahl), Markdown als **Ein-/Ausgabeformat** (`D-40`: Kürzel, Paste, Dialog/Export; kein Speicherformat) und Tabellen als eigener Block (`D-42`).
+
+**Revision 15 (Item-Fähigkeit und Element-Items):** Jedes Element deklariert `items.mode` (`dynamic`/`none`, `schemaVersion 4`). Nur `dynamic` erzeugt beim Publish eine Zeile in `tag_content_elements`; statische Elemente (Text, Hinweis, Trenner, externer Link, Hero, Theme-Assets) stehen ausschließlich im Tag-Dokument. Einzelbild und Einzel-Dokument bleiben item-fähig: Sie halten mehrere Kandidaten (`max: 12`) und zeigen genau ein sichtbares Item – der Owner steuert die Sichtbarkeit, ein neuer Upload verdrängt die bisherigen Kandidaten auf `ownerOnly`, ohne Dateien zu löschen. Die App-API liest Items pro Element nach (`elements=true`/`items=true`, `viewAs=scanner|guest|owner`, `GET …/elements/{elementId}/items`) und filtert die View nach Sichtbarkeit.
 
 **Revision 14 (Beispiel-Templates und Beispieldaten):** Vier vollständige Beispiel-Templates (Hochzeit Garten/Party, Lost & Found, Wartung) liegen unter `public/templates/examples/` und werden über ein Manifest geladen (`D-60`); jedes Beispiel bringt eine **`sample.json`** mit Medien, Dokumenten, Galeriebeiträgen und Wartungseinträgen mit, die die Vorschau füllt, ohne das Artefakt zu verändern. Die Vorschau bekommt dafür einen **Beispieldaten-Schalter und eine Rollensimulation** (`Gast`, `Owner`, `Scanner`) nach der verbindlichen Sichtbarkeitsmatrix aus `40-TAG-APP-DATA-MODEL` §4 (`D-61`). Terminplan und Speisekarte bleiben Tabellen in Textfeldern – kein Schema-Bump. Der nächste Schritt ist ein framework-freier **Compiler** `Template + Beispieldaten + Rolle → Content-Projektion` (`D-62`, offen), den Designer-Vorschau und TAG-App gemeinsam nutzen.
 
@@ -121,8 +123,8 @@ Diese These wird in Abschnitt 3 geprüft, bewertet und mit einer Empfehlung vers
    - zusätzlich relationale Item-Metadaten aus D1 (`content_id`, Typ, Titel, Alt-Text, `display_order`, `visibility`, `items[].scope`).
 2. `isContentDocument` in `app-api.ts` prüft **nur** `schema`, `tagId`, `tagNumericId`, `revision` und die Existenz von `view`. Zusätzliche Felder im TAG-JSON sind damit **additiv** möglich, ohne den Vertrag zu brechen.
 3. `isElementDocument` akzeptiert ein freies, nicht-arrayförmiges `payload`-Objekt. Element-Payloads sind also erweiterbar, solange keine Storage-Keys enthalten sind (`containsStorageKey` verbietet `object_key`, `objectKey`, `r2_key`, `r2Key`).
-4. Sichtbarkeit wird **pro Element und pro Item** serverseitig gefiltert (`isVisibleToScope`: `public` für alle, `shared` ab PIN-/Login-Scope). Das TAG-JSON `view` wird **nicht** gefiltert, weil es genau eine Datei pro TAG und Revision gibt.
-5. Die TAG-App rendert derzeit `view.vault.blocks` und ignoriert `elements` vollständig. Der Content-Response enthält `elements` inklusive `payload` und `items` aber bereits.
+4. Sichtbarkeit wird **pro Element und pro Item** serverseitig gefiltert (`isVisibleToPrincipal`: `public` für alle, `shared` ab PIN-/Login-Scope, `private`/`ownerOnly` nur für `owner`). Seit Revision 15 wird auch die `view` beim Lesen nach der Sichtbarkeit ihrer Blöcke gefiltert; das gespeicherte Dokument bleibt vollständig.
+5. Die TAG-App rendert derzeit `view.vault.blocks`; die Items der item-fähigen Elemente werden über `GET …/elements/{elementId}/items` (oder `?items=true` am Content) nachgeladen.
 6. Die D1-Projektion speichert **keine** Template- oder Revisionsstruktur; Redaktion, Versionierung und Historie liegen laut Datenmodell in TCP.
 7. Der Label-Designer arbeitet mit `schemaVersion`/`kind`, statischem JSON-Import/-Export, Canvas-Vorschau und verlangt ausdrücklich, dass Vorschau und Export dieselbe Rendering-Logik verwenden.
 8. Die TAG-App rendert als **Flusslayout**: `main.tag-page` → `section.tag-context` → `nav.vault-tabs` → `article.vault-content` → Blöcke; `styles.css` kennt nur zwei Breakpoints (`42rem`, `28rem`). Es gibt weder Grid-Platzierung noch Zoom, Paging oder Lightbox-Logik.

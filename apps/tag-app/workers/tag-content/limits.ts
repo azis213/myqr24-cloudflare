@@ -10,7 +10,8 @@
 
 export const TEMPLATE_SCHEMA = "myqr24-tag-content-template-v1";
 export const CONTENT_SCHEMA = "myqr24-tag-content-v2";
-export const SCHEMA_VERSION = 3;
+/** 4: Jedes Element deklariert seine Item-Fähigkeit (`items.mode`). */
+export const SCHEMA_VERSION = 4;
 
 export const MAX_TEMPLATE_BYTES = 128 * 1024;
 export const MAX_REQUEST_BYTES = 132 * 1024;
@@ -94,8 +95,61 @@ export const ELEMENT_TYPE_TAG_TYPES: Record<ElementType, readonly TagType[]> = {
 /** Elemente, die nie als eigener Block/Elementzeile erscheinen. */
 export const HIDDEN_ELEMENT_TYPES: readonly ElementType[] = ["theme-assets"];
 
+export const ITEM_MODES = ["none", "dynamic"] as const;
+export type ItemMode = (typeof ITEM_MODES)[number];
+
+export interface ElementItems {
+  mode: ItemMode;
+  /** Slots, die Items aufnehmen; leer zulässig für Subsystem-Items (Chat). */
+  slotIds?: string[];
+}
+
+/**
+ * Item-Fähigkeit je Elementtyp (Kopie des Designer-Katalogs). Nur `dynamic`
+ * erzeugt beim Publish eine Zeile in `tag_content_elements` und kann Items
+ * aufnehmen. Einzelbild und Einzel-Dokument sind ebenfalls `dynamic`: Sie halten
+ * mehrere Kandidaten, angezeigt wird genau eines.
+ */
+export const ELEMENT_ITEMS: Record<ElementType, ElementItems> = {
+  text: { mode: "none" },
+  image: { mode: "dynamic", slotIds: ["image"] },
+  document: { mode: "dynamic", slotIds: ["document"] },
+  gallery: { mode: "dynamic", slotIds: ["images"] },
+  documents: { mode: "dynamic", slotIds: ["documents"] },
+  hero: { mode: "none" },
+  callout: { mode: "none" },
+  "external-link": { mode: "none" },
+  divider: { mode: "none" },
+  "finder-notice": { mode: "none" },
+  "finder-form": { mode: "dynamic", slotIds: ["photos"] },
+  "contact-channel": { mode: "none" },
+  "maintenance-history": { mode: "dynamic", slotIds: ["entries"] },
+  "theme-assets": { mode: "none" },
+};
+
+/** Anzeigeform: `single` zeigt genau ein Item (das neueste sichtbare). */
+export const ELEMENT_DISPLAY_MODE: Record<ElementType, "single" | "all"> = {
+  text: "all",
+  image: "single",
+  document: "single",
+  gallery: "all",
+  documents: "all",
+  hero: "all",
+  callout: "all",
+  "external-link": "all",
+  divider: "all",
+  "finder-notice": "all",
+  "finder-form": "all",
+  "contact-channel": "all",
+  "maintenance-history": "all",
+  "theme-assets": "all",
+};
+
+/** Sichtprinzipale; `viewAs` darf nur verengen, nie erweitern. */
 export const SLOT_ACCEPTS = ["image", "document", "audio"] as const;
 export const PRINCIPALS = ["scanner", "guest", "owner"] as const;
+/** Sichtprinzipale; `viewAs` darf nur verengen, nie erweitern. */
+export type Principal = (typeof PRINCIPALS)[number];
 export const MARK_NAMES = ["bold", "italic", "underline"] as const;
 export const TEXT_ALIGNS = ["start", "center", "end"] as const;
 export const FONT_FAMILIES = ["sans", "serif", "mono"] as const;

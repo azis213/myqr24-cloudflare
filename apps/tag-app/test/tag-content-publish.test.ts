@@ -20,7 +20,7 @@ const HEX_COLORS = {
 function template(): Record<string, unknown> {
   return {
     schema: "myqr24-tag-content-template-v1",
-    schemaVersion: 3,
+    schemaVersion: 4,
     template: {
       templateId: "tct_test_vault",
       templateVersion: 1,
@@ -51,6 +51,7 @@ function template(): Record<string, unknown> {
         displayOrder: 0,
         visibility: "public",
         hidden: true,
+        items: { mode: "none" },
         payload: { role: "background" },
         slots: [{ slotId: "tag-background", accepts: ["image"], min: 0, max: 1, required: false }],
       },
@@ -59,6 +60,7 @@ function template(): Record<string, unknown> {
         elementType: "hero",
         displayOrder: 10,
         visibility: "public",
+        items: { mode: "none" },
         payload: { variant: "cover" },
         bindings: { title: { from: "tag.displayName" } },
         content: { paragraphs: [{ runs: [{ text: "Willkommen" }] }] },
@@ -69,6 +71,7 @@ function template(): Record<string, unknown> {
         elementType: "text",
         displayOrder: 20,
         visibility: "public",
+        items: { mode: "none" },
         payload: {},
         content: {
           paragraphs: [
@@ -82,6 +85,7 @@ function template(): Record<string, unknown> {
         elementType: "gallery",
         displayOrder: 30,
         visibility: "public",
+        items: { mode: "dynamic", slotIds: ["images"] },
         payload: { name: "Galerie" },
         slots: [{ slotId: "images", accepts: ["image"], min: 0, max: 48, required: false }],
         actions: { upload: { enabled: true, principals: ["guest", "owner"], afterUpload: "quarantine" } },
@@ -91,6 +95,7 @@ function template(): Record<string, unknown> {
         elementType: "documents",
         displayOrder: 40,
         visibility: "shared",
+        items: { mode: "dynamic", slotIds: ["documents"] },
         payload: { view: "list" },
         slots: [{ slotId: "documents", accepts: ["document"], min: 0, max: 32, required: false }],
       },
@@ -192,7 +197,9 @@ function env(current: State): PublishEnv {
         success: true,
         meta: {
           changes: statements[index].sql.startsWith("DELETE FROM tag_content_elements")
-            ? current.deleteChanges
+            ? current.deleteChanges === 0
+              ? 0
+              : Math.max(1, statements[index].values.length - 1)
             : index === 0
               ? current.batchChanges
               : 1,
@@ -266,11 +273,12 @@ describe("PUT /api/v1/tags/{tagId}/content", () => {
     expect(statements.some((sql) => sql.startsWith("UPDATE tag_routing "))).toBe(true);
 
     const elementInserts = current.batch.filter((entry) => entry.sql.startsWith("INSERT INTO tag_content_elements "));
-    expect(elementInserts.map((entry) => entry.values[1])).toEqual(["cel_hero", "cel_text", "cel_gallery", "cel_docs"]);
+    expect(elementInserts.map((entry) => entry.values[1])).toEqual(["cel_gallery", "cel_docs"]);
     expect(elementInserts.map((entry) => entry.values[1])).not.toContain("cel_theme");
+    expect(elementInserts.map((entry) => entry.values[1])).not.toContain("cel_text");
     expect(elementInserts.every((entry) => entry.values.length === 5)).toBe(true);
     expect(elementInserts.every((entry) => !/content_(?:file|sha256|bytes|type)/.test(entry.sql))).toBe(true);
-    expect(new Set(elementInserts.map((entry) => entry.values[6])).size).toBe(1);
+    expect(json.itemElementIds).toEqual(["cel_gallery", "cel_docs"]);
   });
 
   it("erhöht die Revision bei inhaltlichen Änderungen", async () => {
@@ -418,8 +426,6 @@ describe("PUT /api/v1/tags/{tagId}/content", () => {
         visibility: entry.values[4],
       }));
     expect(rows).toEqual([
-      { id: "cel_hero", type: "hero", order: 10, visibility: "public" },
-      { id: "cel_text", type: "text", order: 20, visibility: "public" },
       { id: "cel_gallery", type: "gallery", order: 30, visibility: "public" },
       { id: "cel_docs", type: "documents", order: 40, visibility: "shared" },
     ]);
@@ -440,6 +446,11 @@ describe("PUT /api/v1/tags/{tagId}/content", () => {
       "documents",
     ]);
     expect(document.view.vault.blocks[2].images).toEqual([]);
+    expect(document.view.vault.blocks[2]).toMatchObject({
+      elementId: "cel_gallery",
+      visibility: "public",
+      items: { mode: "dynamic" },
+    });
     expect(document.view.vault.blocks[3].documents).toEqual([]);
     expect(document.elements.map((element: { elementId: string }) => element.elementId)).toEqual([
       "cel_hero",
@@ -448,6 +459,8 @@ describe("PUT /api/v1/tags/{tagId}/content", () => {
       "cel_docs",
     ]);
     expect(document.elements[2].payload.slots[0].max).toBe(48);
+    expect(document.elements[2].payload.items).toEqual({ mode: "dynamic", slotIds: ["images"] });
+    expect(document.elements[0].payload.items).toEqual({ mode: "none" });
     expect(raw).not.toContain("objectKey");
     expect(raw).not.toContain("content/v1/");
   });
@@ -463,7 +476,7 @@ describe("PUT /api/v1/tags/{tagId}/content", () => {
 
   it("löscht beim Re-Publish nur entfallene Elemente ohne Inhalte", async () => {
     const current = state({
-      elementIds: ["cel_hero", "cel_text", "cel_gallery", "cel_docs"],
+      elementIds: ["cel_gallery", "cel_docs"],
       itemCounts: { cel_gallery: 3 },
     });
     await call(current, body());
@@ -506,7 +519,7 @@ describe("PUT /api/v1/tags/{tagId}/content", () => {
   });
 
   it("überschreibt ein Element bei geändertem Anzeigenamen ohne Löschen", async () => {
-    const current = state({ elementIds: ["cel_hero", "cel_text", "cel_gallery", "cel_docs"] });
+    const current = state({ elementIds: ["cel_gallery", "cel_docs"] });
     await call(current, body());
     current.batch = [];
 
@@ -517,21 +530,23 @@ describe("PUT /api/v1/tags/{tagId}/content", () => {
 
     expect(response.status).toBe(200);
     expect(current.batch.some((entry) => entry.sql.startsWith("DELETE FROM tag_content_elements"))).toBe(false);
-    expect(current.batch.filter((entry) => entry.sql.startsWith("INSERT INTO tag_content_elements"))).toHaveLength(4);
+    expect(current.batch.filter((entry) => entry.sql.startsWith("INSERT INTO tag_content_elements"))).toHaveLength(2);
   });
 
   it("fügt neue Elemente hinzu", async () => {
-    const current = state({ elementIds: ["cel_hero", "cel_text", "cel_gallery", "cel_docs"] });
+    const current = state({ elementIds: ["cel_gallery", "cel_docs"] });
     await call(current, body());
     current.batch = [];
 
     const extended = template();
     (extended.elements as Array<Record<string, unknown>>).push({
       elementId: "cel_extra",
-      elementType: "divider",
+      elementType: "image",
       displayOrder: 50,
       visibility: "public",
-      payload: { style: "line" },
+      items: { mode: "dynamic", slotIds: ["image"] },
+      payload: {},
+      slots: [{ slotId: "image", accepts: ["image"], min: 0, max: 12, required: false }],
     });
     const { response } = await call(current, body({ template: extended }));
 
@@ -539,6 +554,19 @@ describe("PUT /api/v1/tags/{tagId}/content", () => {
     const upserts = current.batch.filter((entry) => entry.sql.startsWith("INSERT INTO tag_content_elements"));
     expect(upserts.map((entry) => entry.values[1])).toContain("cel_extra");
     expect(current.batch.some((entry) => entry.sql.startsWith("DELETE FROM tag_content_elements"))).toBe(false);
+  });
+
+  it("legt für statische Elemente keine Zeile an und räumt Altzeilen auf", async () => {
+    const current = state({ elementIds: ["cel_hero", "cel_text", "cel_gallery", "cel_docs"] });
+    await call(current, body());
+    current.batch = [];
+    await call(current, body({ tagName: "Neuer Name" }));
+
+    const inserts = current.batch.filter((entry) => entry.sql.startsWith("INSERT INTO tag_content_elements"));
+    expect(inserts.map((entry) => entry.values[1])).toEqual(["cel_gallery", "cel_docs"]);
+
+    const deletion = current.batch.find((entry) => entry.sql.startsWith("DELETE FROM tag_content_elements"));
+    expect(deletion?.values).toEqual([623187229, "cel_hero", "cel_text"]);
   });
 
   it("erkennt einen Löschkonflikt durch zwischenzeitliche Inhalte", async () => {

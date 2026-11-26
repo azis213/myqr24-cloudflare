@@ -1,6 +1,6 @@
 {
   "schema": "myqr24-tag-content-template-v1",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "template": {
     "templateId": "tct_example_maintenance_heat_pump",
     "templateVersion": 1,
@@ -52,6 +52,7 @@
     {
       "elementId": "cel_theme",
       "elementType": "theme-assets",
+      "items": { "mode": "none" },
       "displayOrder": 0,
       "visibility": "public",
       "hidden": true,
@@ -63,6 +64,7 @@
     {
       "elementId": "cel_history",
       "elementType": "maintenance-history",
+      "items": { "mode": "dynamic", "slotIds": ["entries"] },
       "displayOrder": 10,
       "visibility": "public",
       "placement": {
@@ -90,6 +92,7 @@
     {
       "elementId": "cel_plate",
       "elementType": "image",
+      "items": { "mode": "dynamic", "slotIds": ["image"] },
       "displayOrder": 20,
       "visibility": "public",
       "placement": {
@@ -99,12 +102,13 @@
       "payload": { "fit": "contain", "zoom": "tap", "maxHeight": "auto" },
       "content": { "paragraphs": [{ "heading": 4, "runs": [{ "text": "Typenschild" }] }] },
       "slots": [
-        { "slotId": "image", "accepts": ["image"], "min": 0, "max": 1, "required": false, "presentation": { "fit": "contain", "caption": "optional" } }
+        { "slotId": "image", "accepts": ["image"], "min": 0, "max": 12, "required": false, "presentation": { "fit": "contain", "caption": "optional" } }
       ]
     },
     {
       "elementId": "cel_log",
       "elementType": "text",
+      "items": { "mode": "none" },
       "displayOrder": 30,
       "visibility": "public",
       "placement": {
@@ -170,6 +174,7 @@
     {
       "elementId": "cel_safety",
       "elementType": "callout",
+      "items": { "mode": "none" },
       "displayOrder": 40,
       "visibility": "public",
       "placement": {
@@ -187,6 +192,7 @@
     {
       "elementId": "cel_docs",
       "elementType": "documents",
+      "items": { "mode": "dynamic", "slotIds": ["documents"] },
       "displayOrder": 50,
       "visibility": "shared",
       "placement": {
@@ -206,6 +212,7 @@
     {
       "elementId": "cel_divider",
       "elementType": "divider",
+      "items": { "mode": "none" },
       "displayOrder": 60,
       "visibility": "public",
       "placement": {

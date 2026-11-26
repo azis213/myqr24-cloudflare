@@ -1,5 +1,5 @@
 $kind: http-request
-url: "{{hostname-tag-app}}/api/v1/tags/{{tag-id}}/content"
+url: "{{hostname-tag-app}}/api/v1/tags/{{tag-id}}/content?items=true"
 method: GET
 headers:
   Cookie: "{{tag-session-cookie}}"

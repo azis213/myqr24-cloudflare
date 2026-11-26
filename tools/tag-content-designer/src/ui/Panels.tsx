@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
-import { allowedTypesFor, ELEMENT_CATALOG } from "../domain/catalog";
+import { allowedTypesFor, ELEMENT_CATALOG, displayModeFor } from "../domain/catalog";
 import type { ValidationIssue } from "../domain/errors";
 import { canonicalize, sha256Hex } from "../domain/serialize";
-import type { ElementType, TagContentDocument } from "../domain/types";
+import type { ElementType, TagContentDocument, TemplateElement } from "../domain/types";
+
+/** Kurzlabel für die Elementliste: statisch, Einzelanzeige oder Liste. */
+function itemsBadge(element: TemplateElement): string {
+  if (element.items?.mode !== "dynamic") return "statisch";
+  return displayModeFor(element.elementType) === "single" ? "Einzel" : "Liste";
+}
 
 export function Outline({
   doc,
@@ -40,7 +46,9 @@ export function Outline({
                 {ELEMENT_CATALOG[element.elementType]?.label ?? element.elementType}
                 {element.hidden ? " (ausgeblendet)" : ""}
               </span>
-              <span className="outline-vis">{element.visibility}</span>
+              <span className="outline-vis">
+                {element.visibility} · {itemsBadge(element)}
+              </span>
             </button>
             <span className="outline-tools">
               <button type="button" className="mini" onClick={() => onMove(element.elementId, -1)} title="nach oben">

@@ -131,9 +131,18 @@ describe("Beispiel-Templates", () => {
 
   it.each(CASES)("$name bleibt innerhalb der Grenzen", ({ doc }) => {
     expect(doc.schema).toBe("myqr24-tag-content-template-v1");
-    expect(doc.schemaVersion).toBe(3);
+    expect(doc.schemaVersion).toBe(4);
     expect(doc.elements.length).toBeLessThanOrEqual(MAX_ELEMENTS);
     expect(canonicalByteLength(doc)).toBeLessThanOrEqual(MAX_DOCUMENT_BYTES);
+  });
+
+  it.each(CASES)("$name deklariert die Item-Fähigkeit je Element", ({ doc }) => {
+    for (const element of doc.elements) {
+      expect(element.items?.mode).toBeDefined();
+      if (element.elementType === "gallery") expect(element.items).toMatchObject({ mode: "dynamic" });
+      if (element.elementType === "image") expect(element.items).toMatchObject({ mode: "dynamic" });
+      if (element.elementType === "text") expect(element.items).toMatchObject({ mode: "none" });
+    }
   });
 
   it.each(CASES)("$name hat eindeutige Element-IDs und gültige Spans", ({ doc }) => {

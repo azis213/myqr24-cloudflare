@@ -35,6 +35,9 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
   const uploadedFilenames = new Map<number, string>();
   const uploadedVariants: Array<{ content_id: number; variant: string }> = [];
   let failNextBatch = false;
+  let elementType = "gallery";
+  let elementItemCount = 0;
+  const batchStatements: Array<{ sql: string; values: unknown[] }> = [];
   const pinHashPromise = argon2id({ password: "123456", secret: pepper, salt: "local-test-salt", iterations: 1, parallelism: 1, memorySize: 8192, hashLength: 32, outputType: "encoded" });
   const tagDocument = {
     schema: "myqr24-tag-content-v2",
@@ -42,7 +45,15 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
     tagId: "ab12cd",
     revision: 8,
     view: { tag: { id: "ab12cd", displayName: "Test", presentation: "standard" }, vault: { blocks: [] }, enabledFeatures: ["vault"] },
-    elements: [{ elementId: "cel_gallery", elementType: "gallery", payload: { title: "Testgalerie" } }],
+    elements: [{
+      elementId: "cel_gallery",
+      elementType: "gallery",
+      payload: {
+        title: "Testgalerie",
+        items: { mode: "dynamic", slotIds: ["images"] },
+        slots: [{ slotId: "images", accepts: ["image"], min: 0, max: 48, required: false }],
+      },
+    }],
   };
   const env = {
     APP_BOOTSTRAP_SECRET_S01: secret,
@@ -85,14 +96,14 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
               async first() {
                 if (sql.includes("FROM tag_routing")) return { ...routing, protection_mode: protectionMode, access_version: accessVersion };
                 if (sql.includes("FROM tag_content AS tc") && sql.includes("JOIN tag_routing")) return { tag_numeric_id: 623187229, status: "active", target_type: "internal" };
-                if (sql.includes("FROM tag_content_elements AS element") && sql.includes("MAX(assignment.display_order)")) return { content_element_type: "gallery", visibility: "public", max_display_order: -1 };
+                if (sql.includes("FROM tag_content_elements AS element") && sql.includes("MAX(assignment.display_order)")) return { content_element_type: elementType, visibility: "public", max_display_order: -1, item_count: elementItemCount };
                 if (sql.includes("FROM tag_content_elements WHERE")) return { visibility: "public" };
                 if (sql.includes("FROM tag_routing WHERE tag_id")) return { status: "active", target_type: "internal" };
                 if (sql.includes("FROM tag_content WHERE tag_base36_id")) return { tag_numeric_id: 623187229, tag_base36_id: "ab12cd", content_revision: 8, content_file: "tag-rev8.json", content_sha256: "a".repeat(64), content_bytes: 1, content_type: "application/json" };
                 if (sql.includes("FROM tag_content AS tc") && sql.includes("JOIN tag_content_element_items") && sql.includes("assignment.content_id")) return { content_id: Number(values[1]), owner_tag_numeric_id: 623187229, content_item_type: "image", original_filename: "same.png", status: "ready", element_visibility: "public", assignment_visibility: "public", content_element_id: "cel_gallery", scope: "tag" };
                 if (sql.includes("FROM tag_content_items WHERE content_id")) return { content_id: Number(values[0]), owner_tag_numeric_id: 623187229, original_filename: uploadedFilenames.get(Number(values[0])) ?? "test.jpg", status: "ready" };
                 if (sql.includes("FROM tag_content AS tc") && sql.includes("assignment.content_id")) return { content_id: Number(values[1]), owner_tag_numeric_id: 623187229, content_item_type: "image", original_filename: "test.jpg", status: "ready", element_visibility: "public", assignment_visibility: "public", content_element_id: "cel_gallery", scope: "tag" };
-                if (sql.includes("FROM tag_content_elements AS element") && sql.includes("MAX(assignment.display_order)")) return { content_element_type: "gallery", visibility: "public", max_display_order: -1 };
+                if (sql.includes("FROM tag_content_elements AS element") && sql.includes("MAX(assignment.display_order)")) return { content_element_type: elementType, visibility: "public", max_display_order: -1, item_count: elementItemCount };
                 if (sql.includes("FROM tag_pin_credentials")) return { pin_hash: await pinHashPromise };
                 if (sql.includes("FROM tag_pin_throttles")) return throttles.get(`${values[0]}:${values[1]}`) ?? null;
                 if (sql.includes("FROM tag_access_sessions")) {
@@ -106,7 +117,7 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
                   return { results: uploadedVariants.filter((variant) => variant.content_id === Number(values[0])) };
                 }
                 if (sql.includes("FROM tag_content_element_items AS assignment")) {
-                  return { results: [{ content_element_id: "cel_gallery", content_id: 1850000000000000, content_item_type: "image", title: "Testbild", alt_text: "Testbeschreibung", original_filename: "Titelbild.jpg", display_order: 0, visibility: "public", scope: "tag" }] };
+                  return { results: [{ content_element_id: "cel_gallery", content_id: 1850000000000000, content_item_type: "image", title: "Testbild", alt_text: "Testbeschreibung", original_filename: "Titelbild.jpg", display_order: 0, visibility: "public", created_at: "2026-11-20T10:00:00.000Z" }] };
                 }
                 if (sql.includes("FROM tag_content_elements")) {
                   return { results: [{ content_element_id: "cel_gallery", content_element_type: "gallery", display_order: 0, visibility: "public" }] };
@@ -141,6 +152,7 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
       throw new Error("simulated D1 batch failure");
     }
     for (const statement of statements as Array<{ sql?: string; values?: unknown[] }>) {
+      if (statement.sql) batchStatements.push({ sql: statement.sql, values: statement.values ?? [] });
       if (statement.sql?.startsWith("INSERT INTO tag_content_media_variants")) {
         uploadedVariants.push({ content_id: Number(statement.values?.[0]), variant: String(statement.values?.[1]) });
       }
@@ -152,7 +164,30 @@ function fakeEnvironment(protectionMode: "public" | "pin_required" = "pin_requir
     }
     return [];
   };
-  return { env, sessions, throttles, r2Keys, r2Objects, deletedR2Keys, uploadedVariants, failBatch: () => { failNextBatch = true; }, signerBodies, setAccessVersion: (value: number) => { accessVersion = value; }, signerRequests: () => signerRequests };
+  return {
+    env,
+    sessions,
+    throttles,
+    r2Keys,
+    r2Objects,
+    deletedR2Keys,
+    uploadedVariants,
+    batchStatements,
+    failBatch: () => { failNextBatch = true; },
+    signerBodies,
+    setAccessVersion: (value: number) => { accessVersion = value; },
+    setElement: (type: string, itemCount: number) => {
+      elementType = type;
+      elementItemCount = itemCount;
+      const entry = tagDocument.elements[0] as { elementType: string; payload: Record<string, unknown> };
+      entry.elementType = type;
+      entry.payload.items = type === "image"
+        ? { mode: "dynamic", slotIds: ["image"] }
+        : { mode: "none" };
+      entry.payload.slots = [{ slotId: "image", accepts: ["image"], min: 0, max: 12, required: false }];
+    },
+    signerRequests: () => signerRequests,
+  };
 }
 
 describe("tag access API", () => {
@@ -228,20 +263,77 @@ describe("tag access API", () => {
     const cookie = authorized.headers.get("set-cookie");
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=Strict");
-    const content = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/content", { headers: { cookie: cookie ?? "" } }), state.env);
+    const content = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/content?elements=true&items=true", { headers: { cookie: cookie ?? "" } }), state.env);
     expect(content.status).toBe(200);
     const contentBody = await content.json<Record<string, unknown>>();
     expect(contentBody).toMatchObject({
       schema: "myqr24-tag-content-v2",
       tagId: "ab12cd",
       revision: 8,
-      elements: [{ id: "cel_gallery", type: "gallery", payload: { title: "Testgalerie" }, items: [{ contentId: "1850000000000000", type: "image", title: "Testbild", altText: "Testbeschreibung", filename: "Titelbild.jpg", scope: "tag" }] }],
+      elements: [{
+        id: "cel_gallery",
+        type: "gallery",
+        displayMode: "all",
+        payload: { title: "Testgalerie" },
+        items: [{
+          contentId: "1850000000000000",
+          type: "image",
+          title: "Testbild",
+          altText: "Testbeschreibung",
+          filename: "Titelbild.jpg",
+          displayOrder: 0,
+          visibility: "public",
+          mediaUrl: "/api/v1/tags/ab12cd/items/1850000000000000/media",
+        }],
+      }],
     });
     expect(JSON.stringify(contentBody)).not.toContain("object_key");
     expect(state.r2Keys).toEqual(["content/v1/tags/623187229/tag-rev8.json"]);
     state.setAccessVersion(4);
     const revoked = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/content", { headers: { cookie: cookie ?? "" } }), state.env);
     expect(revoked.status).toBe(404);
+  });
+
+  it("ersetzt das sichtbare Einzelbild und blendet ältere Kandidaten aus", async () => {
+    const state = fakeEnvironment();
+    state.setElement("image", 1);
+    const response = await handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/elements/cel_gallery/items", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer content-api-test-key",
+        "x-file-name": "neu.png",
+        "content-type": "image/png",
+      },
+      body: Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 1]),
+    }), state.env);
+
+    expect(response.status).toBe(201);
+    const body = await response.json<{ visibility: string }>();
+    expect(body.visibility).toBe("public");
+    const hidden = state.batchStatements.find((entry) =>
+      entry.sql.startsWith("UPDATE tag_content_element_items SET visibility = 'ownerOnly'"),
+    );
+    expect(hidden?.values.slice(0, 2)).toEqual([623187229, "cel_gallery"]);
+  });
+
+  it("weist Uploads an statische Elemente und volle Slots ab", async () => {
+    const upload = (state: ReturnType<typeof fakeEnvironment>) => handleAppApiRequest(new Request("https://app.test/api/v1/tags/ab12cd/elements/cel_gallery/items", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer content-api-test-key",
+        "x-file-name": "neu.png",
+        "content-type": "image/png",
+      },
+      body: Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 1]),
+    }), state.env);
+
+    const full = fakeEnvironment();
+    full.setElement("image", 12);
+    expect((await upload(full)).status).toBe(409);
+
+    const staticElement = fakeEnvironment();
+    staticElement.setElement("text", 0);
+    expect((await upload(staticElement)).status).toBe(404);
   });
 
   it("uploads same-name images as distinct items, streams originals only with a session, and deletes by contentId", async () => {
